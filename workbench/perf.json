@@ -1,0 +1,13 @@
+{
+  "grid": [
+    128,
+    128
+  ],
+  "population": 1909,
+  "lineages": 169,
+  "meanStepMs": 4.911616674999999,
+  "targetMs": 16.67,
+  "holds60fps": true,
+  "lastHash": "5786d8e7",
+  "tick": 48
+}

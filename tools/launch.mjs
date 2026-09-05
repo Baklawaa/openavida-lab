@@ -1,0 +1,161 @@
+import { chromium } from "playwright";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const root = resolve(__dir, "..");
+const scratch = process.env.OPENAVIDA_SCRATCH || resolve(root, "scratch");
+mkdirSync(scratch, { recursive: true });
+
+const url = process.argv[2] || "http://127.0.0.1:4174/";
+const shot1 = process.argv[3] || resolve(scratch, "lab-1.png");
+const shot2 = process.argv[4] || resolve(scratch, "lab-2.png");
+
+function log(...a) {
+  console.log(...a);
+}
+
+async function probe(page, label) {
+  const errors = [];
+  const ignore = (s) => /favicon|fonts\.google|Failed to load resource: .*favicon/i.test(s);
+  page.on("pageerror", (e) => {
+    const t = String(e);
+    if (!ignore(t)) errors.push(t);
+  });
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      const t = msg.text();
+      if (!ignore(t)) errors.push(t);
+    }
+  });
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForSelector("#gl", { timeout: 20000 });
+  await page.waitForFunction(() => window.__openavida && window.__openavida.population > 0, null, {
+    timeout: 20000,
+  });
+  await page.waitForTimeout(1400);
+  await page.locator("#btn-pause").click();
+  await page.waitForTimeout(200);
+
+  const before = await page.evaluate(() => {
+    const g = document.getElementById("inspect-genome")?.textContent ?? "";
+    const p = document.getElementById("inspect-phenotype")?.textContent ?? "";
+    return { g, p, probe: window.__openavida };
+  });
+
+  const pixel = await page.evaluate(() => {
+    const c = document.getElementById("gl");
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    if (!gl) return { error: "no webgl", filled: 0, bbox: 0 };
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let painted = 0;
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const r = buf[i], g = buf[i + 1], b = buf[i + 2];
+        if (r + g + b > 12) {
+          painted++;
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    const bbox = painted ? ((maxX - minX + 1) * (maxY - minY + 1)) / (w * h) : 0;
+    return {
+      w,
+      h,
+      canvasW: c.width,
+      canvasH: c.height,
+      painted,
+      frac: painted / (w * h),
+      bbox,
+      renderer: gl.getParameter(gl.RENDERER),
+    };
+  });
+
+  const org = await page.evaluate(() => {
+    const pick = window.__openavidaOrgPixel;
+    if (!pick) return null;
+    for (let i = 0; i < 80; i++) {
+      const p = pick(i);
+      if (p && p.y > 90 && p.x > 40) return p;
+    }
+    return pick(0);
+  });
+  if (org) {
+    await page.mouse.click(org.x, org.y);
+  } else {
+    const box = await page.locator("#gl").boundingBox();
+    if (box) await page.mouse.click(box.x + box.width * 0.45, box.y + box.height * 0.45);
+  }
+  await page.waitForFunction(
+    () => (document.getElementById("inspect-genome")?.textContent?.trim().length ?? 0) > 8,
+    null,
+    { timeout: 8000 },
+  );
+
+  const after = await page.evaluate(() => {
+    const g = document.getElementById("inspect-genome")?.textContent ?? "";
+    const p = document.getElementById("inspect-phenotype")?.textContent ?? "";
+    return { g, p, probe: window.__openavida };
+  });
+
+  return { label, errors, before, after, pixel, org };
+}
+
+const browser = await chromium.launch({
+  channel: "chrome",
+  headless: true,
+  args: ["--use-gl=angle", "--use-angle=metal"],
+});
+
+const results = [];
+try {
+  const page1 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const r1 = await probe(page1, "launch-1");
+  await page1.screenshot({ path: shot1, fullPage: true });
+  results.push(r1);
+  await page1.close();
+
+  const page2 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const r2 = await probe(page2, "launch-2");
+  await page2.screenshot({ path: shot2, fullPage: true });
+  results.push(r2);
+  await page2.close();
+} finally {
+  await browser.close();
+}
+
+const summary = {
+  url,
+  shot1,
+  shot2,
+  results: results.map((r) => ({
+    label: r.label,
+    errors: r.errors,
+    pixel: r.pixel,
+    inspectBefore: { genomeLen: r.before.g.length, phenoLen: r.before.p.length },
+    inspectAfter: { genomeLen: r.after.g.length, phenoLen: r.after.p.length, genome: r.after.g.slice(0, 80) },
+    probe: r.after.probe,
+  })),
+};
+writeFileSync(resolve(scratch, "launch.json"), JSON.stringify(summary, null, 2));
+console.log(JSON.stringify(summary, null, 2));
+
+const ok = results.every(
+  (r) =>
+    r.errors.length === 0 &&
+    r.pixel.frac > 0.5 &&
+    r.pixel.bbox > 0.8 &&
+    r.pixel.w === r.pixel.canvasW &&
+    r.after.g.length > 0 &&
+    r.after.p.length > 0,
+);
+process.exit(ok ? 0 : 2);

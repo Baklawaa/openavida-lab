@@ -1,0 +1,21 @@
+/// <reference types="vite/client" />
+
+interface OpenAvidaProbe {
+  tick: number;
+  population: number;
+  selectedGenome: string;
+  selectedPhenotype: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  drawingBufferWidth: number;
+  drawingBufferHeight: number;
+  lastStepMs: number;
+  seed: number;
+  world: "A" | "B";
+}
+
+interface Window {
+  __openavida?: OpenAvidaProbe;
+  __openavidaSelectAt?: (x: number, y: number) => boolean;
+  __openavidaOrgPixel?: (index?: number) => { x: number; y: number; id: number } | null;
+}

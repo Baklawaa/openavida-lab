@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenAvida Lab</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="file-warning" hidden>
+      <div>
+        <h1>OpenAvida Lab</h1>
+        <p>
+          This app uses ES modules and cannot run from a <code>file://</code> URL.
+          Serve it:
+        </p>
+        <pre>cd openavida-lab
+npm install
+npm run dev</pre>
+        <p>Then open <code>http://localhost:5174</code>. Production: <code>npm run build && npm run preview</code> (Vercel uses <code>dist/</code>).</p>
+      </div>
+    </div>
+    <div id="app"></div>
+    <script>
+      if (location.protocol === "file:") {
+        document.getElementById("file-warning").hidden = false;
+      }
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
