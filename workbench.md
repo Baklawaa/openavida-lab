@@ -47,6 +47,10 @@ Round 1 critic picked **bar**: overlapping `gl.POINTS` halos. Loop 2: opaque NEA
 
 **Biggest remaining scientific gap vs full Avida:** no Logic-9 NAND/EQU virtual CPU (out of scope). Mapping is scalar traits, not tasks.
 
+## Editor / apply path (verifier gap)
+
+rAF `refreshMetrics` used to call `selectOrganism` and reset `#genome-edit` every frame, so point/indel/duplication/apply and load-founder could not stick. `src/ui/editorSync.ts` is the shipped policy: only `"select"` and `"apply"` write the textarea. Launch probe: `wipedByRaf=false`, `pointStuck=true` on both loads (`{SCRATCH}/launch.log`).
+
 ## How to run
 
 ```bash

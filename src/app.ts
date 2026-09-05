@@ -31,6 +31,7 @@ import {
   type WorldSnapshot,
 } from "./sim/index";
 import { Rng } from "./sim/rng";
+import { syncGenomeEditor, type EditorSyncReason } from "./ui/editorSync";
 
 const BRUSHES: { id: BrushKind; label: string }[] = [
   { id: "nutrientBlob", label: "nutrient" },
@@ -240,7 +241,7 @@ export function mount(root: HTMLElement): void {
     (side.querySelector("#status-line") as HTMLElement).textContent = msg;
   }
 
-  function selectOrganism(world: World, id: number): void {
+  function selectOrganism(world: World, id: number, reason: EditorSyncReason = "select"): void {
     state.selectedId = id;
     renderer.selectedId = id;
     const org = world.organisms.find((o) => o.id === id) ?? null;
@@ -250,11 +251,13 @@ export function mount(root: HTMLElement): void {
     const genesEl = side.querySelector("#inspect-genes")!;
     const ta = side.querySelector("#genome-edit") as HTMLTextAreaElement;
     if (!org) {
-      meta.textContent = "Click an organism on the plate.";
-      gEl.textContent = "";
-      pEl.innerHTML = "";
-      genesEl.innerHTML = "";
-      browser.clear();
+      if (reason === "select") {
+        meta.textContent = "Click an organism on the plate.";
+        gEl.textContent = "";
+        pEl.innerHTML = "";
+        genesEl.innerHTML = "";
+        browser.clear();
+      }
       return;
     }
     const decoded = decodeGenome(org.genome);
@@ -263,8 +266,8 @@ export function mount(root: HTMLElement): void {
     gEl.textContent = org.genome;
     pEl.innerHTML = phenotypeTableHtml(org.ph);
     genesEl.innerHTML = genesHtml(track);
-    ta.value = org.genome;
-    browser.setSequence(org.genome);
+    syncGenomeEditor(ta, org.genome, reason);
+    if (reason !== "refresh") browser.setSequence(org.genome);
   }
 
   function layout(): void {
@@ -302,7 +305,7 @@ export function mount(root: HTMLElement): void {
     }
     if (state.selectedId >= 0) {
       const org = w.organisms.find((o) => o.id === state.selectedId);
-      if (org) selectOrganism(w, org.id);
+      if (org) selectOrganism(w, org.id, "refresh");
     }
     const now = performance.now();
     if (now - state.lastUi > 120) {
@@ -318,6 +321,7 @@ export function mount(root: HTMLElement): void {
       population: w.organisms.length,
       selectedGenome: (document.getElementById("inspect-genome") as HTMLElement).textContent ?? "",
       selectedPhenotype: (document.getElementById("inspect-phenotype") as HTMLElement).textContent ?? "",
+      editorValue: (document.getElementById("genome-edit") as HTMLTextAreaElement | null)?.value ?? "",
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
       drawingBufferWidth: gl.drawingBufferWidth,
@@ -506,7 +510,7 @@ export function mount(root: HTMLElement): void {
       return;
     }
     current().replaceGenome(state.selectedId, seq);
-    selectOrganism(current(), state.selectedId);
+    selectOrganism(current(), state.selectedId, "apply");
     status("genome applied (new lineage)");
   });
   side.querySelector("#btn-load-founder")!.addEventListener("click", () => {

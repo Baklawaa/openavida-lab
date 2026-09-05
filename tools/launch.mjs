@@ -113,13 +113,47 @@ async function probe(page, label) {
     { timeout: 8000 },
   );
 
+  const editor = await page.evaluate(async () => {
+    const ta = document.getElementById("genome-edit");
+    if (!(ta instanceof HTMLTextAreaElement)) return { ok: false, reason: "no textarea" };
+    const original = ta.value;
+    const marker = "ACGTACGT";
+    ta.value = original + marker;
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    const afterRaf = ta.value;
+    const point = document.getElementById("btn-point");
+    point?.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const afterPoint = ta.value;
+    const load = document.getElementById("btn-load-founder");
+    load?.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const afterFounder = ta.value;
+    const apply = document.getElementById("btn-apply");
+    apply?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const inspect = document.getElementById("inspect-genome")?.textContent ?? "";
+    return {
+      ok: true,
+      original,
+      afterRaf,
+      afterPoint,
+      afterFounder,
+      inspect,
+      wipedByRaf: afterRaf !== original + marker,
+      pointStuck: afterPoint !== original && afterPoint !== original + marker,
+      founderStuck: afterFounder.length > 8 && afterFounder !== original,
+    };
+  });
+
   const after = await page.evaluate(() => {
     const g = document.getElementById("inspect-genome")?.textContent ?? "";
     const p = document.getElementById("inspect-phenotype")?.textContent ?? "";
     return { g, p, probe: window.__openavida };
   });
 
-  return { label, errors, before, after, pixel, org };
+  return { label, errors, before, after, pixel, org, editor };
 }
 
 const browser = await chromium.launch({
@@ -155,6 +189,7 @@ const summary = {
     pixel: r.pixel,
     inspectBefore: { genomeLen: r.before.g.length, phenoLen: r.before.p.length },
     inspectAfter: { genomeLen: r.after.g.length, phenoLen: r.after.p.length, genome: r.after.g.slice(0, 80) },
+    editor: r.editor,
     probe: r.after.probe,
   })),
 };
@@ -168,6 +203,9 @@ const ok = results.every(
     r.pixel.bbox > 0.8 &&
     r.pixel.w === r.pixel.canvasW &&
     r.after.g.length > 0 &&
-    r.after.p.length > 0,
+    r.after.p.length > 0 &&
+    r.editor?.ok === true &&
+    r.editor.wipedByRaf === false &&
+    r.editor.pointStuck === true,
 );
 process.exit(ok ? 0 : 2);

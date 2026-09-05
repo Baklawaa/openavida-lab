@@ -5,6 +5,7 @@ interface OpenAvidaProbe {
   population: number;
   selectedGenome: string;
   selectedPhenotype: string;
+  editorValue: string;
   canvasWidth: number;
   canvasHeight: number;
   drawingBufferWidth: number;
