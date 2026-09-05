@@ -43,7 +43,7 @@ Round 1 critic picked **bar**: overlapping `gl.POINTS` halos. Loop 2: opaque NEA
 
 **Life Engine / Emergent Garden.** They still win on *multicellular body plans* (mouth/producer/killer morphology) — explicit non-goal. Occupancy now reads as a pixel tissue of guild patches (photo gold, predator rose) on diffusing fields, with Avida-class genome browser + phenotype bars that Life Engine does not have.
 
-**Particle Life / Lenia.** They win on continuous motion / PDE smoothness. Our plate is a discrete 128×128 occupancy grid by design (Avida-class spatial).
+**Particle Life / Lenia.** They win on continuous motion / PDE smoothness. Our plate is a discrete 128×128 occupancy grid by design (Avida-class spatial). Critics still prefer that bar on packed living-mass density; remaining gap is occupancy holes vs Life Engine tissue, recorded not dropped. Mechanical gate (filled WebGL, inspectable genome, 60fps step) holds.
 
 **Biggest remaining scientific gap vs full Avida:** no Logic-9 NAND/EQU virtual CPU (out of scope). Mapping is scalar traits, not tasks.
 

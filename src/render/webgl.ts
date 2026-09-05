@@ -377,7 +377,7 @@ function occupancyCrop(world: World): [number, number, number, number] {
   }
   const cx = ((bestI % bins) + 0.5) * (w / bins);
   const cy = (Math.floor(bestI / bins) + 0.5) * (h / bins);
-  const side = Math.max(48, Math.min(w, h, Math.floor(Math.max(w, h) * 0.58)));
+  const side = Math.max(40, Math.min(w, h, Math.floor(Math.max(w, h) * 0.42)));
   let x0 = Math.floor(cx - side / 2);
   let y0 = Math.floor(cy - side / 2);
   let x1 = x0 + side;
