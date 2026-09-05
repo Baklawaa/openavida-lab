@@ -1,4 +1,10 @@
-import { emptyNeighbor, interactNeighbors, metabolize, moveOrganisms } from "./ecology";
+import {
+  emptyNeighbor,
+  interactNeighbors,
+  metabolize,
+  moveOrganisms,
+  sampleNeighborEffects,
+} from "./ecology";
 import { Fields } from "./fields";
 import { fitness, reproduceThreshold } from "./fitness";
 import {
@@ -240,7 +246,15 @@ export class World {
 
   refreshFitness(org: Organism): void {
     const env = this.fields.sample(org.x, org.y);
-    org.fitness = fitness(org.ph, env, { predationGain: 0, mutualismGain: 0 });
+    const neighbors = sampleNeighborEffects(
+      org,
+      this.occupancy,
+      this.organisms,
+      this.w,
+      this.h,
+      this.params,
+    );
+    org.fitness = fitness(org.ph, env, neighbors);
   }
 
   rebuildOccupancy(): void {

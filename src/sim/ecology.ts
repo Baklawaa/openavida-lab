@@ -187,6 +187,34 @@ export function moveOrganisms(
   return { moved, displacements };
 }
 
+export function sampleNeighborEffects(
+  org: Organism,
+  occupancy: Int32Array,
+  organisms: Organism[],
+  w: number,
+  h: number,
+  params: SimParams,
+): { predationGain: number; mutualismGain: number } {
+  let predationGain = 0;
+  let mutualismGain = 0;
+  for (let d = 0; d < 8; d++) {
+    const ni = neighborIndex(org.x, org.y, d, w, h);
+    if (ni === null) continue;
+    const j = occupancy[ni]!;
+    if (j < 0) continue;
+    const other = organisms[j]!;
+    if (!other || other.energy <= 0) continue;
+    if (org.ph.signal >= 1 && org.ph.signal === other.ph.signal) {
+      mutualismGain += params.mutualismShare;
+    }
+    if (org.ph.aggression >= params.predationThreshold) {
+      const gap = org.ph.aggression - other.ph.aggression;
+      if (gap > 0.1) predationGain += gap * 0.35;
+    }
+  }
+  return { predationGain, mutualismGain };
+}
+
 export function emptyNeighbor(
   x: number,
   y: number,

@@ -1,5 +1,6 @@
 import type { World } from "../sim/world";
 import { TRAIT_COLOR } from "../sim/mapping";
+import { TERRAIN } from "../sim/types";
 
 const VS_FIELD = `#version 300 es
 precision highp float;
@@ -16,6 +17,8 @@ uniform float uTime;
 uniform int uMode;
 uniform int uSplit;
 uniform sampler2D uFieldsB;
+uniform sampler2D uPlate;
+uniform sampler2D uPlateB;
 out vec4 fragColor;
 
 vec3 fieldColor(vec4 f) {
@@ -37,73 +40,38 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 tuv;
   vec4 f;
+  vec4 plate;
   if (uSplit == 1) {
     if (uv.x < 0.5) {
       tuv = vec2(uv.x * 2.0, 1.0 - uv.y);
       f = texture(uFields, tuv);
+      plate = texture(uPlate, tuv);
     } else {
       tuv = vec2((uv.x - 0.5) * 2.0, 1.0 - uv.y);
       f = texture(uFieldsB, tuv);
+      plate = texture(uPlateB, tuv);
     }
   } else {
     tuv = vec2(uv.x, 1.0 - uv.y);
     f = texture(uFields, tuv);
+    plate = texture(uPlate, tuv);
   }
   vec3 col = fieldColor(f);
+  if (plate.a > 0.02) {
+    col = mix(col, plate.rgb, plate.a);
+    vec2 c = fract(tuv * uWorld);
+    float hair = (c.x < 0.07 || c.y < 0.07) ? 1.0 : 0.0;
+    col *= 1.0 - hair * 0.22 * plate.a;
+  }
   float vig = smoothstep(1.15, 0.22, length(uv - 0.5));
-  col *= 0.78 + 0.22 * vig;
+  col *= 0.82 + 0.18 * vig;
   float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-  col += (g - 0.5) * 0.018;
+  col += (g - 0.5) * 0.012;
   if (uSplit == 1) {
     float line = smoothstep(0.003, 0.0, abs(uv.x - 0.5));
     col = mix(col, vec3(0.25, 0.85, 0.75), line * 0.55);
   }
   fragColor = vec4(col, 1.0);
-}
-`;
-
-const VS_ORG = `#version 300 es
-precision highp float;
-layout(location=0) in vec2 aPos;
-layout(location=1) in vec3 aColor;
-layout(location=2) in float aSize;
-layout(location=3) in float aEnergy;
-uniform vec2 uRes;
-uniform vec2 uWorld;
-uniform int uSplit;
-uniform int uSide;
-out vec3 vColor;
-out float vEnergy;
-void main() {
-  vec2 grid = aPos;
-  vec2 uv = vec2(grid.x / uWorld.x, 1.0 - grid.y / uWorld.y);
-  vec2 clip = uv * 2.0 - 1.0;
-  if (uSplit == 1) {
-    if (uSide == 0) clip.x = clip.x * 0.5 - 0.5;
-    else clip.x = clip.x * 0.5 + 0.5;
-  }
-  gl_Position = vec4(clip, 0.0, 1.0);
-  float px = uRes.y / max(uWorld.y, 1.0);
-  gl_PointSize = max(2.4, aSize * px * 1.85);
-  vColor = aColor;
-  vEnergy = aEnergy;
-}
-`;
-
-const FS_ORG = `#version 300 es
-precision highp float;
-in vec3 vColor;
-in float vEnergy;
-out vec4 fragColor;
-void main() {
-  vec2 p = gl_PointCoord * 2.0 - 1.0;
-  float r = length(p);
-  if (r > 1.0) discard;
-  float core = smoothstep(1.0, 0.12, r);
-  float halo = exp(-r * 2.8);
-  vec3 col = vColor * (0.45 + 0.7 * clamp(vEnergy, 0.0, 1.5));
-  float a = core * 0.95 + halo * 0.45;
-  fragColor = vec4(col * a, a);
 }
 `;
 
@@ -163,7 +131,7 @@ export function organismRgb(ph: { uptake: number; photo: number; resist: number;
   for (const g of guilds) if (g[1] > best[1]) best = g;
   const [br, bg, bb] = hexRgb(TRAIT_COLOR[best[0]]);
   const [hr, hg, hb] = hsl(ph.hue, 0.62, 0.58);
-  return [br * 0.72 + hr * 0.28, bg * 0.72 + hg * 0.28, bb * 0.72 + hb * 0.28];
+  return [br * 0.9 + hr * 0.1, bg * 0.9 + hg * 0.1, bb * 0.9 + hb * 0.1];
 }
 
 export type FieldMode = 0 | 1 | 2 | 3 | 4;
@@ -173,13 +141,13 @@ export class LabRenderer {
   readonly canvas: HTMLCanvasElement;
   readonly gl: WebGL2RenderingContext;
   private fieldProg: WebGLProgram;
-  private orgProg: WebGLProgram;
   private texA: WebGLTexture;
   private texB: WebGLTexture;
+  private plateA: WebGLTexture;
+  private plateB: WebGLTexture;
   private rgba: Uint8Array;
-  private orgBuf: WebGLBuffer;
-  private orgData = new Float32Array(7 * 4096);
-  private vao: WebGLVertexArrayObject;
+  private plate: Uint8Array;
+
   fieldMode: FieldMode = 0;
   view: ViewMode = "A";
   selectedId = -1;
@@ -196,32 +164,21 @@ export class LabRenderer {
     if (!gl) throw new Error("WebGL2 required");
     this.gl = gl;
     this.fieldProg = program(gl, VS_FIELD, FS_FIELD);
-    this.orgProg = program(gl, VS_ORG, FS_ORG);
-    this.texA = this.makeTex();
-    this.texB = this.makeTex();
+    this.texA = this.makeTex(false);
+    this.texB = this.makeTex(false);
+    this.plateA = this.makeTex(true);
+    this.plateB = this.makeTex(true);
     this.rgba = new Uint8Array(128 * 128 * 4);
-    this.orgBuf = gl.createBuffer()!;
-    this.vao = gl.createVertexArray()!;
-    gl.bindVertexArray(this.vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.orgBuf);
-    const stride = 7 * 4;
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0);
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 8);
-    gl.enableVertexAttribArray(2);
-    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 20);
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 24);
-    gl.bindVertexArray(null);
+    this.plate = new Uint8Array(128 * 128 * 4);
   }
 
-  private makeTex(): WebGLTexture {
+  private makeTex(nearest: boolean): WebGLTexture {
     const gl = this.gl;
     const t = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const filt = nearest ? gl.NEAREST : gl.LINEAR;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return t;
@@ -260,34 +217,72 @@ export class LabRenderer {
     );
   }
 
-  private fillOrgs(world: World): number {
-    const orgs = world.organisms;
-    const need = orgs.length * 7;
-    if (this.orgData.length < need) this.orgData = new Float32Array(need + 256);
-    const d = this.orgData;
-    for (let i = 0; i < orgs.length; i++) {
-      const o = orgs[i]!;
-      const [r, g, b] = organismRgb(o.ph);
-      const o7 = i * 7;
-      d[o7] = o.x + 0.5;
-      d[o7 + 1] = o.y + 0.5;
-      const selected = o.id === this.selectedId;
-      d[o7 + 2] = selected ? 0.85 : r;
-      d[o7 + 3] = selected ? 1.0 : g;
-      d[o7 + 4] = selected ? 0.95 : b;
-      d[o7 + 5] = (selected ? 1.35 : 0.55) + o.ph.size * 0.7;
-      d[o7 + 6] = Math.min(1.6, o.energy);
+  private uploadPlate(tex: WebGLTexture, world: World): void {
+    const gl = this.gl;
+    const n = world.w * world.h;
+    if (this.plate.length !== n * 4) this.plate = new Uint8Array(n * 4);
+    const out = this.plate;
+    out.fill(0);
+    const terrain = world.terrain;
+    for (let i = 0; i < n; i++) {
+      const t = terrain[i]!;
+      const o = i * 4;
+      if (t === TERRAIN.barrier) {
+        out[o] = 10;
+        out[o + 1] = 12;
+        out[o + 2] = 16;
+        out[o + 3] = 255;
+      } else if (t === TERRAIN.nutrientVent) {
+        out[o] = 30;
+        out[o + 1] = 200;
+        out[o + 2] = 170;
+        out[o + 3] = 70;
+      } else if (t === TERRAIN.toxinVent) {
+        out[o] = 210;
+        out[o + 1] = 30;
+        out[o + 2] = 120;
+        out[o + 3] = 70;
+      } else if (t === TERRAIN.thermalVent) {
+        out[o] = 230;
+        out[o + 1] = 80;
+        out[o + 2] = 20;
+        out[o + 3] = 70;
+      } else if (t === TERRAIN.shade) {
+        out[o] = 8;
+        out[o + 1] = 10;
+        out[o + 2] = 18;
+        out[o + 3] = 110;
+      }
     }
-    return orgs.length;
+    for (const org of world.organisms) {
+      const i = (org.y * world.w + org.x) * 4;
+      const [r, g, b] = organismRgb(org.ph);
+      const sel = org.id === this.selectedId;
+      out[i] = sel ? 230 : Math.round(r * 255);
+      out[i + 1] = sel ? 255 : Math.round(g * 255);
+      out[i + 2] = sel ? 245 : Math.round(b * 255);
+      out[i + 3] = 255;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, world.w, world.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, out);
   }
 
   draw(worldA: World, worldB: World, timeSec: number): void {
     const gl = this.gl;
     const split = this.view === "split";
     const primary = this.view === "B" ? worldB : worldA;
-    this.uploadFields(this.texA, worldA);
-    if (split) this.uploadFields(this.texB, worldB);
-    else if (this.view === "B") this.uploadFields(this.texA, worldB);
+    if (this.view === "B" && !split) {
+      this.uploadFields(this.texA, worldB);
+      this.uploadPlate(this.plateA, worldB);
+    } else {
+      this.uploadFields(this.texA, worldA);
+      this.uploadPlate(this.plateA, worldA);
+    }
+    if (split) {
+      this.uploadFields(this.texB, worldB);
+      this.uploadPlate(this.plateB, worldB);
+    }
 
     gl.disable(gl.BLEND);
     gl.useProgram(this.fieldProg);
@@ -302,32 +297,13 @@ export class LabRenderer {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texB);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uFieldsB"), 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.plateA);
+    gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uPlate"), 2);
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, this.plateB);
+    gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uPlateB"), 3);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    gl.useProgram(this.orgProg);
-    gl.uniform2f(gl.getUniformLocation(this.orgProg, "uRes"), this.canvas.width, this.canvas.height);
-    gl.bindVertexArray(this.vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.orgBuf);
-
-    const drawSide = (world: World, side: number) => {
-      const n = this.fillOrgs(world);
-      if (n === 0) return;
-      gl.bufferData(gl.ARRAY_BUFFER, this.orgData.subarray(0, n * 7), gl.DYNAMIC_DRAW);
-      gl.uniform2f(gl.getUniformLocation(this.orgProg, "uWorld"), world.w, world.h);
-      gl.uniform1i(gl.getUniformLocation(this.orgProg, "uSplit"), split ? 1 : 0);
-      gl.uniform1i(gl.getUniformLocation(this.orgProg, "uSide"), side);
-      gl.drawArrays(gl.POINTS, 0, n);
-    };
-
-    if (split) {
-      drawSide(worldA, 0);
-      drawSide(worldB, 1);
-    } else {
-      drawSide(primary, 0);
-    }
-    gl.bindVertexArray(null);
   }
 
   canvasToGrid(clientX: number, clientY: number, world: World): { x: number; y: number } | null {

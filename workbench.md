@@ -39,13 +39,13 @@ Screenshots: `workbench/lab-1.png`, `workbench/lab-2.png` (also `{SCRATCH}/lab-1
 
 ## Blind A/B vs the bar (notes)
 
-**Life Engine / Emergent Garden.** They win on *multicellular body plans* (mouth/producer/killer cells as morphology). We are not cloning that ISA (non-goal). We win on Avida-class genome→phenotype (named genes, codon table, numeric fitness, phylogeny CSV) which Life Engine does not expose as a sequence.
+Round 1 critic picked **bar**: overlapping `gl.POINTS` halos, not readable occupancy. Loop: organisms are now opaque NEAREST grid cells with hairlines (tissue), walls/vents as plate glyphs, hard guild chroma. Fitness neighbor terms now enter the live score.
 
-**Particle Life / Lenia.** They win on continuous motion / PDE smoothness and trail persistence. Our plate is a discrete 128×128 occupancy grid. Fields are Lenia-adjacent (diffusing RGBA glow). Organisms are guild-colored points (photo gold, predator rose, uptake teal).
+**Life Engine / Emergent Garden.** They still win on *multicellular body plans* (mouth/producer/killer morphology) — explicit non-goal. Occupancy now reads as a pixel tissue of guild patches (photo gold, predator rose) on diffusing fields, with Avida-class genome browser + phenotype bars that Life Engine does not have.
 
-**Biggest remaining visual gap:** no motion trails / continuum body — discrete cells in a bloom look more like Life Engine than Particle Life. Closable later with a persistence FBO (not required to gate).
+**Particle Life / Lenia.** They win on continuous motion / PDE smoothness. Our plate is a discrete 128×128 occupancy grid by design (Avida-class spatial).
 
-**Biggest remaining scientific gap vs full Avida:** no Logic-9 NAND/EQU virtual CPU (explicitly out of scope). Mapping is scalar traits, not tasks.
+**Biggest remaining scientific gap vs full Avida:** no Logic-9 NAND/EQU virtual CPU (out of scope). Mapping is scalar traits, not tasks.
 
 ## How to run
 

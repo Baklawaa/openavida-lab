@@ -53,6 +53,23 @@ describe("ecology", () => {
     expect(w.organisms.find((o) => o.id === preyId)).toBeUndefined();
   });
 
+  it("matching mutualism raises the shipped fitness score via neighbor terms", () => {
+    const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 4 });
+    w.terrain.fill(TERRAIN.empty);
+    const a = w.birth(2, 2, founderPhototroph(), null, false, 1);
+    expect(a).toBeTruthy();
+    a!.ph.signal = 2;
+    a!.ph.aggression = 0;
+    w.refreshFitness(a!);
+    const solo = a!.fitness;
+    const b = w.birth(3, 2, founderPhototroph(), null, false, 1);
+    expect(b).toBeTruthy();
+    b!.ph.signal = 2;
+    b!.ph.aggression = 0;
+    w.refreshFitness(a!);
+    expect(a!.fitness).toBeGreaterThan(solo);
+  });
+
   it("matching mutualism signals register on adjacent organisms", () => {
     const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 4 });
     w.terrain.fill(TERRAIN.empty);
