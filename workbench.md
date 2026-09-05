@@ -17,6 +17,13 @@ Isolated Vite + TypeScript + Vitest app at `openavida-lab/`. Sim core (`src/sim/
 
 Phase 2 hooks (comments only): 3D continuum, biochemistry, multiplayer, LLM brains.
 
+## Round: less bloom, lasting dynamics, hover help (2026-09-06)
+
+- Hover catalog `src/ui/help.ts` (`CONTROL_HELP`) attached as `title` + visible `#hover-tip`. Launch: pause and inject titles match the catalog; tip visible.
+- Bloom: default `maxPopulation` 1800, crowding + scarcer photo, seasons, toxin pulses / drought / crashes after a delay. Dynamics test: 220 default `World.step`s stay **below cap**, Shannon **> 0.5** after tick 80, new lineage or extinction, late fitness not a constant.
+- Visuals: organisms draw at ~58% cover so nutrient/toxin/light stay readable; full-plate zoom default (no chase).
+- Step ~3.3 ms on 128×128 (`{SCRATCH}/perf.json`).
+
 ## Metrics (gating)
 
 | Check | Result |

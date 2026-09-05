@@ -24,6 +24,21 @@ export function neighborIndex(
  * Harvest / pay environment costs. Nutrient is consumed; light/temp/toxin
  * are sampled. Returns the metabolic delta applied to energy.
  */
+export function crowdingPenalty(
+  x: number,
+  y: number,
+  occupancy: Int32Array,
+  w: number,
+  h: number,
+): number {
+  let n = 0;
+  for (let d = 0; d < 8; d++) {
+    const ni = neighborIndex(x, y, d, w, h);
+    if (ni !== null && occupancy[ni]! >= 0) n++;
+  }
+  return 0.01 * n;
+}
+
 export function metabolize(org: Organism, fields: Fields, params: SimParams): number {
   void params;
   const env = fields.sample(org.x, org.y);

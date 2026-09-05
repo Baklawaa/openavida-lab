@@ -66,6 +66,23 @@ header.top {
 .stat.violet b { color: var(--violet); }
 .spacer { flex: 1; }
 .clock { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.speed-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  padding: 0 8px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+.speed-ctl input[type="range"] { width: 140px; accent-color: var(--teal); }
+.speed-ctl b {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--teal);
+  min-width: 48px;
+}
 
 .viz {
   grid-area: viz;
@@ -217,6 +234,20 @@ footer.charts canvas:last-child { border-right: none; }
 .mapping-legend div { break-inside: avoid; margin-bottom: 2px; }
 
 input[type="range"] { width: 100%; accent-color: var(--teal); }
+
+#hover-tip {
+  position: fixed;
+  z-index: 40;
+  max-width: 300px;
+  background: #0c1822;
+  border: 1px solid var(--teal);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
 
 #status-line {
   font-family: var(--mono);

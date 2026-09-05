@@ -38,6 +38,24 @@ async function probe(page, label) {
   await page.locator("#btn-pause").click();
   await page.waitForTimeout(200);
 
+  const hover = {};
+  for (const id of ["btn-pause", "btn-inject"]) {
+    await page.locator("#" + id).hover();
+    await page.waitForTimeout(80);
+    hover[id] = await page.evaluate((cid) => {
+      const el = document.getElementById(cid);
+      const tip = document.getElementById("hover-tip");
+      const catalog = window.__openavidaHelp?.[cid] ?? "";
+      return {
+        title: el?.getAttribute("title") ?? "",
+        tip: tip?.textContent ?? "",
+        tipVisible: tip ? !tip.hidden : false,
+        catalog,
+        titleMatches: (el?.getAttribute("title") ?? "") === catalog && catalog.length > 12,
+      };
+    }, id);
+  }
+
   const before = await page.evaluate(() => {
     const g = document.getElementById("inspect-genome")?.textContent ?? "";
     const p = document.getElementById("inspect-phenotype")?.textContent ?? "";
@@ -153,7 +171,7 @@ async function probe(page, label) {
     return { g, p, probe: window.__openavida };
   });
 
-  return { label, errors, before, after, pixel, org, editor };
+  return { label, errors, before, after, pixel, org, editor, hover };
 }
 
 const browser = await chromium.launch({
@@ -190,6 +208,7 @@ const summary = {
     inspectBefore: { genomeLen: r.before.g.length, phenoLen: r.before.p.length },
     inspectAfter: { genomeLen: r.after.g.length, phenoLen: r.after.p.length, genome: r.after.g.slice(0, 80) },
     editor: r.editor,
+    hover: r.hover,
     probe: r.after.probe,
   })),
 };
@@ -206,6 +225,8 @@ const ok = results.every(
     r.after.p.length > 0 &&
     r.editor?.ok === true &&
     r.editor.wipedByRaf === false &&
-    r.editor.pointStuck === true,
+    r.editor.pointStuck === true &&
+    r.hover?.["btn-pause"]?.titleMatches === true &&
+    r.hover?.["btn-inject"]?.titleMatches === true,
 );
 process.exit(ok ? 0 : 2);

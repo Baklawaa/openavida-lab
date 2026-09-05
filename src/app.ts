@@ -32,6 +32,8 @@ import {
 } from "./sim/index";
 import { Rng } from "./sim/rng";
 import { syncGenomeEditor, type EditorSyncReason } from "./ui/editorSync";
+import { formatSpeed, ticksDue } from "./ui/speed";
+import { CONTROL_HELP, attachControlHelp } from "./ui/help";
 
 const BRUSHES: { id: BrushKind; label: string }[] = [
   { id: "nutrientBlob", label: "nutrient" },
@@ -84,7 +86,7 @@ export function mount(root: HTMLElement): void {
   const state = {
     view: "A" as ViewMode,
     paused: false,
-    speed: 1,
+    speed: 2,
     brush: "nutrientBlob" as BrushKind,
     radius: 3,
     painting: false,
@@ -106,6 +108,16 @@ export function mount(root: HTMLElement): void {
     <div class="stat"><i>fixed</i><b id="m-fix">—</b></div>
     <div class="stat"><i>extinct</i><b id="m-ex">0</b></div>
     <div class="stat"><i>step</i><b id="m-ms">—</b></div>
+    <div class="speed-ctl">
+      <label class="tiny" for="speed-top">speed</label>
+      <input id="speed-top" type="range" min="0" max="60" step="1" value="2" />
+      <b id="spd-lab-top">2 /s</b>
+    </div>
+    <div class="speed-ctl">
+      <label class="tiny" for="zoom-top">zoom</label>
+      <input id="zoom-top" type="range" min="30" max="100" step="1" value="100" />
+      <b id="zoom-lab-top">100%</b>
+    </div>
     <div class="spacer"></div>
     <div class="clock" id="m-seed"></div>
   `;
@@ -162,17 +174,17 @@ export function mount(root: HTMLElement): void {
       <div class="row" id="brushes"></div>
       <label class="tiny">brush radius <span id="rad-lab">3</span></label>
       <input id="radius" type="range" min="0" max="12" value="3" />
+      <label class="tiny">speed <span id="spd-lab">2 /s</span></label>
+      <input id="speed" type="range" min="0" max="60" step="1" value="2" />
       <div class="row" style="margin-top:8px">
         <button type="button" id="btn-pause">pause</button>
-        <button type="button" data-spd="1" class="spd active">1×</button>
-        <button type="button" data-spd="2" class="spd">2×</button>
-        <button type="button" data-spd="4" class="spd">4×</button>
-        <button type="button" data-spd="8" class="spd">8×</button>
+        <button type="button" id="btn-slow">slow</button>
+        <button type="button" id="btn-step-once">1 tick</button>
       </div>
       <div class="row">
-        <button type="button" data-view="A" class="view active">world A</button>
-        <button type="button" data-view="B" class="view">world B</button>
-        <button type="button" data-view="split" class="view">A | B</button>
+        <button type="button" id="view-A" data-view="A" class="view active">world A</button>
+        <button type="button" id="view-B" data-view="B" class="view">world B</button>
+        <button type="button" id="view-split" data-view="split" class="view">A | B</button>
       </div>
       <div class="row">
         <button type="button" id="btn-step-a">step A</button>
@@ -202,11 +214,11 @@ export function mount(root: HTMLElement): void {
     <section class="block">
       <h2>Field overlay</h2>
       <div class="row">
-        <button type="button" data-fm="0" class="fm active">composite</button>
-        <button type="button" data-fm="1" class="fm">nutrient</button>
-        <button type="button" data-fm="2" class="fm">toxin</button>
-        <button type="button" data-fm="3" class="fm">temp</button>
-        <button type="button" data-fm="4" class="fm">light</button>
+        <button type="button" id="fm-0" data-fm="0" class="fm active">composite</button>
+        <button type="button" id="fm-1" data-fm="1" class="fm">nutrient</button>
+        <button type="button" id="fm-2" data-fm="2" class="fm">toxin</button>
+        <button type="button" id="fm-3" data-fm="3" class="fm">temp</button>
+        <button type="button" id="fm-4" data-fm="4" class="fm">light</button>
       </div>
     </section>
     <section class="block">
@@ -221,7 +233,7 @@ export function mount(root: HTMLElement): void {
 
   const brushRow = side.querySelector("#brushes")!;
   for (const b of BRUSHES) {
-    const btn = el("button", { type: "button", "data-brush": b.id }, b.label);
+    const btn = el("button", { type: "button", id: "brush-" + b.id, "data-brush": b.id }, b.label);
     if (b.id === state.brush) btn.classList.add("active");
     brushRow.append(btn);
   }
@@ -397,15 +409,48 @@ export function mount(root: HTMLElement): void {
     state.radius = Number((ev.target as HTMLInputElement).value);
     (side.querySelector("#rad-lab") as HTMLElement).textContent = String(state.radius);
   });
-  side.querySelector("#btn-pause")!.addEventListener("click", () => {
-    state.paused = !state.paused;
+  const speedTop = header.querySelector("#speed-top") as HTMLInputElement;
+  const speedSide = side.querySelector("#speed") as HTMLInputElement;
+  const setSpeed = (n: number, from?: "top" | "side") => {
+    const v = Math.max(0, Math.min(60, n));
+    state.speed = v;
+    if (v > 0) state.paused = false;
+    else state.paused = true;
+    const label = formatSpeed(v);
+    (header.querySelector("#spd-lab-top") as HTMLElement).textContent = label;
+    (side.querySelector("#spd-lab") as HTMLElement).textContent = label;
+    if (from !== "top") speedTop.value = String(v);
+    if (from !== "side") speedSide.value = String(v);
     (side.querySelector("#btn-pause") as HTMLElement).textContent = state.paused ? "run" : "pause";
+  };
+  speedTop.addEventListener("input", () => setSpeed(Number(speedTop.value), "top"));
+  speedSide.addEventListener("input", () => setSpeed(Number(speedSide.value), "side"));
+  const zoomTop = header.querySelector("#zoom-top") as HTMLInputElement;
+  zoomTop.addEventListener("input", () => {
+    const pct = Math.max(30, Math.min(100, Number(zoomTop.value)));
+    renderer.zoom = pct / 100;
+    (header.querySelector("#zoom-lab-top") as HTMLElement).textContent = `${pct}%`;
   });
-  side.querySelectorAll(".spd").forEach((b) => {
-    b.addEventListener("click", () => {
-      state.speed = Number((b as HTMLElement).dataset.spd);
-      side.querySelectorAll(".spd").forEach((x) => x.classList.toggle("active", x === b));
-    });
+  side.querySelector("#btn-pause")!.addEventListener("click", () => {
+    if (state.paused || state.speed <= 0) {
+      if (state.speed <= 0) setSpeed(2, "top");
+      else {
+        state.paused = false;
+        (side.querySelector("#btn-pause") as HTMLElement).textContent = "pause";
+      }
+    } else {
+      state.paused = true;
+      (side.querySelector("#btn-pause") as HTMLElement).textContent = "run";
+    }
+  });
+  side.querySelector("#btn-slow")!.addEventListener("click", () => setSpeed(2));
+  side.querySelector("#btn-step-once")!.addEventListener("click", () => {
+    state.paused = true;
+    (side.querySelector("#btn-pause") as HTMLElement).textContent = "run";
+    if (state.view === "split") dual.step("both");
+    else if (state.view === "B") dual.b.step();
+    else dual.a.step();
+    refreshMetrics();
   });
   side.querySelectorAll(".view").forEach((b) => {
     b.addEventListener("click", () => {
@@ -528,9 +573,10 @@ export function mount(root: HTMLElement): void {
     if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement) return;
     if (ev.code === "Space") {
       ev.preventDefault();
-      state.paused = !state.paused;
-      (side.querySelector("#btn-pause") as HTMLElement).textContent = state.paused ? "run" : "pause";
+      (side.querySelector("#btn-pause") as HTMLElement).click();
     }
+    if (ev.key === "[") setSpeed(Math.max(0, state.speed - 1));
+    if (ev.key === "]") setSpeed(Math.min(60, state.speed + 1));
     if (ev.key === "s") {
       state.snapshot = takeSnapshot(current());
       status("snapshot");
@@ -562,23 +608,32 @@ export function mount(root: HTMLElement): void {
     return { x: p.x, y: p.y, id: o.id };
   };
 
+  let lastFrame = performance.now();
+  let tickAccum = 0;
   const loop = (now: number) => {
-    if (!state.paused) {
-      const budget = 14;
-      let used = 0;
-      const n = state.speed;
-      for (let i = 0; i < n && used < budget; i++) {
-        const t0 = performance.now();
+    const dt = Math.min(100, now - lastFrame);
+    lastFrame = now;
+    if (!state.paused && state.speed > 0) {
+      const due = ticksDue(tickAccum, dt, state.speed, 24);
+      tickAccum = due.accumMs;
+      for (let i = 0; i < due.ticks; i++) {
         if (state.view === "split") dual.step("both");
         else if (state.view === "B") dual.b.step();
         else dual.a.step();
-        used += performance.now() - t0;
       }
+    } else {
+      tickAccum = 0;
     }
     renderer.draw(dual.a, dual.b, now / 1000);
     refreshMetrics();
     requestAnimationFrame(loop);
   };
+
+  const tip = el("div", { id: "hover-tip" });
+  tip.hidden = true;
+  document.body.append(tip);
+  attachControlHelp(root, tip);
+  window.__openavidaHelp = CONTROL_HELP;
 
   layout();
   browser.clear();

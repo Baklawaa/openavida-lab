@@ -1,4 +1,6 @@
+import { CRASH_EVERY, DROUGHT_EVERY, TOXIN_PULSE_EVERY, seasonLight } from "./climate";
 import {
+  crowdingPenalty,
   emptyNeighbor,
   interactNeighbors,
   metabolize,
@@ -269,12 +271,14 @@ export class World {
     const t0 =
       typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     this.tick++;
-    this.fields.advance(this.terrain, this.params);
+    this.fields.advance(this.terrain, this.params, seasonLight(this.tick));
+    this.applyDisturbances();
     const orgs = this.organisms;
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
       o.age++;
       metabolize(o, this.fields, this.params);
+      o.energy -= crowdingPenalty(o.x, o.y, this.occupancy, this.w, this.h);
       this.refreshFitness(o);
     }
     const inter = interactNeighbors(
@@ -311,15 +315,33 @@ export class World {
     return m;
   }
 
+  private applyDisturbances(): void {
+    const { w, h, rng, tick } = this;
+    if (tick >= TOXIN_PULSE_EVERY && tick % TOXIN_PULSE_EVERY === 0) {
+      this.fields.addBlob("toxin", rng.int(w), rng.int(h), 5 + rng.int(4), 0.55);
+    }
+    if (tick >= DROUGHT_EVERY && tick % DROUGHT_EVERY === 0) {
+      const nut = this.fields.nutrient;
+      for (let i = 0; i < nut.length; i++) nut[i] = nut[i]! * 0.78;
+    }
+    if (tick >= CRASH_EVERY && tick % CRASH_EVERY === 0 && this.organisms.length > 280) {
+      for (const o of this.organisms) {
+        if (rng.chance(0.07)) o.energy = 0;
+      }
+    }
+  }
+
   private reproduceAll(): void {
     const snapshot = this.organisms;
     const n = snapshot.length;
+    const pressure = n / Math.max(1, this.params.maxPopulation);
     for (let i = 0; i < n; i++) {
       const parent = snapshot[i]!;
       if (parent.energy <= 0) continue;
       const need = reproduceThreshold(parent.ph, this.params.reproduceEnergy);
       if (parent.energy < need) continue;
       if (this.organisms.length >= this.params.maxPopulation) break;
+      if (pressure > 0.52 && !this.rng.chance(Math.max(0.08, 1 - pressure))) continue;
       const spot = emptyNeighbor(
         parent.x,
         parent.y,

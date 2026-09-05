@@ -23,10 +23,10 @@ export function fitness(ph: Phenotype, env: EnvSample, neighbors: NeighborEffect
 }
 
 export function metabolicDelta(ph: Phenotype, env: EnvSample): number {
-  const gain = ph.uptake * env.nutrient * 0.22 + ph.photo * env.light * 0.18;
-  const tox = env.toxin * (1 - ph.resist) * 0.28;
+  const gain = ph.uptake * env.nutrient * 0.21 + ph.photo * env.light * 0.14;
+  const tox = env.toxin * (1 - ph.resist) * 0.3;
   const therm = Math.abs(env.temperature - ph.tpref) * 0.12;
-  const maintain = 0.035 + 0.028 * ph.size;
+  const maintain = 0.04 + 0.028 * ph.size;
   const v = gain - tox - therm - maintain;
   return Number.isFinite(v) ? v : 0;
 }

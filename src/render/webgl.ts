@@ -1,6 +1,7 @@
 import type { World } from "../sim/world";
 import { TRAIT_COLOR } from "../sim/mapping";
 import { TERRAIN } from "../sim/types";
+import { viewCrop } from "../ui/camera";
 
 const VS_FIELD = `#version 300 es
 precision highp float;
@@ -29,13 +30,13 @@ vec3 fieldColor(vec4 f) {
   vec3 tox = vec3(0.98, 0.12, 0.58) * pow(max(f.g, 0.0), 0.62);
   vec3 cold = vec3(0.12, 0.32, 0.95);
   vec3 hot = vec3(0.98, 0.32, 0.06);
-  vec3 tmp = mix(cold, hot, clamp(f.b, 0.0, 1.0)) * (0.12 + 0.42 * f.b);
-  vec3 lit = vec3(1.0, 0.9, 0.55) * pow(max(f.a, 0.0), 1.2) * 0.16;
-  if (uMode == 1) return bg + nut * 1.7;
-  if (uMode == 2) return bg + tox * 1.7;
-  if (uMode == 3) return bg + tmp * 1.9;
-  if (uMode == 4) return bg + lit * 2.2;
-  return bg + nut * 1.05 + tox * 0.9 + tmp + lit;
+  vec3 tmp = mix(cold, hot, clamp(f.b, 0.0, 1.0)) * (0.16 + 0.5 * f.b);
+  vec3 lit = vec3(1.0, 0.9, 0.55) * pow(max(f.a, 0.0), 1.15) * 0.28;
+  if (uMode == 1) return bg + nut * 1.85;
+  if (uMode == 2) return bg + tox * 1.85;
+  if (uMode == 3) return bg + tmp * 2.0;
+  if (uMode == 4) return bg + lit * 2.4;
+  return bg + nut * 1.25 + tox * 1.05 + tmp + lit;
 }
 
 vec2 applyCrop(vec2 local, vec4 crop) {
@@ -67,7 +68,7 @@ void main() {
     plate = texture(uPlate, tuv);
   }
   vec3 col = fieldColor(f);
-  if (plate.a > 0.02) col = mix(col, plate.rgb, plate.a);
+  if (plate.a > 0.02) col = mix(col, plate.rgb, min(0.58, plate.a));
   float vig = smoothstep(1.15, 0.22, length(uv - 0.5));
   col *= 0.86 + 0.14 * vig;
   float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
@@ -140,7 +141,7 @@ export function organismRgb(
   const [br, bg, bb] = hexRgb(TRAIT_COLOR[best[0]]);
   const linHue = (lineageId * 0.14159265 + ph.hue * 0.17) % 1;
   const [lr, lg, lb] = hsl(linHue, 0.72, 0.56);
-  return [br * 0.48 + lr * 0.52, bg * 0.48 + lg * 0.52, bb * 0.48 + lb * 0.52];
+  return [br * 0.68 + lr * 0.32, bg * 0.68 + lg * 0.32, bb * 0.68 + lb * 0.32];
 }
 
 export type FieldMode = 0 | 1 | 2 | 3 | 4;
@@ -160,6 +161,8 @@ export class LabRenderer {
   fieldMode: FieldMode = 0;
   view: ViewMode = "A";
   selectedId = -1;
+  /** 1 = whole 128×128 plate. User-controlled; does not chase biomass. */
+  zoom = 1;
   private cropA: [number, number, number, number] = [0, 0, 1, 1];
   private cropB: [number, number, number, number] = [0, 0, 1, 1];
 
@@ -272,7 +275,7 @@ export class LabRenderer {
       out[i] = sel ? 230 : Math.round(r * 255);
       out[i + 1] = sel ? 255 : Math.round(g * 255);
       out[i + 2] = sel ? 245 : Math.round(b * 255);
-      out[i + 3] = 255;
+      out[i + 3] = sel ? 230 : 148;
     }
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -301,8 +304,8 @@ export class LabRenderer {
     gl.uniform2f(gl.getUniformLocation(this.fieldProg, "uWorld"), primary.w, primary.h);
     gl.uniform1f(gl.getUniformLocation(this.fieldProg, "uTime"), timeSec);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uMode"), this.fieldMode);
-    this.cropA = occupancyCrop(this.view === "B" && !split ? worldB : worldA);
-    this.cropB = occupancyCrop(worldB);
+    this.cropA = viewCrop(this.zoom);
+    this.cropB = viewCrop(this.zoom);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uSplit"), split ? 1 : 0);
     gl.uniform4f(gl.getUniformLocation(this.fieldProg, "uCrop"), ...this.cropA);
     gl.uniform4f(gl.getUniformLocation(this.fieldProg, "uCropB"), ...this.cropB);
@@ -353,52 +356,6 @@ export class LabRenderer {
     const u = (clientX - rect.left) / rect.width;
     return u < 0.5 ? "A" : "B";
   }
-}
-
-function occupancyCrop(world: World): [number, number, number, number] {
-  const w = world.w;
-  const h = world.h;
-  const orgs = world.organisms;
-  if (orgs.length === 0) return [0, 0, 1, 1];
-  const bins = 16;
-  const counts = new Int32Array(bins * bins);
-  for (const o of orgs) {
-    const bx = Math.min(bins - 1, Math.floor((o.x / w) * bins));
-    const by = Math.min(bins - 1, Math.floor((o.y / h) * bins));
-    counts[by * bins + bx]!++;
-  }
-  let best = 0;
-  let bestI = 0;
-  for (let i = 0; i < counts.length; i++) {
-    if (counts[i]! > best) {
-      best = counts[i]!;
-      bestI = i;
-    }
-  }
-  const cx = ((bestI % bins) + 0.5) * (w / bins);
-  const cy = (Math.floor(bestI / bins) + 0.5) * (h / bins);
-  const side = Math.max(40, Math.min(w, h, Math.floor(Math.max(w, h) * 0.42)));
-  let x0 = Math.floor(cx - side / 2);
-  let y0 = Math.floor(cy - side / 2);
-  let x1 = x0 + side;
-  let y1 = y0 + side;
-  if (x0 < 0) {
-    x1 -= x0;
-    x0 = 0;
-  }
-  if (y0 < 0) {
-    y1 -= y0;
-    y0 = 0;
-  }
-  if (x1 > w) {
-    x0 = Math.max(0, x0 - (x1 - w));
-    x1 = w;
-  }
-  if (y1 > h) {
-    y0 = Math.max(0, y0 - (y1 - h));
-    y1 = h;
-  }
-  return [x0 / w, y0 / h, x1 / w, y1 / h];
 }
 
 export { TRAIT_COLOR, hsl };

@@ -123,11 +123,12 @@ export class Fields {
     this.light.set(s);
   }
 
-  applyVentsAndDecay(terrain: Uint8Array, params: SimParams): void {
+  applyVentsAndDecay(terrain: Uint8Array, params: SimParams, lightScale = 1): void {
     const n = this.w * this.h;
+    const sun = lightScale < 0 ? 0 : lightScale;
     for (let i = 0; i < n; i++) {
       const t = terrain[i]!;
-      if (t === TERRAIN.nutrientVent) this.nutrient[i] = this.nutrient[i]! + 0.09;
+      if (t === TERRAIN.nutrientVent) this.nutrient[i] = this.nutrient[i]! + 0.08;
       if (t === TERRAIN.toxinVent) this.toxin[i] = this.toxin[i]! + 0.07;
       if (t === TERRAIN.thermalVent) this.temperature[i] = this.temperature[i]! + 0.05;
       this.nutrient[i] = clamp(this.nutrient[i]! * (1 - params.nutrientDecay), 0, 4);
@@ -135,16 +136,16 @@ export class Fields {
       this.temperature[i] = clamp(this.temperature[i]! * (1 - params.temperatureDecay), 0, 1.5);
       const shade = t === TERRAIN.shade ? 0.35 : 1;
       this.light[i] = clamp(
-        this.light[i]! * (1 - params.lightDecay) + this.solar[i]! * 0.08 * shade,
+        this.light[i]! * (1 - params.lightDecay) + this.solar[i]! * 0.08 * shade * sun,
         0,
         2,
       );
     }
   }
 
-  advance(terrain: Uint8Array, params: SimParams): void {
+  advance(terrain: Uint8Array, params: SimParams, lightScale = 1): void {
     this.diffuseAll(params.diffusionRate, terrain);
-    this.applyVentsAndDecay(terrain, params);
+    this.applyVentsAndDecay(terrain, params, lightScale);
   }
 
   consumeNutrient(x: number, y: number, amount: number): number {
