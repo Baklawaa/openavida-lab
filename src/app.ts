@@ -554,10 +554,8 @@ export function mount(root: HTMLElement): void {
       w.organisms.find((org) => org.x > w.w * 0.25 && org.y > w.h * 0.25) ??
       w.organisms[0];
     if (!o) return null;
-    const rect = canvas.getBoundingClientRect();
-    const u = (o.x + 0.5) / w.w;
-    const v = (o.y + 0.5) / w.h;
-    return { x: rect.left + u * rect.width, y: rect.top + v * rect.height, id: o.id };
+    const p = renderer.gridToCanvas(o.x, o.y, w);
+    return { x: p.x, y: p.y, id: o.id };
   };
 
   const loop = (now: number) => {

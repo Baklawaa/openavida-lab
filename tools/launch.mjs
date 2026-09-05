@@ -82,18 +82,30 @@ async function probe(page, label) {
 
   const org = await page.evaluate(() => {
     const pick = window.__openavidaOrgPixel;
-    if (!pick) return null;
-    for (let i = 0; i < 80; i++) {
+    const c = document.getElementById("gl");
+    if (!pick || !c) return null;
+    const box = c.getBoundingClientRect();
+    let best = null;
+    let bestD = 1e9;
+    for (let i = 0; i < 240; i++) {
       const p = pick(i);
-      if (p && p.y > 90 && p.x > 40) return p;
+      if (!p) continue;
+      if (p.x < box.left + 10 || p.y < box.top + 40 || p.x > box.right - 10 || p.y > box.bottom - 10) continue;
+      const dx = p.x - (box.left + box.width * 0.5);
+      const dy = p.y - (box.top + box.height * 0.5);
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
     }
-    return pick(0);
+    return best;
   });
   if (org) {
     await page.mouse.click(org.x, org.y);
   } else {
     const box = await page.locator("#gl").boundingBox();
-    if (box) await page.mouse.click(box.x + box.width * 0.45, box.y + box.height * 0.45);
+    if (box) await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
   }
   await page.waitForFunction(
     () => (document.getElementById("inspect-genome")?.textContent?.trim().length ?? 0) > 8,

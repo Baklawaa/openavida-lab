@@ -39,7 +39,7 @@ Screenshots: `workbench/lab-1.png`, `workbench/lab-2.png` (also `{SCRATCH}/lab-1
 
 ## Blind A/B vs the bar (notes)
 
-Round 1 critic picked **bar**: overlapping `gl.POINTS` halos, not readable occupancy. Loop: organisms are now opaque NEAREST grid cells with hairlines (tissue), walls/vents as plate glyphs, hard guild chroma. Fitness neighbor terms now enter the live score.
+Round 1 critic picked **bar**: overlapping `gl.POINTS` halos. Loop 2: opaque NEAREST cells. Loop 3: drop gutters, clade coloring, density crop so living mass fills the view. Fitness neighbor terms enter the live score.
 
 **Life Engine / Emergent Garden.** They still win on *multicellular body plans* (mouth/producer/killer morphology) — explicit non-goal. Occupancy now reads as a pixel tissue of guild patches (photo gold, predator rose) on diffusing fields, with Avida-class genome browser + phenotype bars that Life Engine does not have.
 

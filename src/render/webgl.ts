@@ -19,6 +19,8 @@ uniform int uSplit;
 uniform sampler2D uFieldsB;
 uniform sampler2D uPlate;
 uniform sampler2D uPlateB;
+uniform vec4 uCrop;
+uniform vec4 uCropB;
 out vec4 fragColor;
 
 vec3 fieldColor(vec4 f) {
@@ -36,37 +38,40 @@ vec3 fieldColor(vec4 f) {
   return bg + nut * 1.05 + tox * 0.9 + tmp + lit;
 }
 
+vec2 applyCrop(vec2 local, vec4 crop) {
+  return vec2(mix(crop.x, crop.z, local.x), mix(crop.y, crop.w, local.y));
+}
+
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 local;
   vec2 tuv;
   vec4 f;
   vec4 plate;
   if (uSplit == 1) {
     if (uv.x < 0.5) {
-      tuv = vec2(uv.x * 2.0, 1.0 - uv.y);
+      local = vec2(uv.x * 2.0, 1.0 - uv.y);
+      tuv = applyCrop(local, uCrop);
       f = texture(uFields, tuv);
       plate = texture(uPlate, tuv);
     } else {
-      tuv = vec2((uv.x - 0.5) * 2.0, 1.0 - uv.y);
+      local = vec2((uv.x - 0.5) * 2.0, 1.0 - uv.y);
+      tuv = applyCrop(local, uCropB);
       f = texture(uFieldsB, tuv);
       plate = texture(uPlateB, tuv);
     }
   } else {
-    tuv = vec2(uv.x, 1.0 - uv.y);
+    local = vec2(uv.x, 1.0 - uv.y);
+    tuv = applyCrop(local, uCrop);
     f = texture(uFields, tuv);
     plate = texture(uPlate, tuv);
   }
   vec3 col = fieldColor(f);
-  if (plate.a > 0.02) {
-    col = mix(col, plate.rgb, plate.a);
-    vec2 c = fract(tuv * uWorld);
-    float hair = (c.x < 0.07 || c.y < 0.07) ? 1.0 : 0.0;
-    col *= 1.0 - hair * 0.22 * plate.a;
-  }
+  if (plate.a > 0.02) col = mix(col, plate.rgb, plate.a);
   float vig = smoothstep(1.15, 0.22, length(uv - 0.5));
-  col *= 0.82 + 0.18 * vig;
+  col *= 0.86 + 0.14 * vig;
   float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-  col += (g - 0.5) * 0.012;
+  col += (g - 0.5) * 0.01;
   if (uSplit == 1) {
     float line = smoothstep(0.003, 0.0, abs(uv.x - 0.5));
     col = mix(col, vec3(0.25, 0.85, 0.75), line * 0.55);
@@ -119,7 +124,10 @@ function hexRgb(hex: string): [number, number, number] {
 }
 
 /** Display color from dominant metabolic trait, tinted by the hue locus. */
-export function organismRgb(ph: { uptake: number; photo: number; resist: number; aggression: number; signal: number; hue: number }): [number, number, number] {
+export function organismRgb(
+  ph: { uptake: number; photo: number; resist: number; aggression: number; signal: number; hue: number },
+  lineageId = 0,
+): [number, number, number] {
   const guilds: Array<[keyof typeof TRAIT_COLOR, number]> = [
     ["aggression", ph.aggression],
     ["photo", ph.photo],
@@ -130,8 +138,9 @@ export function organismRgb(ph: { uptake: number; photo: number; resist: number;
   let best = guilds[0]!;
   for (const g of guilds) if (g[1] > best[1]) best = g;
   const [br, bg, bb] = hexRgb(TRAIT_COLOR[best[0]]);
-  const [hr, hg, hb] = hsl(ph.hue, 0.62, 0.58);
-  return [br * 0.9 + hr * 0.1, bg * 0.9 + hg * 0.1, bb * 0.9 + hb * 0.1];
+  const linHue = (lineageId * 0.14159265 + ph.hue * 0.17) % 1;
+  const [lr, lg, lb] = hsl(linHue, 0.72, 0.56);
+  return [br * 0.48 + lr * 0.52, bg * 0.48 + lg * 0.52, bb * 0.48 + lb * 0.52];
 }
 
 export type FieldMode = 0 | 1 | 2 | 3 | 4;
@@ -151,6 +160,8 @@ export class LabRenderer {
   fieldMode: FieldMode = 0;
   view: ViewMode = "A";
   selectedId = -1;
+  private cropA: [number, number, number, number] = [0, 0, 1, 1];
+  private cropB: [number, number, number, number] = [0, 0, 1, 1];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -256,7 +267,7 @@ export class LabRenderer {
     }
     for (const org of world.organisms) {
       const i = (org.y * world.w + org.x) * 4;
-      const [r, g, b] = organismRgb(org.ph);
+      const [r, g, b] = organismRgb(org.ph, org.lineageId);
       const sel = org.id === this.selectedId;
       out[i] = sel ? 230 : Math.round(r * 255);
       out[i + 1] = sel ? 255 : Math.round(g * 255);
@@ -290,7 +301,11 @@ export class LabRenderer {
     gl.uniform2f(gl.getUniformLocation(this.fieldProg, "uWorld"), primary.w, primary.h);
     gl.uniform1f(gl.getUniformLocation(this.fieldProg, "uTime"), timeSec);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uMode"), this.fieldMode);
+    this.cropA = occupancyCrop(this.view === "B" && !split ? worldB : worldA);
+    this.cropB = occupancyCrop(worldB);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uSplit"), split ? 1 : 0);
+    gl.uniform4f(gl.getUniformLocation(this.fieldProg, "uCrop"), ...this.cropA);
+    gl.uniform4f(gl.getUniformLocation(this.fieldProg, "uCropB"), ...this.cropB);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texA);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uFields"), 0);
@@ -311,13 +326,25 @@ export class LabRenderer {
     let u = (clientX - rect.left) / rect.width;
     const v = (clientY - rect.top) / rect.height;
     if (u < 0 || v < 0 || u > 1 || v > 1) return null;
-    if (this.view === "split") {
-      u = u < 0.5 ? u * 2 : (u - 0.5) * 2;
-    }
-    const x = Math.floor(u * world.w);
-    const y = Math.floor(v * world.h);
+    const side = this.view === "split" ? (u < 0.5 ? "A" : "B") : this.view;
+    if (this.view === "split") u = u < 0.5 ? u * 2 : (u - 0.5) * 2;
+    const crop = side === "B" ? this.cropB : this.cropA;
+    const tu = crop[0] + u * (crop[2] - crop[0]);
+    const tv = crop[1] + v * (crop[3] - crop[1]);
+    const x = Math.floor(tu * world.w);
+    const y = Math.floor(tv * world.h);
     if (x < 0 || y < 0 || x >= world.w || y >= world.h) return null;
     return { x, y };
+  }
+
+  gridToCanvas(gx: number, gy: number, world: World): { x: number; y: number } {
+    const crop = this.view === "B" ? this.cropB : this.cropA;
+    const tu = (gx + 0.5) / world.w;
+    const tv = (gy + 0.5) / world.h;
+    const u = (tu - crop[0]) / Math.max(1e-6, crop[2] - crop[0]);
+    const v = (tv - crop[1]) / Math.max(1e-6, crop[3] - crop[1]);
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: rect.left + u * rect.width, y: rect.top + v * rect.height };
   }
 
   pickWorld(clientX: number): "A" | "B" {
@@ -326,6 +353,52 @@ export class LabRenderer {
     const u = (clientX - rect.left) / rect.width;
     return u < 0.5 ? "A" : "B";
   }
+}
+
+function occupancyCrop(world: World): [number, number, number, number] {
+  const w = world.w;
+  const h = world.h;
+  const orgs = world.organisms;
+  if (orgs.length === 0) return [0, 0, 1, 1];
+  const bins = 16;
+  const counts = new Int32Array(bins * bins);
+  for (const o of orgs) {
+    const bx = Math.min(bins - 1, Math.floor((o.x / w) * bins));
+    const by = Math.min(bins - 1, Math.floor((o.y / h) * bins));
+    counts[by * bins + bx]!++;
+  }
+  let best = 0;
+  let bestI = 0;
+  for (let i = 0; i < counts.length; i++) {
+    if (counts[i]! > best) {
+      best = counts[i]!;
+      bestI = i;
+    }
+  }
+  const cx = ((bestI % bins) + 0.5) * (w / bins);
+  const cy = (Math.floor(bestI / bins) + 0.5) * (h / bins);
+  const side = Math.max(48, Math.min(w, h, Math.floor(Math.max(w, h) * 0.58)));
+  let x0 = Math.floor(cx - side / 2);
+  let y0 = Math.floor(cy - side / 2);
+  let x1 = x0 + side;
+  let y1 = y0 + side;
+  if (x0 < 0) {
+    x1 -= x0;
+    x0 = 0;
+  }
+  if (y0 < 0) {
+    y1 -= y0;
+    y0 = 0;
+  }
+  if (x1 > w) {
+    x0 = Math.max(0, x0 - (x1 - w));
+    x1 = w;
+  }
+  if (y1 > h) {
+    y0 = Math.max(0, y0 - (y1 - h));
+    y1 = h;
+  }
+  return [x0 / w, y0 / h, x1 / w, y1 / h];
 }
 
 export { TRAIT_COLOR, hsl };
