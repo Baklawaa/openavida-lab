@@ -35,6 +35,7 @@ import { Rng } from "./sim/rng";
 import { syncGenomeEditor, type EditorSyncReason } from "./ui/editorSync";
 import { formatSpeed, ticksDue } from "./ui/speed";
 import { CONTROL_HELP, attachControlHelp } from "./ui/help";
+import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 
 const BRUSHES: { id: BrushKind; label: string }[] = [
   { id: "nutrientBlob", label: "nutrient" },
@@ -50,7 +51,7 @@ const BRUSHES: { id: BrushKind; label: string }[] = [
   { id: "wipeOrgs", label: "wipe" },
 ];
 
-type LabTool = "inspect" | "paint" | "place";
+
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -258,7 +259,7 @@ export function mount(root: HTMLElement): void {
     const ph = phenotypeForKit(id);
     const focus = kit.focus;
     (side.querySelector("#kit-traits") as HTMLElement).textContent =
-      `${focus} ${Number(ph[focus]).toFixed(2)} · uptake ${ph.uptake.toFixed(2)} · photo ${ph.photo.toFixed(2)} · resist ${ph.resist.toFixed(2)}`;
+      `${focus} ${Number(ph[focus]).toFixed(2)} · uptake ${ph.uptake.toFixed(2)} · resist ${ph.resist.toFixed(2)}`;
     (side.querySelector("#genome-edit") as HTMLTextAreaElement).value = genomeForKit(id);
     (side.querySelector("#founder") as HTMLSelectElement).value = id;
   };
@@ -270,9 +271,7 @@ export function mount(root: HTMLElement): void {
     const t = ev.target as HTMLElement;
     const id = t.id.startsWith("kit-") ? t.id.slice(4) : "";
     if (id) {
-      state.tool = "place";
-      hud.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "tool-place"));
-      showKit(id);
+      selectKit(id);
     }
   });
   const legend = side.querySelector("#legend")!;
@@ -292,13 +291,19 @@ export function mount(root: HTMLElement): void {
   }
 
   function setTool(tool: LabTool): void {
-    state.tool = tool;
-    state.paintMode = tool === "paint";
+    const next = applyTool(tool);
+    state.tool = next.tool;
+    state.paintMode = next.paintMode;
     hud.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "tool-" + tool));
     const hint = side.querySelector("#place-hint") as HTMLElement;
     if (tool === "place") hint.textContent = "Pick a kit, then click an empty cell on the plate.";
     else if (tool === "paint") hint.textContent = "Click or drag to paint the selected substance (nutrient, toxin, wall…).";
     else hint.textContent = "Click an organism to inspect its genome.";
+  }
+
+  function selectKit(id: string): void {
+    setTool("place");
+    showKit(id);
   }
 
   function selectOrganism(world: World, id: number, reason: EditorSyncReason = "select"): void {
@@ -419,14 +424,20 @@ export function mount(root: HTMLElement): void {
     const world = sidePick === "B" ? dual.b : dual.a;
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
     if (!grid) return;
-    const paint = state.tool === "paint" || state.paintMode || ev.shiftKey || ev.altKey || ev.buttons === 2;
-    if (paint) {
+    const action = pointerAction({
+      tool: state.tool,
+      paintMode: state.paintMode,
+      shiftKey: ev.shiftKey,
+      altKey: ev.altKey,
+      buttons: ev.buttons,
+    });
+    if (action === "paint") {
       state.painting = true;
       paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
       return;
     }
     if (!down) return;
-    if (state.tool === "place") {
+    if (action === "place") {
       const seq = (side.querySelector("#genome-edit") as HTMLTextAreaElement).value || genomeForKit(state.kit);
       const child = placeOrganismAt(world, grid.x, grid.y, seq);
       if (child) {
@@ -458,7 +469,14 @@ export function mount(root: HTMLElement): void {
   });
   canvas.addEventListener("pointermove", (ev) => {
     if (ev.buttons === 0) return;
-    if (state.painting || state.paintMode || ev.shiftKey) paintAt(ev);
+    const action = pointerAction({
+      tool: state.tool,
+      paintMode: state.paintMode,
+      shiftKey: ev.shiftKey,
+      altKey: ev.altKey,
+      buttons: ev.buttons,
+    });
+    if (action === "paint") paintAt(ev);
   });
   canvas.addEventListener("pointerup", () => {
     state.painting = false;

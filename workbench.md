@@ -17,6 +17,10 @@ Isolated Vite + TypeScript + Vitest app at `openavida-lab/`. Sim core (`src/sim/
 
 Phase 2 hooks (comments only): 3D continuum, biochemistry, multiplayer, LLM brains.
 
+## Pointer: kit after paint
+
+`applyTool("place")` clears `paintMode`. `pointerAction` is what `onPointer` uses. Kit buttons call `selectKit` → `setTool("place")`. Test: paint then kit-select → action is place (`tests/pointer.test.ts`).
+
 ## Round: blank start + place DNA kits (2026-09-06)
 
 - Default `startPopulation` 0, no random orbs. Launch `pop0=0`.
