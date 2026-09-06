@@ -103,6 +103,8 @@ export const CONTROL_HELP: Record<string, string> = {
   "goal-popmax": "Plafond de population des réplicats.",
   "goal-disturb": "Active les perturbations aléatoires dans les réplicats.",
   "btn-goal-run": "Lance les réplicats depuis l’état de départ. Le monde affiché continue indépendamment.",
+  "btn-goal-det": "Relance le réplicat n° 1 deux fois (même graine, même état de départ) et compare hashState() des mondes finaux. ✓ si identiques.",
+  "goal-det-result": "Résultat du contrôle de déterminisme : ✓ et le hash commun, ou ✗ avec les deux hashes.",
   "btn-goal-stop": "Arrête les réplicats en cours ; les résultats déjà obtenus restent affichés.",
   "btn-goal-csv": "Télécharge les résultats des réplicats au format CSV : graine, pas d’atteinte (une colonne par objectif), valeur finale, population.",
   "btn-goal-report": "Télécharge un rapport HTML autonome : configuration, recette, programme, objectifs, synthèse, tableau, graphique, arbre si l’explorateur est ouvert, organismes enregistrés cités.",

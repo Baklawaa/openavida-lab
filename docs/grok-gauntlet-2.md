@@ -34,6 +34,7 @@ node tools/verify-interface.mjs
 node tools/verify-interface.mjs 'http://127.0.0.1:5174/?worker=1'
 node tools/verify-worker.mjs
 node tools/launch.mjs http://127.0.0.1:5174/
+node tools/verify-determinism.mjs
 ```
 
 All must exit 0. If a gate fails, fix the cause; never weaken an assertion, never skip a gate, never comment out a test. You may extend `verify-interface.mjs` with new assertions; keep its total runtime under 3 minutes.

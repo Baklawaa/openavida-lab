@@ -239,6 +239,13 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Test: every French heading + 3 table body rows for 3 results.
 - GATES: tsc ok; vitest 135/135 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0.
 
+## Task 10 — Determinism self-check (2026-09-07)
+
+- Expérience step 3 `#btn-goal-det`: two `runReplicates` of replicate #1 with `keepSnapshot`, compare `worldFromSnapshot(...).hashState()`. Inline ✓ / ✗.
+- `tools/verify-determinism.mjs` does the same headlessly (inject 24, pop template, 40 pas).
+- Test: two `runTrial` with seed 9 and `keepSnapshot` share a hash.
+- GATES: tsc ok; vitest 136/136 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0; **verify-determinism.mjs** `✓ identiques 49597030`.
+
 ## Metrics (gating)
 
 | Check | Result |

@@ -351,6 +351,8 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 #btn-goal-run { flex: 1; min-width: 0; }
 #btn-goal-csv { padding: 7px 9px; }
 #btn-goal-report { margin-top: 8px; }
+#goal-det-result { margin-left: 8px; }
+#goal-det-result .mono { font-size: 10px; }
 .goal-progress { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .goal-total { height: 8px; background: #1a2a34; border-radius: 4px; overflow: hidden; }
 .goal-total i { display: block; height: 100%; background: var(--teal); transition: width .2s; }

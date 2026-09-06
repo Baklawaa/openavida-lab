@@ -223,4 +223,14 @@ describe("goal metrics", () => {
     expect(stop.ticks).toBe(3);
     expect(stop.extinct).toBe(false);
   });
+
+  it("the same seed hashes identically when two trials keep their end snapshots", () => {
+    const snap = takeSnapshot(toxinWorld());
+    const goal: Goal = { metric: { kind: "population" }, op: ">=", target: 1e9, sustain: 1 };
+    const cfg = { seed: 9, maxTicks: 25, sampleEvery: 5, keepSnapshot: true } as const;
+    const a = runTrial(snap, goal, cfg);
+    const b = runTrial(snap, goal, cfg);
+    expect(a.snapshot).toBeTruthy();
+    expect(worldFromSnapshot(a.snapshot!).hashState()).toBe(worldFromSnapshot(b.snapshot!).hashState());
+  });
 });

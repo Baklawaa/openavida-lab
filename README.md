@@ -34,6 +34,8 @@ The French interface keeps playback, field layers, world selection, and the 2D/3
 
 **Rapport HTML** (step 4) downloads a self-contained HTML file: setup, recipe, schedule, goals, replicate summary and table, the trial chart, the lineage tree if the explorer is open, and saved organisms whose genomes appear in the start state.
 
+**Vérifier le déterminisme** (step 3) runs replicate #1 twice with `keepSnapshot` and compares `hashState()` of the restored end worlds.
+
 Runs are built for scale: up to 1000 replicates (200 per value in a sweep) on all cores but one, the start state cloned once per worker, and each replicate stopping as soon as the goal holds, the world is empty, or the goal has become impossible (a "≥" goal on a strain with no living member). The panel coalesces updates to five per second, lists the first 100 replicates (all of them go to the CSV, with an `unreachable` column), and plots an even sample of 100 curves; the summary adds P25–P75. Measured: 1000 replicates × 300 steps in 18 s on 9 workers with the interface holding 60 fps; 2000 replicates list in a single table that sorts in about 20 ms.
 
 Every replicate appears in a sortable table (successes fastest or slowest first, failures earliest or latest first, final value, final population, launch order). Any replicate can be **replayed**: its row, its seed chip under the summary, or a seed typed into the "Rejouer dans B" field rebuilds the run's start state with that seed and the run's parameters in world B and starts playing it, reproducing the replicate step for step; clicking again restarts it. "fin" opens a replicate's final state instead (kept for the first eight). The last run (start state, parameters, every result) is saved in the browser and restored after a reload, so a seed from an exported CSV can still be replayed later; only the final-state snapshots are dropped.
@@ -72,6 +74,8 @@ node tools/verify-interface.mjs
 ```
 
 This checks placement, DNA editing, painting, 2D/3D, A/B, snapshots, Espèces (define / inject / rename), presets, a 2-replicate goal run, keyboard navigation, and five viewport sizes. Pass the app URL as the first argument (default `http://127.0.0.1:5174/`). Screenshots are written to `scratch/interface/`.
+
+`node tools/verify-determinism.mjs` injects a population, runs replicate #1 twice, and asserts the two `hashState()` values match.
 
 ES modules will not load from `file://`. Use `npm run dev` or `npm run preview`.
 

@@ -22,6 +22,7 @@ import {
   trialGoalTicks,
   summarizeTournament,
   worldForTrial,
+  worldFromSnapshot,
   type FieldName,
   type Goal,
   type GoalMetric,
@@ -247,6 +248,7 @@ function template(): string {
         </div>
         <p class="micro">Les réplicats reçoivent les graines graine, graine + 1, graine + 2, … Elles figurent dans le tableau des résultats et dans la colonne seed du CSV.</p>
         <div class="row"><button type="button" id="btn-goal-run" class="primary">${icon("play")}Lancer les réplicats</button><button type="button" id="btn-goal-stop" disabled>Arrêter</button><button type="button" id="btn-goal-csv" class="quiet" disabled>${icon("save")}CSV</button></div>
+        <div class="row"><button type="button" id="btn-goal-det">Vérifier le déterminisme</button><span id="goal-det-result" class="micro"></span></div>
         <div id="goal-progress" class="goal-progress"></div>
       </div>
 
@@ -1044,6 +1046,63 @@ export class GoalPanel {
       : "";
   }
 
+  private async checkDeterminism(): Promise<void> {
+    if (this.handle) {
+      this.opts.status("Une course est déjà en cours.");
+      return;
+    }
+    const goals = this.currentGoals();
+    const goal = goals?.[0] ?? null;
+    if (!goal || !goals) {
+      this.opts.status("Objectif incomplet : choisissez une mesure et une valeur cible.");
+      return;
+    }
+    const start = await this.startSnapshot();
+    if (!start) return;
+    if (start.snapshot.organisms.length === 0) {
+      this.opts.status("L’état de départ ne contient aucun organisme.");
+      return;
+    }
+    const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
+    const seed = parseSeed(this.q<HTMLInputElement>("#goal-seed").value);
+    if (seed === null) {
+      this.opts.status(SEED_HINT);
+      return;
+    }
+    const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
+    const maxPopulation = Math.max(16, Math.round(Number(this.q<HTMLInputElement>("#goal-popmax").value) || 16));
+    const disturbances = this.q<HTMLInputElement>("#goal-disturb").checked;
+    const config: TrialConfig = {
+      seed,
+      maxTicks,
+      sampleEvery: Math.max(1, Math.round(maxTicks / 80)),
+      overrides: { mutationRate, maxPopulation, disturbances },
+      keepSnapshot: true,
+    };
+    const host = this.q("#goal-det-result");
+    host.textContent = "Deux courses du réplicat n° 1…";
+    this.q<HTMLButtonElement>("#btn-goal-det").disabled = true;
+    this.handle = runReplicates(start.snapshot, goals.length === 1 ? goal : goals, [{ ...config }, { ...config }]);
+    const pair = await this.handle.promise;
+    this.handle = null;
+    this.q<HTMLButtonElement>("#btn-goal-det").disabled = false;
+    const a = pair[0]?.snapshot;
+    const b = pair[1]?.snapshot;
+    if (!a || !b) {
+      host.innerHTML = `<span class="dead">✗ instantanés absents</span>`;
+      return;
+    }
+    const ha = worldFromSnapshot(a).hashState();
+    const hb = worldFromSnapshot(b).hashState();
+    if (ha === hb) {
+      host.innerHTML = `<span class="hit">✓ identiques <span class="mono">${ha}</span></span>`;
+      this.opts.status(`Déterminisme : les deux courses du réplicat n° 1 donnent ${ha}.`);
+    } else {
+      host.innerHTML = `<span class="dead">✗ <span class="mono">${ha}</span> ≠ <span class="mono">${hb}</span></span>`;
+      this.opts.status(`Déterminisme : hashes distincts ${ha} et ${hb}.`);
+    }
+  }
+
   private async exportReport(): Promise<void> {
     if (!this.lastRun || !this.lastGoal) {
       this.opts.status("Aucune course à rapporter.");
@@ -1242,6 +1301,7 @@ export class GoalPanel {
     });
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
     this.q("#btn-goal-report").addEventListener("click", () => void this.exportReport());
+    this.q("#btn-goal-det").addEventListener("click", () => void this.checkDeterminism());
     this.q("#btn-sweep-csv").addEventListener("click", () => this.exportSweepCsv());
     this.q("#tournament-picks").addEventListener("change", () => this.limitTournamentPicks());
     this.q("#btn-tournament-run").addEventListener("click", () => void this.runTournament());
