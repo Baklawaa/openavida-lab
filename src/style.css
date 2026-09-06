@@ -393,3 +393,18 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .goal-table td.ops { text-align: right; }
 .goal-table td.ops button { min-height: 20px; padding: 0 5px; font-size: 9px; margin-left: 3px; }
 .goal-table td.ops button .icon { width: 10px; height: 10px; }
+
+.goal-step { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.goal-step > .eyebrow { display: block; margin-bottom: 8px; }
+.goal-step > select, .goal-step .goal-field input { width: 100%; }
+.goal-step > label.tiny { display: block; margin: 10px 0 5px; }
+.goal-field { margin-top: 8px; }
+.goal-field label { display: block; margin-bottom: 5px; line-height: 1.4; }
+#goal-block .goal-config { margin-top: 2px; }
+#goal-block .goal-config + .micro { margin: 8px 0 0; }
+#goal-block .goal-step .row { margin-top: 10px; }
+.replay-row { margin-top: 10px; }
+.replay-info { margin-top: 10px; padding: 9px 11px; font-size: 10px; line-height: 1.6; color: var(--muted); background: #13211b; border: 1px solid #2f4a3b; border-radius: 6px; }
+.replay-info b { color: var(--teal); }
+.replay-info .dead { color: var(--rose); }
+.replay-row + .micro { display: none; }

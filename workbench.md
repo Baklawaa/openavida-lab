@@ -160,6 +160,10 @@ User: after 1000 replicates with 6 successes, where do I put a seed to watch it?
 
 User reloaded after a 1000-replicate run, kept the CSV and a seed, and had no way to replay it. `PresetStore.saveLastRun` / `loadLastRun` store the run (start snapshot, goal, configs, results without final-state snapshots, curves for an even sample of 100) under a reserved id in the presets store (filtered out of `list()`). `GoalPanel.restoreLastRun` rebuilds table, sort, summary and replays on construction and labels the table note "course du … restaurée". verify-interface reloads mid-script and replays seed #1 from the restored run.
 
+## Round: Expérience tab restructured, seeds validated (2026-09-06)
+
+User screenshot: cramped goal builder, a 13-digit seed silently truncated by a number input (seeds are uint32), world B "empty" after replaying with the wrong seed and mutation 1. Changes: the goal block is five numbered steps (état de départ, objectif, paramètres, résultats, rejeu) with full-width selects and the field threshold on its own labelled row; seed inputs are text fields validated by `parseSeed` (digits, 1…4294967295) with an explicit refusal message; after a replay `#replay-info` states the start state, seed, parameters, what the replicate did in the run (step reached, extinction, budget) and how to play. Browser check: invalid seed refused; typed valid seed replays; Reprendre advances world B from tick 0 with the 24 organisms; verify-interface OK; Vitest 108/108 (`tests/goalPanel.test.ts` adds parseSeed + sort presets).
+
 ## Metrics (gating)
 
 | Check | Result |

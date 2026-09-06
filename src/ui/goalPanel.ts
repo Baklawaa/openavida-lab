@@ -67,6 +67,15 @@ export const RESULT_SORTS: Array<{ id: ResultSort; label: string }> = [
   { id: "launch", label: "Ordre de lancement" },
 ];
 
+/** Seeds are unsigned 32-bit: digits only, 1 … 4294967295. Returns null otherwise (never silently truncates). */
+export function parseSeed(text: string): number | null {
+  const t = text.trim().replace(/[\s_'’]/g, "");
+  if (!/^\d{1,10}$/.test(t)) return null;
+  const n = Number(t);
+  return n >= 1 && n <= 0xffffffff ? n : null;
+}
+export const SEED_HINT = "Graine invalide : un entier entre 1 et 4294967295, tel qu’affiché dans le tableau ou la colonne seed du CSV.";
+
 /** Stable comparator over (index, result) pairs. Failures are extinctions, impossibles and budget exhaustion. */
 export function compareResults(sort: ResultSort): (a: [number, TrialResult], b: [number, TrialResult]) => number {
   const hit = (r: TrialResult) => r.reachedTick !== null;
@@ -187,38 +196,61 @@ function template(): string {
     </section>
     <section class="block" id="goal-block">
       <div class="section-heading"><h2>Expérience ciblée</h2><span class="tag">MULTI-SIMULATION</span></div>
-      <p class="muted">Depuis un état de départ, lance n réplicats en arrière-plan avec des graines différentes et mesure le pas auquel l’objectif est atteint.</p>
-      <label class="tiny" for="goal-source">État de départ</label>
-      <select id="goal-source"><option value="current">Monde actif</option></select>
-      <label class="tiny" for="goal-example">Objectifs types</label>
-      <select id="goal-example"><option value="">Choisir un exemple…</option>${TEMPLATES.map((t) => `<option value="${t.id}">${t.label}</option>`).join("")}</select>
-      <label class="tiny" for="goal-metric">Mesure</label>
-      <div class="goal-row">
+      <p class="muted">Depuis un état de départ, n réplicats à graines différentes courent en arrière-plan. Chacun s’arrête au pas où l’objectif est atteint, à l’extinction, ou au bout du budget.</p>
+
+      <div class="goal-step">
+        <span class="eyebrow">1 · ÉTAT DE DÉPART</span>
+        <select id="goal-source"><option value="current">Monde actif</option></select>
+      </div>
+
+      <div class="goal-step">
+        <span class="eyebrow">2 · OBJECTIF</span>
+        <select id="goal-example"><option value="">Choisir un objectif type…</option>${TEMPLATES.map((t) => `<option value="${t.id}">${t.label}</option>`).join("")}</select>
+        <label class="tiny" for="goal-metric">Mesure</label>
         <select id="goal-metric"></select>
-        <input id="goal-field-min" type="number" step="0.05" min="0" value="0.3" aria-label="Seuil du champ" title="Seuil du champ">
+        <div id="goal-field-min-row" class="goal-field">
+          <label class="tiny" for="goal-field-min">Seuil du champ : un organisme compte si sa cellule atteint cette valeur</label>
+          <input id="goal-field-min" type="number" step="0.05" min="0" value="0.3">
+        </div>
+        <label class="tiny">Condition</label>
+        <div class="goal-row">
+          <select id="goal-op" aria-label="Comparaison"><option value=">=">≥</option><option value="<=">≤</option></select>
+          <input id="goal-target" type="number" step="0.05" value="0.5" aria-label="Valeur cible">
+          <span class="tiny">maintenu</span><input id="goal-sustain" type="number" min="1" max="500" step="1" value="10" aria-label="Pas consécutifs"><span class="tiny">pas</span>
+        </div>
+        <div id="goal-text" class="micro"></div>
       </div>
-      <div class="goal-row">
-        <select id="goal-op" aria-label="Comparaison"><option value=">=">≥</option><option value="<=">≤</option></select>
-        <input id="goal-target" type="number" step="0.05" value="0.5" aria-label="Valeur cible">
-        <span class="tiny">maintenu</span><input id="goal-sustain" type="number" min="1" max="500" step="1" value="10" aria-label="Pas consécutifs"><span class="tiny">pas</span>
+
+      <div class="goal-step">
+        <span class="eyebrow">3 · PARAMÈTRES DE LA COURSE</span>
+        <div class="goal-config">
+          <label>Réplicats<input id="goal-reps" type="number" min="1" max="5000" step="1" value="6"></label>
+          <label>Pas max par réplicat<input id="goal-max" type="number" min="10" max="20000" step="10" value="600"></label>
+          <label>Taux de mutation<input id="goal-mut" type="number" min="0" max="1" step="0.01"></label>
+          <label>Population max<input id="goal-popmax" type="number" min="16" max="20000" step="10"></label>
+          <label>Graine du 1er réplicat<input id="goal-seed" type="text" inputmode="numeric" pattern="[0-9]*" spellcheck="false"></label>
+          <label class="goal-check"><input id="goal-disturb" type="checkbox"> Perturbations</label>
+        </div>
+        <p class="micro">Les réplicats reçoivent les graines graine, graine + 1, graine + 2, … Elles figurent dans le tableau des résultats et dans la colonne seed du CSV.</p>
+        <div class="row"><button type="button" id="btn-goal-run" class="primary">${icon("play")}Lancer les réplicats</button><button type="button" id="btn-goal-stop" disabled>Arrêter</button><button type="button" id="btn-goal-csv" class="quiet" disabled>${icon("save")}CSV</button></div>
+        <div id="goal-progress" class="goal-progress"></div>
       </div>
-      <div id="goal-text" class="micro"></div>
-      <div class="goal-config">
-        <label>Réplicats<input id="goal-reps" type="number" min="1" max="5000" step="1" value="6"></label>
-        <label>Pas max<input id="goal-max" type="number" min="10" max="20000" step="10" value="600"></label>
-        <label>Graine<input id="goal-seed" type="number" min="1" step="1"></label>
-        <label>Taux de mutation<input id="goal-mut" type="number" min="0" max="1" step="0.01"></label>
-        <label>Pop. max<input id="goal-popmax" type="number" min="16" max="20000" step="10"></label>
-        <label class="goal-check"><input id="goal-disturb" type="checkbox"> Perturbations</label>
+
+      <div class="goal-step">
+        <span class="eyebrow">4 · RÉSULTATS</span>
+        <div id="goal-summary" class="goal-summary"></div>
+        <div class="chart-card goal-chart"><div class="chart-heading"><h3>Mesure par réplicat</h3><span id="goal-chart-note"></span></div><canvas id="chart-goal" role="img" aria-label="Évolution de la mesure pour chaque réplicat"></canvas></div>
+        <div class="goal-table-head"><label class="tiny" for="goal-sort">Trier</label><select id="goal-sort">${RESULT_SORTS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}</select><span id="goal-table-note" class="tiny"></span></div>
+        <div id="goal-results" class="goal-results"></div>
       </div>
-      <div class="row"><button type="button" id="btn-goal-run" class="primary">${icon("play")}Lancer les réplicats</button><button type="button" id="btn-goal-stop" disabled>Arrêter</button><button type="button" id="btn-goal-csv" class="quiet" disabled>${icon("save")}CSV</button></div>
-      <div id="goal-progress" class="goal-progress"></div>
-      <div id="goal-summary" class="goal-summary"></div>
-      <div class="row replay-row"><input id="replay-seed" type="number" min="1" step="1" placeholder="Graine d’un réplicat"><button type="button" id="btn-replay-seed">${icon("play")}Rejouer dans B</button></div>
-      <p class="micro">Reconstruit l’état de départ de la dernière course avec cette graine et ses paramètres, dans le monde B, en pause : la lecture reproduit le réplicat pas pour pas.</p>
-      <div class="chart-card goal-chart"><div class="chart-heading"><h3>Mesure par réplicat</h3><span id="goal-chart-note"></span></div><canvas id="chart-goal" role="img" aria-label="Évolution de la mesure pour chaque réplicat"></canvas></div>
-      <div class="goal-table-head"><label class="tiny" for="goal-sort">Trier</label><select id="goal-sort">${RESULT_SORTS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}</select><span id="goal-table-note" class="tiny"></span></div>
-      <div id="goal-results" class="goal-results"></div>
+
+      <div class="goal-step" id="replay-step">
+        <span class="eyebrow">5 · REJOUER UN RÉPLICAT DANS LE MONDE B</span>
+        <p class="micro">Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, en pause. Lecture : la simulation reproduit le réplicat pas pour pas.</p>
+        <div class="row replay-row"><input id="replay-seed" type="text" inputmode="numeric" pattern="[0-9]*" spellcheck="false" placeholder="Graine du réplicat"><button type="button" id="btn-replay-seed" class="primary">${icon("play")}Rejouer dans B</button></div>
+        <div id="replay-info" class="replay-info" hidden></div>
+      </div>
+
       <div class="section-heading" style="margin-top:18px"><h2>Balayage</h2><span class="tag">PARAMÈTRE</span></div>
       <p class="muted">Répète l’objectif pour une grille linéaire d’une variable (ex. échelle des toxines). Les graines se suivent d’une valeur à l’autre.</p>
       <label class="tiny" for="sweep-var">Variable</label>
@@ -346,7 +378,7 @@ export class GoalPanel {
 
   private toggleFieldMin(): void {
     const isShare = this.q<HTMLSelectElement>("#goal-metric").value.startsWith("share:");
-    this.q("#goal-field-min").hidden = !isShare;
+    this.q("#goal-field-min-row").hidden = !isShare;
   }
 
   currentGoal(): Goal | null {
@@ -440,7 +472,12 @@ export class GoalPanel {
     }
     const reps = Math.max(1, Math.min(MAX_REPLICATES, Math.round(Number(this.q<HTMLInputElement>("#goal-reps").value) || 1)));
     const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
-    const seed = Math.round(Number(this.q<HTMLInputElement>("#goal-seed").value)) >>> 0 || 1;
+    const seed = parseSeed(this.q<HTMLInputElement>("#goal-seed").value);
+    if (seed === null) {
+      this.opts.status(SEED_HINT);
+      this.q("#goal-seed").focus();
+      return;
+    }
     const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
     const maxPopulation = Math.max(16, Math.round(Number(this.q<HTMLInputElement>("#goal-popmax").value) || 16));
     const disturbances = this.q<HTMLInputElement>("#goal-disturb").checked;
@@ -904,9 +941,11 @@ export class GoalPanel {
       }
     });
     this.q("#btn-replay-seed").addEventListener("click", () => {
-      const seed = Math.round(Number(this.q<HTMLInputElement>("#replay-seed").value)) >>> 0;
-      if (!seed) {
-        this.opts.status("Entrez la graine d’un réplicat (colonne « graine » des résultats ou du CSV).");
+      const seed = parseSeed(this.q<HTMLInputElement>("#replay-seed").value);
+      if (seed === null) {
+        this.opts.status(SEED_HINT);
+        this.showReplayInfo(`<span class="dead">${SEED_HINT}</span>`);
+        this.q("#replay-seed").focus();
         return;
       }
       this.replaySeed(seed);
@@ -958,6 +997,24 @@ export class GoalPanel {
     const w = worldForTrial(this.lastRun.snapshot, config);
     this.opts.replayInto(w.snapshot());
     this.q<HTMLInputElement>("#replay-seed").value = String(config.seed);
-    this.opts.status(`Monde B : ${label} rejoué depuis ${this.lastRun.label} (graine ${config.seed}, mutation ${config.overrides?.mutationRate ?? w.params.mutationRate}). Lecture en pause.`);
+    const known = this.results.find((r) => r && r.seed === config.seed);
+    const expected = !known
+      ? "Graine hors de la dernière course : pas de résultat de référence."
+      : known.reachedTick !== null
+        ? `Dans la course, ce réplicat a atteint l’objectif au pas ${known.reachedTick - known.startTick} (pas absolu ${known.reachedTick}).`
+        : known.extinct
+          ? `Dans la course, ce réplicat s’est éteint après ${known.ticks} pas.`
+          : known.unreachable
+            ? `Dans la course, l’objectif est devenu impossible après ${known.ticks} pas.`
+            : `Dans la course, ce réplicat n’a pas atteint l’objectif en ${known.ticks} pas (valeur finale ${known.finalValue.toFixed(3)}).`;
+    const o = config.overrides ?? {};
+    this.showReplayInfo(`<b>Monde B prêt, en pause</b> · ${label} · départ ${this.lastRun.label}, pas ${w.tick}, ${w.organisms.length} organismes<br>Graine <span class="mono">${config.seed}</span> · mutation ${o.mutationRate ?? w.params.mutationRate} · pop. max ${o.maxPopulation ?? w.params.maxPopulation} · perturbations ${(o.disturbances ?? w.disturbances) ? "oui" : "non"}<br>${expected}<br>Appuyez sur Reprendre (ou Espace) : le monde B rejoue ce réplicat pas pour pas.`);
+    this.opts.status(`Monde B : ${label} rejoué (graine ${config.seed}). Lecture en pause.`);
+  }
+
+  private showReplayInfo(html: string): void {
+    const box = this.q("#replay-info");
+    box.innerHTML = html;
+    box.hidden = false;
   }
 }
