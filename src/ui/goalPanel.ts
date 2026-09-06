@@ -45,6 +45,13 @@ export interface GoalPanelOptions {
   applyRecipe(recipe: Recipe, target: "active" | "B"): void;
 }
 
+/** Replicate ceilings: runs are long but the UI must stay responsive, so rendering is throttled and capped. */
+export const MAX_REPLICATES = 1000;
+export const MAX_SWEEP_REPLICATES = 200;
+const MAX_RESULT_ROWS = 100;
+const MAX_CHART_SERIES = 100;
+const RENDER_INTERVAL_MS = 200;
+
 const FIELD_LABEL: Record<FieldName, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
 
 const SWEEP_LABEL: Record<SweepVariable, string> = {
@@ -163,7 +170,7 @@ function template(): string {
       </div>
       <div id="goal-text" class="micro"></div>
       <div class="goal-config">
-        <label>Réplicats<input id="goal-reps" type="number" min="1" max="32" step="1" value="6"></label>
+        <label>Réplicats<input id="goal-reps" type="number" min="1" max="1000" step="1" value="6"></label>
         <label>Pas max<input id="goal-max" type="number" min="10" max="20000" step="10" value="600"></label>
         <label>Graine<input id="goal-seed" type="number" min="1" step="1"></label>
         <label>Taux de mutation<input id="goal-mut" type="number" min="0" max="1" step="0.01"></label>
@@ -183,7 +190,7 @@ function template(): string {
         <label>De<input id="sweep-from" type="number" step="0.05" value="0.25"></label>
         <label>À<input id="sweep-to" type="number" step="0.05" value="2"></label>
         <label>Points<input id="sweep-steps" type="number" min="2" max="16" step="1" value="5"></label>
-        <label>Réplicats / valeur<input id="sweep-reps" type="number" min="1" max="16" step="1" value="4"></label>
+        <label>Réplicats / valeur<input id="sweep-reps" type="number" min="1" max="200" step="1" value="4"></label>
       </div>
       <div class="row"><button type="button" id="btn-sweep-run">${icon("play")}Lancer le balayage</button><button type="button" id="btn-sweep-csv" class="quiet" disabled>${icon("save")}CSV du balayage</button></div>
       <div id="sweep-table"></div>
@@ -350,7 +357,7 @@ export class GoalPanel {
       this.opts.status("L’état de départ ne contient aucun organisme.");
       return;
     }
-    const reps = Math.max(1, Math.min(32, Math.round(Number(this.q<HTMLInputElement>("#goal-reps").value) || 1)));
+    const reps = Math.max(1, Math.min(MAX_REPLICATES, Math.round(Number(this.q<HTMLInputElement>("#goal-reps").value) || 1)));
     const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
     const seed = Math.round(Number(this.q<HTMLInputElement>("#goal-seed").value)) >>> 0 || 1;
     const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
@@ -379,21 +386,22 @@ export class GoalPanel {
     this.handle = runReplicates(start.snapshot, goal, configs, {
       onProgress: (i, tick) => {
         this.progress[i] = tick - start.snapshot.tick;
-        this.renderProgress(maxTicks);
+        this.scheduleRender(maxTicks, false);
       },
       onResult: (i, r) => {
         this.results[i] = r;
         this.progress[i] = r.ticks;
-        this.renderProgress(maxTicks);
-        this.renderResults();
+        this.scheduleRender(maxTicks, true);
       },
     });
     const all = await this.handle.promise;
     this.handle = null;
+    this.cancelScheduledRender();
     this.q<HTMLButtonElement>("#btn-goal-run").disabled = false;
     this.q<HTMLButtonElement>("#btn-sweep-run").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = all.length === 0;
+    this.renderProgress(maxTicks);
     this.renderResults();
     const s = summarizeTrials(all);
     this.opts.status(`Réplicats terminés en ${((performance.now() - t0) / 1000).toFixed(1)} s : ${s.successes}/${s.n} atteignent l’objectif${s.medianTicks !== null ? ` (médiane ${s.medianTicks} pas)` : ""}.`);
@@ -417,7 +425,7 @@ export class GoalPanel {
     const from = Number(this.q<HTMLInputElement>("#sweep-from").value);
     const to = Number(this.q<HTMLInputElement>("#sweep-to").value);
     const steps = Math.max(2, Math.round(Number(this.q<HTMLInputElement>("#sweep-steps").value) || 2));
-    const perValue = Math.max(1, Math.min(16, Math.round(Number(this.q<HTMLInputElement>("#sweep-reps").value) || 1)));
+    const perValue = Math.max(1, Math.min(MAX_SWEEP_REPLICATES, Math.round(Number(this.q<HTMLInputElement>("#sweep-reps").value) || 1)));
     if (!Number.isFinite(from) || !Number.isFinite(to)) {
       this.opts.status("Bornes du balayage invalides.");
       return;
@@ -451,16 +459,18 @@ export class GoalPanel {
     this.handle = runReplicates(start.snapshot, goal, configs, {
       onProgress: (i, tick) => {
         this.progress[i] = tick - start.snapshot.tick;
-        this.renderProgress(maxTicks);
+        this.scheduleRender(maxTicks, false);
       },
       onResult: (i, r) => {
         this.results[i] = r;
         this.progress[i] = r.ticks;
-        this.renderProgress(maxTicks);
+        this.scheduleRender(maxTicks, false);
       },
     });
     const all = await this.handle.promise;
     this.handle = null;
+    this.cancelScheduledRender();
+    this.renderProgress(maxTicks);
     this.q<HTMLButtonElement>("#btn-goal-run").disabled = false;
     this.q<HTMLButtonElement>("#btn-sweep-run").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
@@ -527,16 +537,60 @@ export class GoalPanel {
     URL.revokeObjectURL(a.href);
   }
 
+  private renderTimer: number | null = null;
+  private renderMax = 0;
+  private resultsDirty = false;
+
+  /** Coalesce progress/result events: at most one DOM update per RENDER_INTERVAL_MS. */
+  private scheduleRender(maxTicks: number, results: boolean): void {
+    this.renderMax = maxTicks;
+    if (results) this.resultsDirty = true;
+    if (this.renderTimer !== null) return;
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = null;
+      this.renderProgress(this.renderMax);
+      if (this.resultsDirty) {
+        this.resultsDirty = false;
+        this.renderResults();
+      }
+    }, RENDER_INTERVAL_MS);
+  }
+
+  private cancelScheduledRender(): void {
+    if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
+    this.renderTimer = null;
+    this.resultsDirty = false;
+  }
+
   private renderProgress(maxTicks: number): void {
     const host = this.q("#goal-progress");
-    host.innerHTML = this.progress
-      .map((p, i) => {
-        const r = this.results[i];
-        const cls = r ? (r.reachedTick !== null ? "hit" : r.extinct ? "dead" : "miss") : "";
-        const pct = Math.min(100, (p / maxTicks) * 100);
-        return `<span class="goal-bar ${cls}" title="Réplicat ${i + 1}"><i style="width:${pct.toFixed(0)}%"></i></span>`;
-      })
-      .join("");
+    const total = this.progress.length;
+    if (!total) {
+      host.innerHTML = "";
+      return;
+    }
+    let done = 0;
+    let hit = 0;
+    let dead = 0;
+    let unreachable = 0;
+    let running = 0;
+    const active: string[] = [];
+    for (let i = 0; i < total; i++) {
+      const r = this.results[i];
+      if (r) {
+        done++;
+        if (r.reachedTick !== null) hit++;
+        else if (r.extinct) dead++;
+        else if (r.unreachable) unreachable++;
+      } else if (this.progress[i]! > 0) {
+        running++;
+        if (active.length < 16) active.push(`<span class="goal-bar" title="Réplicat ${i + 1}"><i style="width:${Math.min(100, (this.progress[i]! / maxTicks) * 100).toFixed(0)}%"></i></span>`);
+      }
+    }
+    const pct = (done / total) * 100;
+    host.innerHTML = `<div class="goal-total" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}"><i style="width:${pct.toFixed(1)}%"></i></div>
+      <div class="tiny goal-progress-text">${done}/${total} terminés · <span class="hit">${hit} atteints</span> · ${done - hit - dead - unreachable} non atteints · <span class="dead">${dead} extinctions</span>${unreachable ? ` · ${unreachable} impossibles` : ""}${running ? ` · ${running} en cours` : ""}</div>
+      ${active.length ? `<div class="goal-active">${active.join("")}</div>` : ""}`;
   }
 
   private renderResults(): void {
@@ -549,18 +603,30 @@ export class GoalPanel {
       ? `<div class="goal-stats">
           <span>Réussite<b>${s.successes}/${s.n}</b></span>
           <span>Médiane<b>${fmtT(s.medianTicks)}</b></span>
+          <span>P25 – P75<b>${s.p25Ticks === null ? "—" : `${Math.round(s.p25Ticks)} – ${Math.round(s.p75Ticks!)}`}</b></span>
           <span>Min – max<b>${s.minTicks === null ? "—" : `${s.minTicks} – ${s.maxTicks}`}</b></span>
           <span>Extinctions<b>${s.extinctions}</b></span>
+          <span>Impossibles<b>${s.unreachable}</b></span>
         </div>`
       : "";
-    this.q("#goal-results").innerHTML = this.results
-      .map((r, i) => {
-        if (!r) return `<div class="feed-row goal-row-pending"><div class="feed-head">#${i + 1} · en cours…</div></div>`;
-        const outcome = r.reachedTick !== null ? `<b class="hit">atteint au pas ${r.reachedTick - r.startTick}</b>` : r.extinct ? `<b class="dead">extinction au pas ${r.ticks}</b>` : `<b class="miss">non atteint en ${r.ticks} pas</b>`;
-        const open = r.snapshot ? `<button type="button" class="quiet" data-open="${i}">Ouvrir dans B</button>` : "";
-        return `<div class="feed-row goal-result"><div class="feed-head">#${i + 1} · graine ${r.seed} · ${outcome}</div><div class="muted">Valeur finale ${r.finalValue.toFixed(3)} · ${r.finalPopulation} organismes</div>${open}</div>`;
-      })
-      .join("");
+    const rows: string[] = [];
+    let hidden = 0;
+    this.results.forEach((r, i) => {
+      if (!r) return;
+      if (rows.length >= MAX_RESULT_ROWS) {
+        hidden++;
+        return;
+      }
+      const outcome = r.reachedTick !== null
+        ? `<b class="hit">atteint au pas ${r.reachedTick - r.startTick}</b>`
+        : r.extinct ? `<b class="dead">extinction au pas ${r.ticks}</b>`
+          : r.unreachable ? `<b class="dead">impossible dès le pas ${r.ticks}</b>`
+            : `<b class="miss">non atteint en ${r.ticks} pas</b>`;
+      const open = r.snapshot ? `<button type="button" class="quiet" data-open="${i}">Ouvrir dans B</button>` : "";
+      rows.push(`<div class="feed-row goal-result"><div class="feed-head">#${i + 1} · graine ${r.seed} · ${outcome}</div><div class="muted">Valeur finale ${r.finalValue.toFixed(3)} · ${r.finalPopulation} organismes</div>${open}</div>`);
+    });
+    if (hidden) rows.push(`<p class="muted">${hidden} autres réplicats : résumé ci-dessus, détail dans le CSV.</p>`);
+    this.q("#goal-results").innerHTML = rows.join("");
     this.drawChart();
   }
 
@@ -568,15 +634,20 @@ export class GoalPanel {
     const canvas = this.q<HTMLCanvasElement>("#chart-goal");
     const cw = canvas.parentElement!.clientWidth - 28;
     if (cw <= 0) return;
-    const runs = this.results.filter(Boolean).map((r) => ({ series: r.series, reached: r.reachedTick !== null }));
+    const all = this.results.filter(Boolean);
+    // Draw an even sample so a thousand replicates stay legible and cheap.
+    const stride = Math.max(1, Math.ceil(all.length / MAX_CHART_SERIES));
+    const runs = all.filter((_, i) => i % stride === 0).map((r) => ({ series: r.series, reached: r.reachedTick !== null }));
     drawTrialSeries(canvas, cw, 120, runs, this.lastGoal?.target ?? null);
-    this.q("#goal-chart-note").textContent = runs.length ? `${runs.length} réplicat${runs.length > 1 ? "s" : ""} · cible en pointillé` : "";
+    this.q("#goal-chart-note").textContent = all.length
+      ? `${all.length} réplicat${all.length > 1 ? "s" : ""}${runs.length < all.length ? ` (${runs.length} tracés)` : ""} · cible en pointillé`
+      : "";
   }
 
   private exportCsv(): void {
-    const rows = [["replicate", "seed", "reached_tick", "ticks_run", "final_value", "final_population", "extinct"]];
+    const rows = [["replicate", "seed", "reached_tick", "ticks_run", "final_value", "final_population", "extinct", "unreachable"]];
     this.results.forEach((r, i) => {
-      if (r) rows.push([String(i + 1), String(r.seed), r.reachedTick === null ? "" : String(r.reachedTick - r.startTick), String(r.ticks), r.finalValue.toFixed(4), String(r.finalPopulation), r.extinct ? "1" : "0"]);
+      if (r) rows.push([String(i + 1), String(r.seed), r.reachedTick === null ? "" : String(r.reachedTick - r.startTick), String(r.ticks), r.finalValue.toFixed(4), String(r.finalPopulation), r.extinct ? "1" : "0", r.unreachable ? "1" : "0"]);
     });
     const text = rows.map((r) => r.join(",")).join("\n");
     const blob = new Blob([text], { type: "text/csv" });

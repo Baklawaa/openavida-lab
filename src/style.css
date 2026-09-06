@@ -338,7 +338,12 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 #goal-block .row:has(#btn-goal-run) { flex-wrap: nowrap; }
 #btn-goal-run { flex: 1; min-width: 0; }
 #btn-goal-csv { padding: 7px 9px; }
-.goal-progress { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 12px; }
+.goal-progress { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.goal-total { height: 8px; background: #1a2a34; border-radius: 4px; overflow: hidden; }
+.goal-total i { display: block; height: 100%; background: var(--teal); transition: width .2s; }
+.goal-progress-text { line-height: 1.5; }
+.goal-progress-text .hit { color: var(--teal); } .goal-progress-text .dead { color: var(--rose); }
+.goal-active { display: flex; flex-wrap: wrap; gap: 3px; }
 .goal-progress:empty { display: none; }
 .goal-bar { flex: 1 0 40px; height: 6px; background: #1a2a34; border-radius: 3px; overflow: hidden; }
 .goal-bar i { display: block; height: 100%; background: #6b8a7a; transition: width .2s; }

@@ -162,6 +162,7 @@ export {
   applySweepValue,
   evaluateGoalMetric,
   goalHolds,
+  goalUnreachable,
   replicateSeeds,
   runTrial,
   summarizeSweep,

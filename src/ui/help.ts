@@ -80,7 +80,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "goal-field-min": "Seuil du champ qui définit la zone : un organisme compte s’il se trouve sur une cellule où le champ atteint cette valeur.",
   "goal-target": "Valeur à atteindre. L’objectif est atteint au premier pas où la comparaison tient, pendant le nombre de pas indiqué.",
   "goal-sustain": "Nombre de pas consécutifs pendant lesquels la condition doit tenir avant de compter l’objectif comme atteint.",
-  "goal-reps": "Nombre de simulations indépendantes lancées avec des graines successives. Elles s’exécutent en parallèle en arrière-plan.",
+  "goal-reps": "Nombre de simulations indépendantes (jusqu’à 1000) lancées avec des graines successives, en parallèle sur tous les cœurs sauf un. Un réplicat s’arrête dès que l’objectif est atteint, que le monde est vide ou que l’objectif devient impossible.",
   "goal-max": "Budget de pas par réplicat. Au-delà, le réplicat compte comme non atteint.",
   "goal-seed": "Graine du premier réplicat ; les suivants utilisent graine + 1, + 2, …",
   "goal-mut": "Taux de mutation appliqué aux réplicats (le monde actif n’est pas modifié).",

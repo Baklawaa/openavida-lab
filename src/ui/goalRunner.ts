@@ -14,9 +14,10 @@ export interface RunHandle {
   cancel(): void;
 }
 
+/** All cores but one (the UI keeps a thread), capped at 16. */
 export function workerCount(n: number): number {
   const cores = typeof navigator !== "undefined" && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 2;
-  return Math.max(1, Math.min(n, cores - 1, 6));
+  return Math.max(1, Math.min(n, cores - 1, 16));
 }
 
 export function runReplicates(snapshot: WorldSnapshot, goal: Goal, configs: TrialConfig[], hooks: RunHooks = {}): RunHandle {
@@ -58,10 +59,12 @@ export function runReplicates(snapshot: WorldSnapshot, goal: Goal, configs: Tria
   const assign = (w: Worker) => {
     if (cancelled || nextIndex >= configs.length) return;
     const index = nextIndex++;
-    w.postMessage({ type: "run", id: index, snapshot, goal, config: configs[index] });
+    w.postMessage({ type: "run", id: index, config: configs[index] });
   };
   for (let k = 0; k < workerCount(configs.length); k++) {
     const w = new Worker(new URL("../sim/goalWorker.ts", import.meta.url), { type: "module" });
+    // The start state is cloned once per worker, not once per replicate.
+    w.postMessage({ type: "init", snapshot, goal });
     w.onmessage = (ev: MessageEvent<{ type: string; id: number; tick?: number; value?: number; result?: TrialResult }>) => {
       const m = ev.data;
       if (m.type === "progress") hooks.onProgress?.(m.id, m.tick ?? 0, m.value ?? 0);

@@ -30,6 +30,8 @@ The French interface keeps playback, field layers, world selection, and the 2D/3
 
 **Balayage** repeats that goal on a linear grid of one variable (mutation rate, population cap, reproduction energy, or a start-snapshot field scale: toxin / nutrient / temperature / light). Seeds continue from one value to the next. The table reports success k/n, median and min–max steps, and extinctions; the chart plots median ticks-to-goal vs the variable with a min–max band. Pure model in `src/sim/goals.ts`.
 
+Runs are built for scale: up to 1000 replicates (200 per value in a sweep) on all cores but one, the start state cloned once per worker, and each replicate stopping as soon as the goal holds, the world is empty, or the goal has become impossible (a "≥" goal on a strain with no living member). The panel coalesces updates to five per second, lists the first 100 replicates (all of them go to the CSV, with an `unreachable` column), and plots an even sample of 100 curves; the summary adds P25–P75. Measured: 1000 replicates × 300 steps in 18 s on 9 workers with the interface holding 60 fps.
+
 ## Recipes
 
 A **recette** is a tiny replayable setup: `SimParams` plus an op list (paint, place, inject, named strain, step). Consecutive steps collapse to one `{n}`. Recording is on by default for a fresh world (`World.recording`). Export JSON, re-run into world B, or share `?recipe=` (base64url JSON). If that payload exceeds 6000 characters, the copied link falls back to parameters only. Opening a recipe URL applies it to world A at startup (`src/sim/recipe.ts`).

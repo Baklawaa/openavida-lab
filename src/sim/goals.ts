@@ -76,6 +76,8 @@ export interface TrialResult {
   finalValue: number;
   finalPopulation: number;
   extinct: boolean;
+  /** Stopped early because the goal can no longer be met (e.g. the tracked strain died out). */
+  unreachable: boolean;
   series: Array<[number, number]>;
   snapshot?: WorldSnapshot;
 }
@@ -88,8 +90,11 @@ export interface TrialSummary {
   meanTicks: number | null;
   minTicks: number | null;
   maxTicks: number | null;
+  p25Ticks: number | null;
+  p75Ticks: number | null;
   meanFinalValue: number;
   extinctions: number;
+  unreachable: number;
 }
 
 export function evaluateGoalMetric(world: World, metric: GoalMetric): number {
@@ -136,6 +141,15 @@ export function goalHolds(goal: Goal, value: number): boolean {
   return goal.op === ">=" ? value >= goal.target : value <= goal.target;
 }
 
+/** True when no future tick can satisfy the goal: a "≥" goal on a strain that has no living member left. */
+export function goalUnreachable(goal: Goal, world: World): boolean {
+  const m = goal.metric;
+  if (goal.op !== ">=" || goal.target <= 0) return false;
+  if (m.kind !== "strain-count" && m.kind !== "strain-share") return false;
+  for (const o of world.organisms) if (o.strainId === m.strainId) return false;
+  return true;
+}
+
 function scaleField(arr: Float32Array, k: number): void {
   for (let i = 0; i < arr.length; i++) arr[i] = arr[i]! * k;
 }
@@ -179,8 +193,9 @@ export function runTrial(
     if (sustain === 1) reachedTick = w.tick;
   }
   let extinct = w.organisms.length === 0;
+  let unreachable = reachedTick === null && !extinct && goalUnreachable(goal, w);
   let steps = 0;
-  while (reachedTick === null && !extinct && steps < config.maxTicks) {
+  while (reachedTick === null && !extinct && !unreachable && steps < config.maxTicks) {
     w.step();
     steps++;
     value = evaluateGoalMetric(w, goal.metric);
@@ -190,7 +205,8 @@ export function runTrial(
       if (streak >= sustain) reachedTick = w.tick;
     } else streak = 0;
     extinct = w.organisms.length === 0;
-    if (onProgress && steps % 20 === 0 && onProgress(w.tick, value) === false) break;
+    if (reachedTick === null && !extinct) unreachable = goalUnreachable(goal, w);
+    if (onProgress && steps % 50 === 0 && onProgress(w.tick, value) === false) break;
   }
   if (series[series.length - 1]![0] !== w.tick) series.push([w.tick, value]);
   const result: TrialResult = {
@@ -201,6 +217,7 @@ export function runTrial(
     finalValue: value,
     finalPopulation: w.organisms.length,
     extinct,
+    unreachable,
     series,
   };
   if (config.keepSnapshot) result.snapshot = w.snapshot();
@@ -211,17 +228,26 @@ export function summarizeTrials(results: readonly TrialResult[]): TrialSummary {
   const n = results.length;
   const hits = results.filter((r) => r.reachedTick !== null).map((r) => r.reachedTick! - r.startTick).sort((a, b) => a - b);
   const successes = hits.length;
-  const median = successes ? (successes % 2 ? hits[(successes - 1) / 2]! : (hits[successes / 2 - 1]! + hits[successes / 2]!) / 2) : null;
+  const quantile = (q: number): number | null => {
+    if (!successes) return null;
+    const pos = (successes - 1) * q;
+    const lo = Math.floor(pos);
+    const hi = Math.min(successes - 1, lo + 1);
+    return hits[lo]! + (hits[hi]! - hits[lo]!) * (pos - lo);
+  };
   return {
     n,
     successes,
     successRate: n ? successes / n : 0,
-    medianTicks: median,
+    medianTicks: quantile(0.5),
     meanTicks: successes ? hits.reduce((s, v) => s + v, 0) / successes : null,
     minTicks: successes ? hits[0]! : null,
     maxTicks: successes ? hits[successes - 1]! : null,
+    p25Ticks: quantile(0.25),
+    p75Ticks: quantile(0.75),
     meanFinalValue: n ? results.reduce((s, r) => s + r.finalValue, 0) / n : 0,
     extinctions: results.filter((r) => r.extinct).length,
+    unreachable: results.filter((r) => r.unreachable).length,
   };
 }
 

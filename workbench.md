@@ -139,6 +139,15 @@ User: « Les prédateurs devraient se nourrir et grossir en mangeant d'autres or
 - Iterations recorded by control sims (`scratch/pred-sim.ts`, `pred-causes.ts`): (1) sensing raised kills 8 → 41 but predators still starved (meal ≈ 16 steps of upkeep); (2) biomass bonus 0.12 → 0.45 made them grow (mass 0.66 mean) but 37/55 predator deaths were cannibalism from the mass bonus; (3) genome-only eligibility removed cannibalism; (4) breeding gate on mass. Final: 8 fed predators at step 100 (mass up to 1.0), 87 kills; boom-and-bust afterwards on a uniform plate.
 - **Perf hash baseline changed deliberately: 9d4c0f2b → c2c03a81** (the perf world seeds predators). `tests/predation.test.ts` (6). Vitest 106/106; verify-interface, verify-worker (hash identical inline/worker), launch, build all green.
 
+## Round: goal runs at scale (2026-09-06)
+
+User: finish a replicate as soon as no organism is left; raise the replicate limit from 32 to 1000 even if runs take longer.
+
+- Early stops in `runTrial`: extinction already ended a trial; added `goalUnreachable` (a "≥" goal on a strain with no living member) → `TrialResult.unreachable`, counted in `summarizeTrials` with P25/P75 quantiles.
+- Throughput: start snapshot sent once per worker (`init` message) instead of once per replicate; pool = all cores but one (cap 16); progress messages every 50 ticks instead of 20.
+- UI (`goalPanel.ts`): `MAX_REPLICATES` 1000, `MAX_SWEEP_REPLICATES` 200; DOM updates coalesced to one per 200 ms; aggregate progress bar with counts and ≤ 16 active bars instead of one bar per replicate; result list capped at 100 rows (CSV keeps all, with an `unreachable` column); chart draws an even sample of 100 curves.
+- Load test (Playwright, 10-core laptop): 1000 replicates × 300 steps → 18.0 s, rAF interval mean 16.6 ms / max 17 ms during the run, 0 page errors. Vitest 106/106; verify-interface OK; build OK.
+
 ## Metrics (gating)
 
 | Check | Result |
