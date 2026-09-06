@@ -4,7 +4,7 @@
  */
 import type { World } from "../sim/world";
 import { TERRAIN } from "../sim/types";
-import { organismRgb } from "./webgl";
+import { hexRgb, organismRgb } from "./webgl";
 
 const VS_TERRAIN = `#version 300 es
 precision highp float;
@@ -218,6 +218,8 @@ export class View3D {
   dist = 105;
   selectedId = -1;
   fieldMode = 0;
+  /** Color organism columns by founding strain instead of guild + lineage. */
+  colorByStrain = false;
   dragging = false;
   private lastX = 0;
   private lastY = 0;
@@ -388,7 +390,8 @@ export class View3D {
       const o = orgs[i]!;
       const env = world.fields.sample(o.x, o.y);
       const h = (env.nutrient * 0.85 + env.light * 0.35) * 10 + 0.2;
-      const [r, g, b] = organismRgb(o.ph, o.lineageId);
+      const strain = this.colorByStrain ? world.strains.get(o.strainId) : undefined;
+      const [r, g, b] = strain ? hexRgb(strain.color) : organismRgb(o.ph, o.lineageId);
       const off = i * 7;
       inst[off] = o.x + 0.5;
       inst[off + 1] = h + o.ph.size * 0.55;

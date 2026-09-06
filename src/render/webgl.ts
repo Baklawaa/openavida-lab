@@ -162,7 +162,7 @@ function hsl(h: number, s: number, l: number): [number, number, number] {
   return [f(0), f(8), f(4)];
 }
 
-function hexRgb(hex: string): [number, number, number] {
+export function hexRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }

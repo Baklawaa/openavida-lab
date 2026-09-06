@@ -115,6 +115,11 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - `tools/verify-interface.mjs` (still one linear script): Espèces define/inject/color/stratégies/rename; presets save/load/remove to empty list; goal toxin template, 2×60, two `.goal-result`, `#goal-summary` « Réussite », Ouvrir dans B → `__openavida.world === "B"`, CSV download.
 - Runtime ~8 s. Strain defined from the heterotroph kit so the card starts « non placée » (phototrophs already occupy the plate).
 
+## Task 6 — Strain colors in 3D (2026-09-06)
+
+- `View3D.colorByStrain` reads `world.strains.get(org.strainId)?.color` (same hex as 2D). `app.ts` sets it with the 2D renderer; a late-created 3D view copies the flag.
+- `opt-color-strain` help now covers both surfaces. `launch.mjs ?view3d=1` still required.
+
 ## Metrics (gating)
 
 | Check | Result |

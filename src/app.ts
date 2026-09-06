@@ -213,6 +213,7 @@ export function mount(root: HTMLElement): void {
     if (view3d) return view3d;
     view3d = new View3D(canvas3d);
     view3d.fieldMode = renderer.fieldMode;
+    view3d.colorByStrain = renderer.colorByStrain;
     view3d.selectedId = state.selectedId;
     const r = viz.getBoundingClientRect();
     view3d.resize(r.width, r.height);
@@ -372,7 +373,8 @@ export function mount(root: HTMLElement): void {
     },
     onColorByStrain: (on) => {
       renderer.colorByStrain = on;
-      status(on ? "Couleur des organismes : souche fondatrice (vue 2D)." : "Couleur des organismes : guilde et lignée.");
+      if (view3d) view3d.colorByStrain = on;
+      status(on ? "Couleur des organismes : souche fondatrice." : "Couleur des organismes : guilde et lignée.");
     },
     openMutation: (inn) => {
       if (!inn.genome) {
