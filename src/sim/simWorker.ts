@@ -5,7 +5,7 @@
  */
 import type { RecipeOp } from "./recipe";
 import { DualWorld } from "./sandbox";
-import { applySimOp, frameFromWorld, opResetsHistory, opSides, stepSides, worldOf, type Side, type SimOp, type StepSide, type WorldFrame } from "./simHost";
+import { applySimOp, frameFromWorld, opResetsHistory, opSides, stepSides, timelineOf, worldOf, type Side, type SimOp, type StepSide, type WorldFrame } from "./simHost";
 import type { SimParams, WorldSnapshot } from "./types";
 import { worldFromSnapshot } from "./world";
 
@@ -14,12 +14,14 @@ export type HostMessage =
   | { type: "op"; seq: number; op: SimOp }
   | { type: "step"; seq: number; which: StepSide; n: number }
   | { type: "snapshot"; seq: number; id: number; which: Side }
+  | { type: "snapshotAt"; seq: number; id: number; which: Side; tick: number }
   | { type: "hash"; seq: number; id: number; which: Side }
   | { type: "ping"; seq: number; id: number };
 
 export type WorkerMessage =
   | { type: "frames"; seq: number; frames: WorldFrame[]; stepped: boolean }
   | { type: "snapshot"; seq: number; id: number; snapshot: WorldSnapshot }
+  | { type: "snapshotAt"; seq: number; id: number; snapshot: WorldSnapshot | null }
   | { type: "hash"; seq: number; id: number; hash: string }
   | { type: "pong"; seq: number; id: number };
 
@@ -65,6 +67,9 @@ port.onmessage = (ev: MessageEvent<HostMessage>) => {
       if (m.snapshotA) {
         dual.a = worldFromSnapshot(m.snapshotA);
         dual.a.recording = m.recordingA === undefined ? dual.a.recording : m.recordingA;
+        dual.timelineA.clear();
+        dual.timelineA.record(dual.a);
+        dual.a.timelineMeta = dual.timelineA.meta();
       }
       sendFrames(m.seq, ["A", "B"], false, true);
       return;
@@ -83,6 +88,12 @@ port.onmessage = (ev: MessageEvent<HostMessage>) => {
     }
     case "snapshot":
       if (dual) port.postMessage({ type: "snapshot", seq: m.seq, id: m.id, snapshot: worldOf(dual, m.which).snapshot() } satisfies WorkerMessage);
+      return;
+    case "snapshotAt":
+      if (dual) {
+        const snap = timelineOf(dual, m.which).nearest(m.tick)?.snapshot ?? null;
+        port.postMessage({ type: "snapshotAt", seq: m.seq, id: m.id, snapshot: snap } satisfies WorkerMessage);
+      }
       return;
     case "hash":
       if (dual) port.postMessage({ type: "hash", seq: m.seq, id: m.id, hash: worldOf(dual, m.which).hashState() } satisfies WorkerMessage);

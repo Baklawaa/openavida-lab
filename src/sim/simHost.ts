@@ -16,6 +16,8 @@ import { BrainRuntime, baselinePolicy, llmPolicy, type BrainTrace } from "./brai
 import { copyPhenotype } from "./mapping";
 import type { RecipeOp } from "./recipe";
 import { DualWorld } from "./sandbox";
+import { Timeline } from "./timeline";
+import type { TimelineMeta } from "./timeline";
 import type { Innovation, Strain } from "./species";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX } from "./types";
 import type {
@@ -48,7 +50,8 @@ export type SimOp =
   | { kind: "disturbances"; on: boolean }
   | { kind: "brains"; on: boolean; llm: boolean }
   | { kind: "recording"; which: Side; on: boolean }
-  | { kind: "setParams"; which: Side; params: Partial<SimParams> };
+  | { kind: "setParams"; which: Side; params: Partial<SimParams> }
+  | { kind: "timeline"; which: Side; every?: number; trimAfter?: number };
 
 export interface SimOpResult {
   child?: Organism | null;
@@ -59,6 +62,16 @@ export interface SimOpResult {
 
 export function worldOf(dual: DualWorld, side: Side): World {
   return side === "B" ? dual.b : dual.a;
+}
+
+export function timelineOf(dual: DualWorld, side: Side): Timeline {
+  return side === "B" ? dual.timelineB : dual.timelineA;
+}
+
+export function recordTimeline(dual: DualWorld, side: Side): void {
+  const tl = timelineOf(dual, side);
+  tl.record(worldOf(dual, side));
+  worldOf(dual, side).timelineMeta = tl.meta();
 }
 
 /** Sides whose state an op may change (used to decide which frames to send). */
@@ -73,6 +86,22 @@ export function opResetsHistory(op: SimOp): boolean {
 }
 
 export function applySimOp(dual: DualWorld, op: SimOp): SimOpResult {
+  const result = applySimOpCore(dual, op);
+  if (op.kind === "reseed") {
+    dual.timelineA.clear();
+    dual.timelineB.clear();
+  } else if (op.kind === "replaceWorld") {
+    timelineOf(dual, op.which).clear();
+  }
+  if (op.kind === "timeline") {
+    worldOf(dual, op.which).timelineMeta = timelineOf(dual, op.which).meta();
+  } else {
+    for (const s of opSides(op)) recordTimeline(dual, s);
+  }
+  return result;
+}
+
+function applySimOpCore(dual: DualWorld, op: SimOp): SimOpResult {
   switch (op.kind) {
     case "paint":
       worldOf(dual, op.which).paint(op.x, op.y, op.radius, op.brush, op.amount);
@@ -127,13 +156,25 @@ export function applySimOp(dual: DualWorld, op: SimOp): SimOpResult {
     case "setParams":
       Object.assign(worldOf(dual, op.which).params, op.params);
       return {};
+    case "timeline": {
+      const tl = timelineOf(dual, op.which);
+      if (op.every !== undefined) tl.every = Math.max(1, op.every | 0);
+      if (op.trimAfter !== undefined) tl.trimAfter(op.trimAfter);
+      return {};
+    }
   }
 }
 
 export function stepSides(dual: DualWorld, which: StepSide, n = 1): void {
   for (let i = 0; i < n; i++) {
-    if (which === "A" || which === "both") dual.a.step();
-    if (which === "B" || which === "both") dual.b.step();
+    if (which === "A" || which === "both") {
+      dual.a.step();
+      recordTimeline(dual, "A");
+    }
+    if (which === "B" || which === "both") {
+      dual.b.step();
+      recordTimeline(dual, "B");
+    }
   }
 }
 
@@ -174,6 +215,7 @@ export interface WorldFrame {
   brainsEnabled: boolean;
   brainTraces?: BrainTrace[];
   recording: RecipeOp[] | null;
+  timelineMeta?: TimelineMeta | null;
 }
 
 export interface FrameOptions {
@@ -223,6 +265,7 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     disturbances: w.disturbances,
     brainsEnabled: w.brainsEnabled,
     recording: w.recording ? w.recording.map((op) => ({ ...op })) : null,
+    timelineMeta: w.timelineMeta ? { ...w.timelineMeta, entries: w.timelineMeta.entries.map((e) => ({ ...e })) } : w.timelineMeta,
   };
   if (opts.innovations) frame.innovations = w.innovations.map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } }));
   if (opts.lineages) frame.lineages = [...w.lineages.values()].map((l) => ({ ...l }));
@@ -279,6 +322,7 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
     w.brain.traces = f.brainTraces;
   }
   w.recording = f.recording;
+  if (f.timelineMeta !== undefined) w.timelineMeta = f.timelineMeta;
   return true;
 }
 
@@ -293,6 +337,8 @@ export interface SimHost {
   step(which: StepSide, n?: number, budgetMs?: number): void;
   /** Authoritative snapshot / hash (inline: immediate). */
   snapshot(which: Side): Promise<WorldSnapshot>;
+  /** Cadence snapshot closest to `tick`, or null if the ring is empty. */
+  snapshotAt(which: Side, tick: number): Promise<WorldSnapshot | null>;
   hash(which: Side): Promise<string>;
   /** Resolves once everything sent so far has been processed and mirrored. */
   flush(): Promise<void>;
@@ -328,6 +374,10 @@ export class InlineHost implements SimHost {
 
   snapshot(which: Side): Promise<WorldSnapshot> {
     return Promise.resolve(worldOf(this.dual, which).snapshot());
+  }
+
+  snapshotAt(which: Side, tick: number): Promise<WorldSnapshot | null> {
+    return Promise.resolve(timelineOf(this.dual, which).nearest(tick)?.snapshot ?? null);
   }
 
   hash(which: Side): Promise<string> {

@@ -363,6 +363,17 @@ try {
   await page.waitForTimeout(200);
   await page.screenshot({ path: 'scratch/interface/desktop-analysis.png' });
 
+  await page.evaluate(() => window.__openavidaStep(60));
+  await page.waitForFunction(() => window.__openavida.tick >= 60, null, { timeout: 15000 });
+  await visible('#timeline-row');
+  await page.waitForFunction(() => Number(document.querySelector('#timeline-range').max) > 0, null, { timeout: 5000 });
+  const firstRecorded = await page.evaluate(() => Number(document.querySelector('#timeline-range').min));
+  await page.locator('#btn-timeline-first').click();
+  await page.locator('#btn-timeline-resume').click();
+  await page.waitForFunction(t => window.__openavida.tick === t, firstRecorded, { timeout: 8000 });
+  await page.locator('#btn-step-once').click();
+  await page.waitForFunction(t => window.__openavida.tick > t, firstRecorded, { timeout: 5000 });
+
   for (const [width, height] of [[1440, 900], [1100, 768], [768, 1024], [390, 844], [360, 800]]) {
     await page.setViewportSize({ width, height });
     await page.waitForTimeout(150);
@@ -380,7 +391,7 @@ try {
     }
   }
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, explorer (catalogue, branch, saved organisms, lineage tree click), presets, goal runs, replicate catalogue, keyboard, and 5 responsive sizes.');
+  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, explorer (catalogue, branch, saved organisms, lineage tree click), presets, goal runs, replicate catalogue, timeline, keyboard, and 5 responsive sizes.');
 } finally {
   await browser.close();
 }

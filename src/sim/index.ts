@@ -224,6 +224,14 @@ export {
   type Liveness,
 } from "./catalog";
 export {
+  DEFAULT_TIMELINE_BUDGET,
+  DEFAULT_TIMELINE_EVERY,
+  Timeline,
+  estimateSnapshotBytes,
+  type TimelineEntry,
+  type TimelineMeta,
+} from "./timeline";
+export {
   InlineHost,
   applyFrame,
   applySimOp,

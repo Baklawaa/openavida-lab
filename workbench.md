@@ -174,6 +174,13 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Perf hash unchanged: counters draw no RNG.
 - Arbre dessiné: the text branch was not enough to see who descends from whom, so the lineage graph is now drawn. `src/render/lineageTreeLayout.ts` holds a pure tidy layout (founder → focus trunk, sibling and descendant selection under a budget, extinct filtering, x = step, y = packed rows, no DOM and no canvas), unit-tested in `tests/lineageTreeLayout.test.ts`; `src/render/lineageTreeCanvas.ts` is the canvas view on top of it (device-pixel sizing, pan/zoom transform, hit testing for hover tooltip, click select and double-click re-centre). Both are wired into a fourth Explorateur tab **Arbre** (`#ex-tab-tree`: toolbar, canvas, detail pane), reachable from any organism or lineage record via `data-act="tree"`; its controls carry `CONTROL_HELP` entries and the flow is covered in `tools/verify-interface.mjs` inside the Explorateur block.
 
+## Task 1 — Timeline scrubber (2026-09-07)
+
+- `src/sim/timeline.ts`: cadence snapshots (default every 25), 150 MB budget, drop oldest after the origin, same-tick replace. Tests: spacing, eviction keeps tick 0, nearest (lower on a tie).
+- Recording in `stepSides` / `applySimOp` on `DualWorld.timelineA/B`. Frames carry `timelineMeta`. `SimOp.timeline` sets `every` / `trimAfter`. `SimHost.snapshotAt`.
+- UI `#timeline-row` under playback. Scrub pauses and previews a temp World; « Reprendre ici » restores + trims. Plate, charts, Espèces, Explorateur read `viewWorld()`.
+- Decision: tick-0 snapshot is updated in place when the user places/injects before the first step, so rewind to origin is not an empty plate.
+
 ## Metrics (gating)
 
 | Check | Result |

@@ -38,6 +38,8 @@ Every replicate appears in a sortable table (successes fastest or slowest first,
 
 A **recette** is a tiny replayable setup: `SimParams` plus an op list (paint, place, inject, named strain, step). Consecutive steps collapse to one `{n}`. Recording is on by default for a fresh world (`World.recording`). Export JSON, re-run into world B, or share `?recipe=` (base64url JSON). If that payload exceeds 6000 characters, the copied link falls back to parameters only. Opening a recipe URL applies it to world A at startup (`src/sim/recipe.ts`).
 
+**Timeline.** The playback bar records a snapshot every 25 steps (150 Mo budget, oldest after the origin dropped first). The scrubber previews a recorded tick on the plate, charts, Espèces and Explorateur without writing the live world; « Reprendre ici » restores that snapshot and forgets later recordings.
+
 The 2D plate is letterboxed to the world aspect; charts collapse (Réduire) or move beside the plate on wide, short windows. The plate starts empty. Choose a kit and click the world, or add 24 organisms. Space toggles playback; I/O/P select inspect/place/paint; 1–5 select field layers; S saves a restore point. The expand button gives the world more space. In split view, indicators and edits follow the last clicked world. Switching to 3D shows that world individually.
 
 Charts use actual tick positions and a shared fitness scale, including negative values. Organisms remain visible as round markers at small cell sizes, with a ring around the selected organism. “Partager” copies the setup; JSON export preserves the current world.

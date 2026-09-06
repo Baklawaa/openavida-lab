@@ -87,6 +87,8 @@ export class World {
   brain: BrainRuntime | null = null;
   /** Recorded sandbox ops. `null` = not recording; `[]` = recording, empty. */
   recording: RecipeOp[] | null = null;
+  /** Cadence snapshots available for rewind (metadata only on the worker mirror). */
+  timelineMeta: { every: number; used: number; budget: number; entries: Array<{ tick: number; population: number; bytes: number }> } | null = null;
   private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {

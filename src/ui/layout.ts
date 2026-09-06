@@ -88,6 +88,7 @@ export function createLabLayout(root: HTMLElement) {
           <span id="field-legend" class="field-legend"><i class="dot nutrient"></i>Nutriments <i class="dot toxin"></i>Toxines <i class="dot light"></i>Lumière</span>
           <div id="cell-readout" class="cell-readout" hidden></div>
         </div>
+        <div class="playback-stack">
         <div class="playback">
           <button id="btn-pause" class="primary">${icon("pause")}<span>Pause</span></button>
           <button id="btn-step-once" class="icon-button" aria-label="Avancer d’un pas">${icon("step")}</button>
@@ -95,6 +96,19 @@ export function createLabLayout(root: HTMLElement) {
           <span id="view-hint" class="view-hint">Clic sur une cellule libre : place un organisme.</span>
           <div class="speed-ctl"><label for="speed-top">Vitesse</label><input id="speed-top" type="range" min="0" max="60" step="1" value="2"><b id="spd-lab-top">2 /s</b><button id="btn-slow" class="quiet">×1</button></div>
           <div class="zoom-ctl"><label for="zoom-top">Vue</label><input id="zoom-top" type="range" min="30" max="100" step="1" value="100"><b id="zoom-lab-top">100%</b></div>
+        </div>
+        <div id="timeline-row">
+          <button type="button" id="btn-timeline-first" class="icon-button" aria-label="Premier instantané">⏮</button>
+          <button type="button" id="btn-timeline-prev" class="icon-button" aria-label="Instantané précédent">◀</button>
+          <div class="timeline-track">
+            <input id="timeline-range" type="range" min="0" max="0" value="0" step="1" aria-label="Instantané enregistré">
+            <div id="timeline-marks" aria-hidden="true"></div>
+          </div>
+          <button type="button" id="btn-timeline-next" class="icon-button" aria-label="Instantané suivant">▶</button>
+          <button type="button" id="btn-timeline-resume">Reprendre ici</button>
+          <span id="timeline-label" class="tiny">pas 0 (enregistré toutes les 25)</span>
+          <span id="timeline-budget" class="tiny"></span>
+        </div>
         </div>
       </section>
       <section class="charts-section" aria-label="Évolution dans le temps">

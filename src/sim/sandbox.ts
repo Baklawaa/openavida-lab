@@ -9,6 +9,7 @@ import {
   parseJSONSnapshot,
   parseShareURL,
 } from "./serialize";
+import { Timeline } from "./timeline";
 import type { BrushKind, SimParams, WorldSnapshot } from "./types";
 import { World, worldFromSnapshot } from "./world";
 
@@ -72,11 +73,17 @@ export class DualWorld {
   a: World;
   b: World;
   active: "A" | "B" = "A";
+  timelineA = new Timeline();
+  timelineB = new Timeline();
 
   constructor(params: Partial<SimParams> = {}, salt = 0x9e3779b9) {
     this.a = new World(params);
     const seedB = ((params.seed ?? this.a.params.seed) ^ salt) >>> 0 || 1;
     this.b = new World({ ...this.a.params, seed: seedB });
+    this.timelineA.record(this.a);
+    this.timelineB.record(this.b);
+    this.a.timelineMeta = this.timelineA.meta();
+    this.b.timelineMeta = this.timelineB.meta();
   }
 
   current(): World {

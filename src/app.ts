@@ -42,6 +42,7 @@ import {
   peerColor,
   takeSnapshot,
   toGenomeTrack,
+  worldFromSnapshot,
   type BrushKind,
   type Recipe,
   type DeathCause,
@@ -137,6 +138,8 @@ export function mount(root: HTMLElement): void {
     room: null as RoomSession | null,
     roomPost: null as ((op: RoomOp) => void) | null,
     roomClose: null as (() => void) | null,
+    preview: null as World | null,
+    previewTick: null as number | null,
   };
   if (state.flags.view3d) state.surface = "3d";
 
@@ -255,6 +258,7 @@ export function mount(root: HTMLElement): void {
   (root.querySelector("#seed") as HTMLInputElement).value = String(dual.a.params.seed);
 
   const current = (): World => ((state.view === "split" ? dual.active : state.view) === "B" ? dual.b : dual.a);
+  const viewWorld = (): World => state.preview ?? current();
   const sideOf = (w: World): Side => (w === dual.b ? "B" : "A");
   const stepWhich = (): StepSide => (state.view === "split" ? "both" : state.view === "B" ? "B" : "A");
 
@@ -381,7 +385,7 @@ export function mount(root: HTMLElement): void {
   }
   const species = new SpeciesPanel(root.querySelector<HTMLElement>("#panel-species")!, {
     status,
-    world: () => current(),
+    world: () => viewWorld(),
     editorGenome: () => dna.sequence,
     loadGenome: (seq, label) => {
       dna.load(seq);
@@ -417,12 +421,12 @@ export function mount(root: HTMLElement): void {
 
   const explorer = new Explorer(root.querySelector<HTMLDialogElement>("#explorer-dialog")!, {
     status,
-    world: () => current(),
+    world: () => viewWorld(),
     worldSide: () => sideOf(current()),
     store: goals.store,
     selectOrganism: (id) => {
       setTool("inspect");
-      selectOrganism(current(), id, "select");
+      selectOrganism(viewWorld(), id, "select");
       refreshMetrics();
     },
     highlightLineage: (id) => {
@@ -560,7 +564,7 @@ export function mount(root: HTMLElement): void {
   let phyHits: PhylogenyHit[] = [];
   function drawCharts(): void {
     if (root.classList.contains("charts-collapsed") && !root.classList.contains("wide-workspace")) return;
-    const w = current();
+    const w = viewWorld();
     const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
     const size = (c: HTMLCanvasElement) => [c.parentElement!.clientWidth - 28, Math.max(75, c.parentElement!.clientHeight - 42)] as const;
     drawFitness(cFit, ...size(cFit), hist);
@@ -621,13 +625,14 @@ export function mount(root: HTMLElement): void {
   chartsBtn.addEventListener("click", () => setChartsCollapsed(!root.classList.contains("charts-collapsed")));
 
   function refreshMetrics(): void {
-    const w = current();
+    const live = current();
+    const w = viewWorld();
     const last = w.history[w.history.length - 1];
     const set = (id: string, v: string) => {
       const n = document.getElementById(id);
       if (n && n.textContent !== v) n.textContent = v;
     };
-    const activeWorld = w === dual.b ? "B" : "A";
+    const activeWorld = live === dual.b ? "B" : "A";
     set("chart-world", `MONDE ${activeWorld} · HISTORIQUE`);
     set("world-size", `${w.w} × ${w.h}`);
     set("stage-label", state.view === "split" ? `A · ${dual.a.organisms.length} organismes${activeWorld === "A" ? " · sélectionné" : ""}` : `MONDE ${activeWorld}`);
@@ -654,6 +659,7 @@ export function mount(root: HTMLElement): void {
         root.querySelector("#inspect-meta")!.textContent = "Cet organisme n’est plus vivant. Consultez le journal des décès ci-dessous.";
       }
     }
+    refreshTimeline();
     const now = performance.now();
     if (now - state.lastUi > 250) {
       drawCharts();
@@ -903,7 +909,99 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-pause")!.addEventListener("click", () => {
     if (state.speed <= 0) setSpeed(2);
     else state.paused = !state.paused;
+    if (!state.paused) {
+      state.preview = null;
+      state.previewTick = null;
+    }
     updatePlayback();
+  });
+  const timelineRange = root.querySelector<HTMLInputElement>("#timeline-range")!;
+  const timelineMarks = root.querySelector("#timeline-marks")!;
+  const timelineLabel = root.querySelector("#timeline-label")!;
+  const timelineBudget = root.querySelector("#timeline-budget")!;
+  function timelineEntries(): Array<{ tick: number; population: number; bytes: number }> {
+    return current().timelineMeta?.entries ?? [];
+  }
+  function refreshTimeline(): void {
+    const meta = current().timelineMeta;
+    const entries = meta?.entries ?? [];
+    const every = meta?.every ?? 25;
+    const ticks = entries.map((e) => e.tick);
+    const min = ticks.length ? ticks[0]! : 0;
+    const max = ticks.length ? ticks[ticks.length - 1]! : 0;
+    timelineRange.min = String(min);
+    timelineRange.max = String(Math.max(min, max));
+    if (document.activeElement !== timelineRange) {
+      timelineRange.value = String(state.previewTick ?? viewWorld().tick);
+    }
+    const span = Math.max(1, max - min);
+    timelineMarks.innerHTML = ticks.map((t) => `<i style="left:${((t - min) / span) * 100}%"></i>`).join("");
+    const shown = state.previewTick ?? viewWorld().tick;
+    timelineLabel.textContent = `pas ${shown} (enregistré toutes les ${every})`;
+    if (meta) {
+      const usedMo = meta.used / (1024 * 1024);
+      const capMo = meta.budget / (1024 * 1024);
+      timelineBudget.textContent = `${entries.length} instantané${entries.length > 1 ? "s" : ""} · ${usedMo < 0.1 ? `${Math.round(meta.used / 1024)} ko` : `${usedMo.toFixed(1)} Mo`} / ${capMo.toFixed(0)} Mo`;
+    } else timelineBudget.textContent = "";
+  }
+  async function previewTick(tick: number): Promise<void> {
+    state.paused = true;
+    updatePlayback();
+    const entries = timelineEntries();
+    if (!entries.length) return;
+    let nearest = entries[0]!;
+    let best = Math.abs(nearest.tick - tick);
+    for (const e of entries) {
+      const d = Math.abs(e.tick - tick);
+      if (d < best || (d === best && e.tick < nearest.tick)) {
+        nearest = e;
+        best = d;
+      }
+    }
+    state.previewTick = nearest.tick;
+    timelineRange.value = String(nearest.tick);
+    const snap = await host.snapshotAt(sideOf(current()), nearest.tick);
+    if (!snap || state.previewTick !== nearest.tick) return;
+    state.preview = worldFromSnapshot(snap);
+    refreshMetrics();
+  }
+  timelineRange.addEventListener("input", () => {
+    void previewTick(Number(timelineRange.value));
+  });
+  root.querySelector("#btn-timeline-first")!.addEventListener("click", () => {
+    const entries = timelineEntries();
+    if (entries[0]) void previewTick(entries[0].tick);
+  });
+  root.querySelector("#btn-timeline-prev")!.addEventListener("click", () => {
+    const entries = timelineEntries();
+    const cur = state.previewTick ?? viewWorld().tick;
+    const prev = [...entries].reverse().find((e) => e.tick < cur);
+    if (prev) void previewTick(prev.tick);
+  });
+  root.querySelector("#btn-timeline-next")!.addEventListener("click", () => {
+    const entries = timelineEntries();
+    const cur = state.previewTick ?? viewWorld().tick;
+    const next = entries.find((e) => e.tick > cur);
+    if (next) void previewTick(next.tick);
+  });
+  root.querySelector("#btn-timeline-resume")!.addEventListener("click", async () => {
+    const tick = state.previewTick ?? Number(timelineRange.value);
+    const snap = state.preview?.snapshot() ?? (await host.snapshotAt(sideOf(current()), tick));
+    if (!snap) {
+      status("Aucun instantané à cet endroit.");
+      return;
+    }
+    const which = sideOf(current());
+    host.apply({ kind: "restore", which, snapshot: snap });
+    host.apply({ kind: "timeline", which, trimAfter: snap.tick });
+    state.preview = null;
+    state.previewTick = null;
+    state.paused = true;
+    selectOrganism(current(), -1);
+    updatePlayback();
+    paintFeeds();
+    refreshMetrics();
+    status(`Monde ${which} repris au pas ${snap.tick}.`);
   });
   const terrainBox = root.querySelector("#opt-terrain input") as HTMLInputElement;
   const disturbBox = root.querySelector("#opt-disturb input") as HTMLInputElement;
@@ -973,6 +1071,8 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-slow")!.addEventListener("click", () => setSpeed(2));
   root.querySelector("#btn-step-once")!.addEventListener("click", () => {
     state.paused = true;
+    state.preview = null;
+    state.previewTick = null;
     updatePlayback();
     host.step(stepWhich(), 1);
     paintFeeds();
@@ -1230,9 +1330,12 @@ export function mount(root: HTMLElement): void {
       tickAccum = 0;
     }
     if (state.surface === "3d") {
-      ensure3d().draw(current());
+      ensure3d().draw(viewWorld());
     } else {
-      renderer.draw(dual.a, dual.b, now / 1000);
+      const side = sideOf(current());
+      const a = state.preview && side === "A" ? state.preview : dual.a;
+      const b = state.preview && side === "B" ? state.preview : dual.b;
+      renderer.draw(a, b, now / 1000);
     }
     if (state.room?.isHost && !state.paused && state.speed > 0 && current().tick % 10 === 0) {
       state.roomPost?.({ kind: "snapshot", snap: current().snapshot() });

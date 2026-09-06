@@ -34,6 +34,9 @@ export class WorkerHost implements SimHost {
     if (opts.snapshotA) {
       this.dual.a = worldFromSnapshot(opts.snapshotA);
       this.dual.a.recording = opts.recordingA === undefined ? this.dual.a.recording : opts.recordingA;
+      this.dual.timelineA.clear();
+      this.dual.timelineA.record(this.dual.a);
+      this.dual.a.timelineMeta = this.dual.timelineA.meta();
     }
     this.worker = new Worker(new URL("../sim/simWorker.ts", import.meta.url), { type: "module" });
     this.worker.onmessage = (ev: MessageEvent<WorkerMessage>) => this.onMessage(ev.data);
@@ -74,6 +77,10 @@ export class WorkerHost implements SimHost {
     return this.request<WorldSnapshot>((id) => ({ type: "snapshot", seq: 0, id, which }));
   }
 
+  snapshotAt(which: Side, tick: number): Promise<WorldSnapshot | null> {
+    return this.request<WorldSnapshot | null>((id) => ({ type: "snapshotAt", seq: 0, id, which, tick }));
+  }
+
   hash(which: Side): Promise<string> {
     return this.request<string>((id) => ({ type: "hash", seq: 0, id, which }));
   }
@@ -109,6 +116,10 @@ export class WorkerHost implements SimHost {
         return;
       }
       case "snapshot":
+        this.waiters.get(m.id)?.(m.snapshot);
+        this.waiters.delete(m.id);
+        return;
+      case "snapshotAt":
         this.waiters.get(m.id)?.(m.snapshot);
         this.waiters.delete(m.id);
         return;
