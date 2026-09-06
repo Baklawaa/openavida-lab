@@ -87,6 +87,7 @@ describe("goal metrics", () => {
     // Overrides apply to the trial world only.
     const quiet = runTrial(snap, goal, { seed: 3, maxTicks: 10, sampleEvery: 5, overrides: { mutationRate: 0 }, keepSnapshot: true });
     expect(quiet.snapshot!.params.mutationRate).toBe(0);
+    expect(quiet.snapshot!.params.seed).toBe(3);
     expect(snap.params.mutationRate).toBe(1);
     // Extinction stops early.
     const empty = new World({ width: 8, height: 8, seed: 2 });

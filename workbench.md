@@ -148,6 +148,14 @@ User: finish a replicate as soon as no organism is left; raise the replicate lim
 - UI (`goalPanel.ts`): `MAX_REPLICATES` 1000, `MAX_SWEEP_REPLICATES` 200; DOM updates coalesced to one per 200 ms; aggregate progress bar with counts and ≤ 16 active bars instead of one bar per replicate; result list capped at 100 rows (CSV keeps all, with an `unreachable` column); chart draws an even sample of 100 curves.
 - Load test (Playwright, 10-core laptop): 1000 replicates × 300 steps → 18.0 s, rAF interval mean 16.6 ms / max 17 ms during the run, 0 page errors. Vitest 106/106; verify-interface OK; build OK.
 
+## Round: replay a replicate, full sortable table (2026-09-06)
+
+User: after 1000 replicates with 6 successes, where do I put a seed to watch it? Then: show every result, sortable by fast/slow success and fast/slow failure.
+
+- Replay: `GoalPanel.lastRun` keeps the run's start snapshot and configs; `replay(config)` builds `worldForTrial(snapshot, config).snapshot()` and the app replaces world B with it (`replaceWorld` op), pauses, and switches to B. Entry points: ▶ on each row, seed chips under the summary (with Copier), `#replay-seed` + `#btn-replay-seed` (any seed; uses the last run's parameters, or the form when nothing ran). `worldForTrial` now also sets `params.seed` to the replicate seed so the status bar and share link report it (`tests/goals.test.ts`).
+- Table: `renderTable` builds all rows in one HTML string (rebuilt at most once per second during a run, once at the end); `compareResults` presets in `RESULT_SORTS`. Limits raised: 5000 replicates, 500 per sweep value.
+- Checks: verify-interface asserts the replay fills the seed field, opens B paused with the replicate seed, and that sorting keeps every row. Browser replay check (phototrophs, population ≥ 40): the replayed seed reaches the goal at the same step as the trial. Load: 2000 × 200 steps → 16 s, table sort 19 ms, rAF ≤ 17 ms.
+
 ## Metrics (gating)
 
 | Check | Result |

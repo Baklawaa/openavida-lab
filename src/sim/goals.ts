@@ -169,7 +169,10 @@ export function worldForTrial(snapshot: WorldSnapshot, config: TrialConfig): Wor
     }
   }
   if (config.overrides?.disturbances !== undefined) w.disturbances = config.overrides.disturbances;
-  w.rng = new Rng(config.seed >>> 0 || 1);
+  // The replicate seed becomes the world's seed: the RNG restarts from it and the status bar / share link report it.
+  const seed = config.seed >>> 0 || 1;
+  Object.assign(w.params, { seed });
+  w.rng = new Rng(seed);
   return w;
 }
 

@@ -210,10 +210,24 @@ try {
   await input('#goal-reps', 2);
   await input('#goal-max', 60);
   await page.locator('#btn-goal-run').click();
-  await page.waitForFunction(() => document.querySelectorAll('.goal-result').length >= 2, null, { timeout: 45000 });
+  await page.waitForFunction(() => document.querySelectorAll('#goal-results tbody tr').length >= 2, null, { timeout: 45000 });
   assert.match(await page.locator('#goal-summary').textContent(), /Réussite/);
-  await page.locator('.goal-result [data-open]').first().click();
+  await page.locator('#goal-results [data-open]').first().click();
   await page.waitForFunction(() => window.__openavida.world === 'B');
+  // Sorting keeps every replicate and reorders by outcome and speed.
+  await page.locator('#goal-sort').selectOption('fail-fast');
+  assert.equal(await page.locator('#goal-results tbody tr').count(), 2, 'Sorted table keeps all replicates');
+  await page.locator('#goal-sort').selectOption('hit-fast');
+  // Replaying a replicate rebuilds its start state in B, paused, with the replicate's seed.
+  const replaySeed = Number((await page.locator('#goal-results td.seed').first().textContent()).trim());
+  await page.locator('#view-A').click();
+  await page.locator('#tab-experiment').click();
+  await page.locator('#goal-results [data-replay="0"]').click();
+  await page.waitForFunction(() => window.__openavida.world === 'B');
+  assert.equal(await page.locator('#replay-seed').inputValue(), String(replaySeed), 'Replay fills the seed field');
+  assert.match(await page.locator('#run-state').textContent(), /En pause/, 'Replay opens B paused');
+  assert.equal((await probe()).seed, replaySeed, 'World B carries the replicate seed');
+  await page.locator('#tab-experiment').click();
   const csvEvent = page.waitForEvent('download');
   await page.locator('#btn-goal-csv').click();
   const csv = await csvEvent;

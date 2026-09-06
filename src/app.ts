@@ -339,6 +339,14 @@ export function mount(root: HTMLElement): void {
       paintFeeds();
       refreshMetrics();
     },
+    replayInto: (snap) => {
+      host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
+      state.paused = true;
+      updatePlayback();
+      setView("B");
+      paintFeeds();
+      refreshMetrics();
+    },
     setRecording: (on) => host.apply({ kind: "recording", which: sideOf(current()), on }),
     applyRecipe: (recipe: Recipe, target) => {
       const next = applyRecipe(recipe);

@@ -18,6 +18,7 @@ import {
   summarizeTrials,
   sweepConfigs,
   sweepValues,
+  worldForTrial,
   type FieldName,
   type Goal,
   type GoalMetric,
@@ -41,16 +42,49 @@ export interface GoalPanelOptions {
   activeWorld(): "A" | "B";
   /** Restore a snapshot into the active world or into world B (and show it). */
   restoreInto(target: "active" | "B", snapshot: WorldSnapshot): void;
+  /** Replace world B with a start state, show it paused, so a replicate can be watched from its first step. */
+  replayInto(snapshot: WorldSnapshot): void;
   setRecording(on: boolean): void;
   applyRecipe(recipe: Recipe, target: "active" | "B"): void;
 }
 
 /** Replicate ceilings: runs are long but the UI must stay responsive, so rendering is throttled and capped. */
-export const MAX_REPLICATES = 1000;
-export const MAX_SWEEP_REPLICATES = 200;
-const MAX_RESULT_ROWS = 100;
+export const MAX_REPLICATES = 5000;
+export const MAX_SWEEP_REPLICATES = 500;
 const MAX_CHART_SERIES = 100;
 const RENDER_INTERVAL_MS = 200;
+/** The full result table is rebuilt at most this often while a run is in progress (always once at the end). */
+const TABLE_INTERVAL_MS = 1000;
+
+export type ResultSort = "launch" | "hit-fast" | "hit-slow" | "fail-fast" | "fail-slow" | "value-desc" | "pop-desc";
+export const RESULT_SORTS: Array<{ id: ResultSort; label: string }> = [
+  { id: "hit-fast", label: "Réussis, les plus rapides d’abord" },
+  { id: "hit-slow", label: "Réussis, les plus lents d’abord" },
+  { id: "fail-fast", label: "Échoués, les plus rapides d’abord (extinction / impossible tôt)" },
+  { id: "fail-slow", label: "Échoués, les plus lents d’abord" },
+  { id: "value-desc", label: "Valeur finale décroissante" },
+  { id: "pop-desc", label: "Population finale décroissante" },
+  { id: "launch", label: "Ordre de lancement" },
+];
+
+/** Stable comparator over (index, result) pairs. Failures are extinctions, impossibles and budget exhaustion. */
+export function compareResults(sort: ResultSort): (a: [number, TrialResult], b: [number, TrialResult]) => number {
+  const hit = (r: TrialResult) => r.reachedTick !== null;
+  const steps = (r: TrialResult) => (r.reachedTick !== null ? r.reachedTick - r.startTick : r.ticks);
+  return ([ia, a], [ib, b]) => {
+    let d = 0;
+    switch (sort) {
+      case "hit-fast": d = Number(hit(b)) - Number(hit(a)) || (hit(a) ? steps(a) - steps(b) : steps(a) - steps(b)); break;
+      case "hit-slow": d = Number(hit(b)) - Number(hit(a)) || (hit(a) ? steps(b) - steps(a) : steps(b) - steps(a)); break;
+      case "fail-fast": d = Number(hit(a)) - Number(hit(b)) || steps(a) - steps(b); break;
+      case "fail-slow": d = Number(hit(a)) - Number(hit(b)) || steps(b) - steps(a); break;
+      case "value-desc": d = b.finalValue - a.finalValue; break;
+      case "pop-desc": d = b.finalPopulation - a.finalPopulation; break;
+      case "launch": d = 0; break;
+    }
+    return d || ia - ib;
+  };
+}
 
 const FIELD_LABEL: Record<FieldName, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
 
@@ -170,7 +204,7 @@ function template(): string {
       </div>
       <div id="goal-text" class="micro"></div>
       <div class="goal-config">
-        <label>Réplicats<input id="goal-reps" type="number" min="1" max="1000" step="1" value="6"></label>
+        <label>Réplicats<input id="goal-reps" type="number" min="1" max="5000" step="1" value="6"></label>
         <label>Pas max<input id="goal-max" type="number" min="10" max="20000" step="10" value="600"></label>
         <label>Graine<input id="goal-seed" type="number" min="1" step="1"></label>
         <label>Taux de mutation<input id="goal-mut" type="number" min="0" max="1" step="0.01"></label>
@@ -180,8 +214,11 @@ function template(): string {
       <div class="row"><button type="button" id="btn-goal-run" class="primary">${icon("play")}Lancer les réplicats</button><button type="button" id="btn-goal-stop" disabled>Arrêter</button><button type="button" id="btn-goal-csv" class="quiet" disabled>${icon("save")}CSV</button></div>
       <div id="goal-progress" class="goal-progress"></div>
       <div id="goal-summary" class="goal-summary"></div>
+      <div class="row replay-row"><input id="replay-seed" type="number" min="1" step="1" placeholder="Graine d’un réplicat"><button type="button" id="btn-replay-seed">${icon("play")}Rejouer dans B</button></div>
+      <p class="micro">Reconstruit l’état de départ de la dernière course avec cette graine et ses paramètres, dans le monde B, en pause : la lecture reproduit le réplicat pas pour pas.</p>
       <div class="chart-card goal-chart"><div class="chart-heading"><h3>Mesure par réplicat</h3><span id="goal-chart-note"></span></div><canvas id="chart-goal" role="img" aria-label="Évolution de la mesure pour chaque réplicat"></canvas></div>
-      <div id="goal-results" class="feed goal-results"></div>
+      <div class="goal-table-head"><label class="tiny" for="goal-sort">Trier</label><select id="goal-sort">${RESULT_SORTS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}</select><span id="goal-table-note" class="tiny"></span></div>
+      <div id="goal-results" class="goal-results"></div>
       <div class="section-heading" style="margin-top:18px"><h2>Balayage</h2><span class="tag">PARAMÈTRE</span></div>
       <p class="muted">Répète l’objectif pour une grille linéaire d’une variable (ex. échelle des toxines). Les graines se suivent d’une valeur à l’autre.</p>
       <label class="tiny" for="sweep-var">Variable</label>
@@ -190,7 +227,7 @@ function template(): string {
         <label>De<input id="sweep-from" type="number" step="0.05" value="0.25"></label>
         <label>À<input id="sweep-to" type="number" step="0.05" value="2"></label>
         <label>Points<input id="sweep-steps" type="number" min="2" max="16" step="1" value="5"></label>
-        <label>Réplicats / valeur<input id="sweep-reps" type="number" min="1" max="200" step="1" value="4"></label>
+        <label>Réplicats / valeur<input id="sweep-reps" type="number" min="1" max="500" step="1" value="4"></label>
       </div>
       <div class="row"><button type="button" id="btn-sweep-run">${icon("play")}Lancer le balayage</button><button type="button" id="btn-sweep-csv" class="quiet" disabled>${icon("save")}CSV du balayage</button></div>
       <div id="sweep-table"></div>
@@ -208,6 +245,8 @@ export class GoalPanel {
   private results: TrialResult[] = [];
   private progress: number[] = [];
   private lastGoal: Goal | null = null;
+  /** Start state and configs of the last run or sweep, for exact replays. */
+  private lastRun: { snapshot: WorldSnapshot; label: string; configs: TrialConfig[] } | null = null;
   private lastStrains: Strain[] = [];
   private lastMetricKey = "";
   private sweepPoints: SweepPoint[] = [];
@@ -372,6 +411,7 @@ export class GoalPanel {
       keepSnapshot: i < 8,
     }));
     this.lastGoal = goal;
+    this.lastRun = { snapshot: start.snapshot, label: start.label, configs };
     this.results = new Array(reps);
     this.progress = new Array(reps).fill(0);
     this.q<HTMLButtonElement>("#btn-goal-run").disabled = true;
@@ -402,6 +442,7 @@ export class GoalPanel {
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = all.length === 0;
     this.renderProgress(maxTicks);
+    this.lastTableRender = 0;
     this.renderResults();
     const s = summarizeTrials(all);
     this.opts.status(`Réplicats terminés en ${((performance.now() - t0) / 1000).toFixed(1)} s : ${s.successes}/${s.n} atteignent l’objectif${s.medianTicks !== null ? ` (médiane ${s.medianTicks} pas)` : ""}.`);
@@ -445,6 +486,7 @@ export class GoalPanel {
     );
     this.sweepVar = variable;
     this.lastGoal = goal;
+    this.lastRun = { snapshot: start.snapshot, label: start.label, configs };
     this.results = new Array(configs.length);
     this.progress = new Array(configs.length).fill(0);
     this.sweepPoints = [];
@@ -540,6 +582,8 @@ export class GoalPanel {
   private renderTimer: number | null = null;
   private renderMax = 0;
   private resultsDirty = false;
+  private sort: ResultSort = "hit-fast";
+  private lastTableRender = 0;
 
   /** Coalesce progress/result events: at most one DOM update per RENDER_INTERVAL_MS. */
   private scheduleRender(maxTicks: number, results: boolean): void {
@@ -607,27 +651,41 @@ export class GoalPanel {
           <span>Min – max<b>${s.minTicks === null ? "—" : `${s.minTicks} – ${s.maxTicks}`}</b></span>
           <span>Extinctions<b>${s.extinctions}</b></span>
           <span>Impossibles<b>${s.unreachable}</b></span>
-        </div>`
+        </div>${this.successSeedsHtml()}`
       : "";
-    const rows: string[] = [];
-    let hidden = 0;
-    this.results.forEach((r, i) => {
-      if (!r) return;
-      if (rows.length >= MAX_RESULT_ROWS) {
-        hidden++;
-        return;
-      }
-      const outcome = r.reachedTick !== null
-        ? `<b class="hit">atteint au pas ${r.reachedTick - r.startTick}</b>`
-        : r.extinct ? `<b class="dead">extinction au pas ${r.ticks}</b>`
-          : r.unreachable ? `<b class="dead">impossible dès le pas ${r.ticks}</b>`
-            : `<b class="miss">non atteint en ${r.ticks} pas</b>`;
-      const open = r.snapshot ? `<button type="button" class="quiet" data-open="${i}">Ouvrir dans B</button>` : "";
-      rows.push(`<div class="feed-row goal-result"><div class="feed-head">#${i + 1} · graine ${r.seed} · ${outcome}</div><div class="muted">Valeur finale ${r.finalValue.toFixed(3)} · ${r.finalPopulation} organismes</div>${open}</div>`);
-    });
-    if (hidden) rows.push(`<p class="muted">${hidden} autres réplicats : résumé ci-dessus, détail dans le CSV.</p>`);
-    this.q("#goal-results").innerHTML = rows.join("");
+    const now = performance.now();
+    if (!this.handle || now - this.lastTableRender > TABLE_INTERVAL_MS) {
+      this.lastTableRender = now;
+      this.renderTable();
+    }
     this.drawChart();
+  }
+
+  /** Every replicate, sorted; rebuilt as one HTML string so 5000 rows stay a single DOM write. */
+  private renderTable(): void {
+    const pairs: Array<[number, TrialResult]> = [];
+    this.results.forEach((r, i) => {
+      if (r) pairs.push([i, r]);
+    });
+    const host = this.q("#goal-results");
+    if (!pairs.length) {
+      host.innerHTML = "";
+      this.q("#goal-table-note").textContent = "";
+      return;
+    }
+    pairs.sort(compareResults(this.sort));
+    const cells = pairs.map(([i, r]) => {
+      const steps = r.reachedTick !== null ? r.reachedTick - r.startTick : r.ticks;
+      const outcome = r.reachedTick !== null
+        ? `<span class="hit">atteint</span>`
+        : r.extinct ? `<span class="dead">extinction</span>`
+          : r.unreachable ? `<span class="dead">impossible</span>`
+            : `<span class="miss">non atteint</span>`;
+      const open = r.snapshot ? `<button type="button" class="quiet" data-open="${i}" title="État final dans B">fin</button>` : "";
+      return `<tr><td class="mono">${i + 1}</td><td class="mono seed" data-replay-seed="${r.seed}" title="Rejouer cette graine dans B">${r.seed}</td><td>${outcome}</td><td class="mono num">${steps}</td><td class="mono num">${r.finalValue.toFixed(3)}</td><td class="mono num">${r.finalPopulation}</td><td class="ops"><button type="button" data-replay="${i}" title="Rejouer dans B">${icon("play")}</button>${open}</td></tr>`;
+    });
+    host.innerHTML = `<div class="goal-table-wrap"><table class="goal-table"><thead><tr><th>#</th><th>Graine</th><th>Issue</th><th class="num">Pas</th><th class="num">Valeur</th><th class="num">Pop.</th><th></th></tr></thead><tbody>${cells.join("")}</tbody></table></div>`;
+    this.q("#goal-table-note").textContent = `${pairs.length} réplicat${pairs.length > 1 ? "s" : ""}`;
   }
 
   private drawChart(): void {
@@ -763,8 +821,23 @@ export class GoalPanel {
     });
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
     this.q("#btn-sweep-csv").addEventListener("click", () => this.exportSweepCsv());
+    this.q("#goal-sort").addEventListener("change", (ev) => {
+      this.sort = (ev.target as HTMLSelectElement).value as ResultSort;
+      this.renderTable();
+    });
     this.q("#goal-results").addEventListener("click", (ev) => {
-      const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-open]");
+      const t = ev.target as HTMLElement;
+      const replay = t.closest<HTMLElement>("[data-replay]");
+      if (replay) {
+        this.replayIndex(Number(replay.dataset.replay));
+        return;
+      }
+      const seedCell = t.closest<HTMLElement>("[data-replay-seed]");
+      if (seedCell) {
+        this.replaySeed(Number(seedCell.dataset.replaySeed));
+        return;
+      }
+      const btn = t.closest<HTMLElement>("[data-open]");
       if (!btn) return;
       const r = this.results[Number(btn.dataset.open)];
       if (r?.snapshot) {
@@ -772,5 +845,76 @@ export class GoalPanel {
         this.opts.status(`État final du réplicat ${Number(btn.dataset.open) + 1} ouvert dans le monde B.`);
       }
     });
+    this.q("#goal-summary").addEventListener("click", (ev) => {
+      const t = ev.target as HTMLElement;
+      const chip = t.closest<HTMLElement>("[data-replay-seed]");
+      if (chip) {
+        this.replaySeed(Number(chip.dataset.replaySeed));
+        return;
+      }
+      if (t.closest("#btn-copy-seeds")) {
+        const seeds = this.results.filter((r) => r && r.reachedTick !== null).map((r) => r.seed).join(", ");
+        void navigator.clipboard?.writeText(seeds).then(
+          () => this.opts.status("Graines des réplicats réussis copiées."),
+          () => this.opts.status(seeds),
+        );
+      }
+    });
+    this.q("#btn-replay-seed").addEventListener("click", () => {
+      const seed = Math.round(Number(this.q<HTMLInputElement>("#replay-seed").value)) >>> 0;
+      if (!seed) {
+        this.opts.status("Entrez la graine d’un réplicat (colonne « graine » des résultats ou du CSV).");
+        return;
+      }
+      this.replaySeed(seed);
+    });
+    this.q("#replay-seed").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") this.q("#btn-replay-seed").click();
+    });
+  }
+
+  /* ---------- replays ---------- */
+
+  private successSeedsHtml(): string {
+    const hits = this.results.filter((r) => r && r.reachedTick !== null);
+    if (!hits.length) return "";
+    const shown = hits.slice(0, 60);
+    return `<div class="seed-chips"><span class="eyebrow">GRAINES RÉUSSIES</span>${shown
+      .map((r) => `<button type="button" class="seed-chip" data-replay-seed="${r.seed}" title="Rejouer ce réplicat dans B (atteint au pas ${r.reachedTick! - r.startTick})">${r.seed}</button>`)
+      .join("")}${hits.length > shown.length ? `<span class="tiny">+${hits.length - shown.length} dans le CSV</span>` : ""}<button type="button" id="btn-copy-seeds" class="quiet">${icon("copy")}Copier</button></div>`;
+  }
+
+  private replayIndex(i: number): void {
+    const cfg = this.lastRun?.configs[i];
+    if (!this.lastRun || !cfg) return;
+    this.replay(cfg, `réplicat ${i + 1}`);
+  }
+
+  /** Replay a seed with the last run's start state and parameters (or the current form when nothing ran yet). */
+  private replaySeed(seed: number): void {
+    if (this.lastRun) {
+      const exact = this.lastRun.configs.find((c) => c.seed === seed);
+      const template = exact ?? this.lastRun.configs[0];
+      if (!template) return;
+      this.replay({ ...template, seed }, exact ? `graine ${seed}` : `graine ${seed} (hors de la dernière course)`);
+      return;
+    }
+    void this.startSnapshot().then((start) => {
+      if (!start) return;
+      const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
+      const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
+      const maxPopulation = Math.max(16, Math.round(Number(this.q<HTMLInputElement>("#goal-popmax").value) || 16));
+      const disturbances = this.q<HTMLInputElement>("#goal-disturb").checked;
+      this.lastRun = { snapshot: start.snapshot, label: start.label, configs: [] };
+      this.replay({ seed, maxTicks, sampleEvery: 1, overrides: { mutationRate, maxPopulation, disturbances } }, `graine ${seed}`);
+    });
+  }
+
+  private replay(config: TrialConfig, label: string): void {
+    if (!this.lastRun) return;
+    const w = worldForTrial(this.lastRun.snapshot, config);
+    this.opts.replayInto(w.snapshot());
+    this.q<HTMLInputElement>("#replay-seed").value = String(config.seed);
+    this.opts.status(`Monde B : ${label} rejoué depuis ${this.lastRun.label} (graine ${config.seed}, mutation ${config.overrides?.mutationRate ?? w.params.mutationRate}). Lecture en pause.`);
   }
 }
