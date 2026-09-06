@@ -35,6 +35,52 @@ Phase 2 hooks (comments only): 3D continuum, biochemistry, multiplayer, LLM brai
 - Visuals: organisms draw at ~58% cover so nutrient/toxin/light stay readable; full-plate zoom default (no chase).
 - Step ~3.3 ms on 128×128 (`{SCRATCH}/perf.json`).
 
+## Round: visual DNA editor + scientific copy (2026-09-06)
+
+- `src/sim/dnaEdit.ts`: `annotateSequence` tiles the sequence into start/coding/stop/junk/open cells (mirrors `decodeGenome`, including the unclosed-ORF break), range ops, ORF-level ops (`bumpGene`, `setGeneStrength`, `moveGene`, `removeGene`, `appendGene`), `validateSequence`, `EditHistory` (undo/redo with `amend` for slider coalescing). Tests: `tests/dnaEdit.test.ts` (6).
+- `src/ui/dnaEditor.ts` replaces the lossy block builder (blocks → regenerate genome) with sequence-first editing: gene cards, base strip with selection editing, codon palette, phenotype diff vs reference, warnings, raw textarea two-way. Ids kept for probes: `#genome-edit`, `#btn-point/indel/dup/apply`, `#founder`, `#btn-load-founder`, `#gene-add-*`, `.gene-chip .mono`, `[data-act]`, `#dna-builder`, `#dna-advanced`.
+- Editor sync policy: `"select"` and `"apply"` load the editor; new `"peek"` (Place tool clicking an occupied cell, or after placing) does not. `load()` pushes history so a misclick is one undo away.
+- Copy: removed taglines ("Façonnez votre monde", "La vie commence ici", footer motto); labels are now descriptive (kits show their cassettes, help dialog is a protocol).
+- Gating: Vitest 77/77; `tools/verify-interface.mjs` extended (strip typing/undo/redo, codon insert, slider, minimap, pheno delta, `#btn-edit-selected`) passes at 5 sizes; `tools/launch.mjs` ×2 → 0 errors, `wipedByRaf=false`, `pointStuck=true`; `npm run build` ok.
+
+## Round: plate-first workspace (2026-09-06)
+
+User screenshot: on a wide, short window the plate got ~300 px and was stretched to the stage aspect; the empty-state overlay collided with the tool HUD.
+
+- `layout()` letterboxes the 2D canvas to the world aspect (square, or 2:1 in A / B); 3D keeps the full stage.
+- Workspace rows: 40 px metric strip · world · 156 px charts (heading + charts collapsible via `#btn-charts`, persisted in `localStorage["openavida.charts"]`). Heading row, metric cards, field toolbar row and caption row removed; field selector, run state and 2D/3D live in one toolbar; hint, speed and view zoom live in the playback bar; legend and cell readout are stage overlays.
+- `wide-workspace` (workspace aspect > 1.9, > 900 px): charts stack in a column beside the plate.
+- Empty state is a compact top card (button stays clickable, never under the HUD).
+- Plate size at 1440×900: 237 px → 476 px (608 px with charts collapsed); at 2000×700: ~300 px stretched → 452 px square.
+
+## Round: species tab (2026-09-06)
+
+User question: organisms stuck around a thermal vent + nutrient source, then a sub-group expanded away. Needed per-group tracking with the changes that enabled it.
+
+- `src/sim/species.ts`: strains (founding genome → `Organism.strainId`, inherited; `World.defineStrain` / `strainFor` / `renameStrain`), strategy classification (`strategyOf`), `groupStats`, innovations (`phenotypeChanges` at mutant birth, stored with local env; `innovationSpread` = living descendants of the lineage the mutation opened), `traitDrift`. Per-tick `strains` / `strategies` counts on `MetricsSample`. Snapshot v1 carries `strains` / `innovations`; legacy snapshots get founder tags rebuilt. No RNG use: perf hash still **9d4c0f2b**.
+- `src/ui/speciesPanel.ts` + tab `#tab-species`: mode Souches / Stratégies, "Colorer le monde par souche" (`LabRenderer.colorByStrain`, 2D), `drawGroupSeries` chart, cards, strain definition from the editor, rename inline, Placer / +24 per strain. Kit genomes name their strain after the kit.
+- Tests: `tests/species.test.ts` (7). Vitest 84/84, verify-interface OK, launch ×2 OK, build OK.
+
+## Round: presets + goal-directed replicates (2026-09-06)
+
+- Existing: in-memory restore point (session only) and JSON file export. Added `src/ui/presetStore.ts`: IndexedDB store of full snapshots (structured clone), memory fallback; list / save / load / remove; verified persisting across reload.
+- `src/sim/goals.ts`: `GoalMetric` (population, lineages, shannon, meanFitness, trait mean/max, share-in-field ≥ min, strain count/share), `Goal` (op, target, sustain), `runTrial(snapshot, goal, config)` with per-trial seed + param overrides (mutationRate, maxPopulation, disturbances) applied to the trial world only, early stop on extinction, abortable progress callback, `summarizeTrials`, `replicateSeeds`. Tests `tests/goals.test.ts` (3): metrics, sustain, budget, determinism per seed, overrides isolation, extinction, abort, summary.
+- `src/sim/goalWorker.ts` + `src/ui/goalRunner.ts`: worker pool (≤ cores−1, ≤ 6) with main-thread fallback; cancel terminates workers. Vite emits `goalWorker-*.js`.
+- `src/ui/goalPanel.ts` in Expérience: presets block, start-state select, goal templates, metric builder (strain options follow the world), config grid, progress bars, summary, per-replicate chart with target line (`drawTrialSeries`), CSV, "Ouvrir dans B".
+- E2E (Playwright, dev server): preset saved and listed → template "toxines" → 4 replicates (workers) → results + summary → open replicate in B → load preset into A → reload: preset persists → remove. 0 page errors. Vitest 87/87, perf hash 9d4c0f2b, verify-interface OK, launch ×2 OK, build OK.
+
+## Task 0 — Baseline commit (2026-09-06)
+
+No code changes. GATES on the uncommitted tree:
+
+- `npx tsc --noEmit` ok
+- `npx vitest run` 87/87, `lastHash":"9d4c0f2b"`
+- `npm run build` emits `dist/` (html+css+js+goalWorker)
+- `node tools/verify-interface.mjs` → Interface verified
+- `node tools/launch.mjs http://127.0.0.1:5174/` exit 0, ×2, frac 1.0, inspect genome 49 bases
+
+Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not product).
+
 ## Metrics (gating)
 
 | Check | Result |
@@ -68,6 +114,29 @@ Round 1 critic picked **bar**: overlapping `gl.POINTS` halos. Loop 2: opaque NEA
 ## Editor / apply path (verifier gap)
 
 rAF `refreshMetrics` used to call `selectOrganism` and reset `#genome-edit` every frame, so point/indel/duplication/apply and load-founder could not stick. `src/ui/editorSync.ts` is the shipped policy: only `"select"` and `"apply"` write the textarea. Launch probe: `wipedByRaf=false`, `pointStuck=true` on both loads (`{SCRATCH}/launch.log`).
+
+## Phase 2 (flags default off)
+
+Feature flags `view3d` / `mp` / `brains` / `llm` parse from the URL and from sandbox checkboxes. A bare URL is still the phase-1 2D lab. Perf hash after 48 steps on the default 128×128 world remains `9d4c0f2b` with brains off.
+
+- **Biochem.** `src/sim/biochem.ts` maps genome ORFs → named enzymes (permease, photosystem, hydrolase, …) and named molecules (glucose, photon, xenobiotic, ATP, …). Pathway fluxes use the same coefficients as `metabolicDelta`. Inspect panel `#inspect-pathways` is a readout of sim state, not decorative color. DOM dump: `{SCRATCH}/pathways.txt`.
+- **3D.** `src/render/view3d.ts` WebGL2 continuum: height = nutrient+light, toxin tints magenta, organisms are lit columns. Same `World` as 2D. Drag orbit, wheel zoom, click inspect/place/paint. Toggle 2D/3D in the HUD. Launch ×2 with `?view3d=1`: surface `3d`, drawingBuffer = canvas, inspect genome+phenotype non-empty (`{SCRATCH}/launch-3d.log`, `workbench/lab-3d-1.png`).
+- **Multiplayer.** Host-authority ops in `src/sim/net.ts`. A joiner is constructed with `{ claimHost: false }`; `handleIncoming` has the host answer hello with hello+snapshot. Guests never run `World.step`. Cursors emit on 2D and 3D pointermove via `RoomSession.setCursor`. Tests: two-session join + cursor (`tests/net.test.ts`). Transport is BroadcastChannel. Flag off = single-player.
+- **Brains.** Off by default → identical seeded hashes. Baseline traces under a per-tick budget. `maxLlmCallsPerTick` is enforced in `applyPolicyMoves` (further LLM calls are `llm-capped:` baseline). Ablations `no-hunt` / `no-flee` change recorded actions vs the full policy (`tests/brains.test.ts`). LLM adapter is optional and never required.
+
+### Phase-2 gating
+
+| Check | Result |
+| --- | --- |
+| Vitest phase-2 (flags, biochem, net, brains) | 13/13 — `{SCRATCH}/vitest-phase2.txt` |
+| Vitest phase-1 still (core, ecology, sandbox, dynamics, perf) | 29/29, perf hash **9d4c0f2b** — `{SCRATCH}/vitest-phase1-still.txt` |
+| `npm run build` | dist html+css+js — `{SCRATCH}/build.log` |
+| Launch 2D ×2 flags off | 0 errors, frac **1.0**, bbox **1.0**, inspect+pathways non-empty — `{SCRATCH}/launch-2d.log` |
+| Launch 3D ×2 `?view3d=1` | 0 errors, surface `3d`, buffer=canvas, genome 49 bases — `{SCRATCH}/launch-3d.log` |
+
+### Blind A/B (phase 2)
+
+Life Engine / Emergent Garden still win on multicellular body plans (non-goal). Polished Three.js science demos still win on volumetric lighting, SSAO, and camera chrome — our 3D is a field-height continuum of the **same** 128×128 world, not a disconnected cube, but it is not a film-quality volume renderer. Biggest remaining gap vs that bar: no shadow/SSAO/post stack and no true 3D reaction-diffusion volume (abstraction required to hold 60fps). Multiplayer is host-authority BroadcastChannel, not a mass-relay game server (Vercel static constraint).
 
 ## How to run
 

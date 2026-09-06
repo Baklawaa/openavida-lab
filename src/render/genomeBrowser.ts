@@ -1,6 +1,7 @@
 import { BASE_COLOR, TRAIT_COLOR, type TraitName } from "../sim/mapping";
 import { decodeGenome, toGenomeTrack, type GenomeTrack } from "../sim/genome";
 import type { Phenotype } from "../sim/mapping";
+import { TRAIT_LABEL } from "../ui/labels";
 
 export class GenomeBrowser {
   readonly canvas: HTMLCanvasElement;
@@ -45,7 +46,7 @@ export class GenomeBrowser {
     if (!track || track.sequence.length === 0) {
       ctx.fillStyle = "#5a6a78";
       ctx.font = `${12 * (window.devicePixelRatio || 1)}px ui-monospace, monospace`;
-      ctx.fillText("No genome selected — click an organism", 12, h * 0.5);
+      ctx.fillText("Sélectionnez un organisme", 12, h * 0.5);
       return;
     }
     const seq = track.sequence;
@@ -99,7 +100,7 @@ export function phenotypeTableHtml(ph: Phenotype): string {
     const shown = typeof v === "number" ? v.toFixed(3) : String(v);
     const pct = k === "signal" ? (v / 7) * 100 : Math.max(0, Math.min(100, v * 50));
     return `<tr>
-      <td class="trait-name"><span class="swatch" style="background:${color}"></span>${k}</td>
+      <td class="trait-name"><span class="swatch" style="background:${color}"></span>${TRAIT_LABEL[k as TraitName] ?? k}</td>
       <td class="trait-val">${shown}</td>
       <td class="trait-bar"><i style="width:${pct}%;background:${color}"></i></td>
     </tr>`;
@@ -107,8 +108,28 @@ export function phenotypeTableHtml(ph: Phenotype): string {
   return `<table class="pheno">${rows.join("")}</table>`;
 }
 
+/** Phenotype table with a delta column against a reference phenotype. */
+export function phenotypeDiffHtml(ph: Phenotype, ref: Phenotype): string {
+  const rows = (Object.keys(ph) as (keyof Phenotype)[]).map((k) => {
+    const color = TRAIT_COLOR[k as TraitName] ?? "#8aa0b5";
+    const v = ph[k];
+    const d = v - ref[k];
+    const pct = k === "signal" ? (v / 7) * 100 : Math.max(0, Math.min(100, v * 50));
+    const refPct = k === "signal" ? (ref[k] / 7) * 100 : Math.max(0, Math.min(100, ref[k] * 50));
+    const cls = Math.abs(d) < 0.0005 ? "same" : d > 0 ? "up" : "down";
+    const label = cls === "same" ? "=" : `${d > 0 ? "▲ +" : "▼ "}${d.toFixed(2)}`;
+    return `<tr class="${cls}">
+      <td class="trait-name"><span class="swatch" style="background:${color}"></span>${TRAIT_LABEL[k as TraitName] ?? k}</td>
+      <td class="trait-val">${v.toFixed(3)}</td>
+      <td class="trait-bar"><i style="width:${pct}%;background:${color}"></i><u style="left:${refPct}%"></u></td>
+      <td class="trait-delta">${label}</td>
+    </tr>`;
+  });
+  return `<table class="pheno pheno-diff">${rows.join("")}</table>`;
+}
+
 export function genesHtml(track: GenomeTrack): string {
-  if (track.genes.length === 0) return `<p class="muted">No ORFs (ATG…stop) in this sequence.</p>`;
+  if (track.genes.length === 0) return `<p class="muted">Aucun gène (ATG…stop) dans cette séquence.</p>`;
   return track.genes
     .map((g) => {
       const bits = Object.entries(g.contrib)

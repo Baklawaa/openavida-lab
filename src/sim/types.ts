@@ -1,4 +1,28 @@
 import type { Phenotype } from "./mapping";
+import type { Innovation, Strain } from "./species";
+
+export type DeathCause =
+  | "starvation"
+  | "toxin"
+  | "crowding"
+  | "old-age"
+  | "predation"
+  | "competition"
+  | "crash"
+  | "wipe"
+  | "bottleneck";
+
+export interface DeathRecord {
+  tick: number;
+  orgId: number;
+  lineageId: number;
+  genome: string;
+  fitness: number;
+  cause: DeathCause;
+  x: number;
+  y: number;
+  strainId?: number;
+}
 
 export const TERRAIN = {
   empty: 0,
@@ -94,6 +118,9 @@ export interface Organism {
   lineageId: number;
   parentId: number;
   fitness: number;
+  /** Founding-genome group; 0 when untagged (older snapshots). */
+  strainId: number;
+  pendingDeath?: DeathCause;
 }
 
 export interface Gene {
@@ -134,6 +161,9 @@ export interface MetricsSample {
   extinctTotal: number;
   fixationFraction: number;
   fixationLineageId: number;
+  /** Living count per strain id / per strategy at this tick. */
+  strains?: Record<string, number>;
+  strategies?: Record<string, number>;
 }
 
 export interface MutationRates {
@@ -162,6 +192,11 @@ export interface WorldSnapshot {
   lineages: LineageNode[];
   extinctions: ExtinctionRecord[];
   history: MetricsSample[];
+  deaths?: DeathRecord[];
+  strains?: Strain[];
+  nextStrainId?: number;
+  innovations?: Innovation[];
+  nextInnovationId?: number;
 }
 
 export function normalizeParams(partial: Partial<SimParams> = {}): SimParams {

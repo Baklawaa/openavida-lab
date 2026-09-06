@@ -23,8 +23,12 @@ import {
   randomGenome,
 } from "./genome";
 import { copyPhenotype } from "./mapping";
+import { classifyEnergyDeath, deathFromOrganism } from "./deaths";
+import { applyPolicyMoves, type BrainRuntime } from "./brains";
 import { parentChildEdges, sampleMetrics } from "./metrics";
+import type { DeathRecord } from "./types";
 import { mixSeed, Rng } from "./rng";
+import { phenotypeChanges, strainColor, strategyOf, type Innovation, type Strain } from "./species";
 import {
   DEFAULT_PARAMS,
   TERRAIN,
@@ -61,13 +65,21 @@ export class World {
   nextLineageId = 1;
   lineages = new Map<number, LineageNode>();
   extinctions: ExtinctionRecord[] = [];
+  strains = new Map<number, Strain>();
+  nextStrainId = 1;
+  innovations: Innovation[] = [];
+  nextInnovationId = 1;
   history: MetricsSample[] = [];
+  deaths: DeathRecord[] = [];
   lastPredation = 0;
   lastMutualism = 0;
   lastDisplacements = 0;
   lastStepMs = 0;
   randomTerrain: boolean;
   disturbances: boolean;
+  /** Off by default — phase-1 step path. */
+  brainsEnabled = false;
+  brain: BrainRuntime | null = null;
 
   constructor(partial: Partial<SimParams> = {}) {
     this.params = normalizeParams(partial);
@@ -232,11 +244,27 @@ export class World {
       lineageId: 0,
       parentId: parent ? parent.id : -1,
       fitness: 0,
+      strainId: parent ? parent.strainId : this.strainFor(decoded.sequence, decoded.phenotype).id,
     };
     if (!parent) {
       org.lineageId = this.createLineage(-1, org);
     } else if (mutant) {
       org.lineageId = this.createLineage(parent.lineageId, org);
+      const changes = phenotypeChanges(parent.ph, org.ph);
+      if (changes.length) {
+        this.innovations.push({
+          id: this.nextInnovationId++,
+          strainId: org.strainId,
+          tick: this.tick,
+          orgId: org.id,
+          parentOrgId: parent.id,
+          lineageId: org.lineageId,
+          kind: genome.length === parent.genome.length ? "point" : Math.abs(genome.length - parent.genome.length) <= 3 ? "indel" : "duplication",
+          changes,
+          env: this.fields.sample(x, y),
+        });
+        if (this.innovations.length > 900) this.pruneInnovations();
+      }
     } else {
       org.lineageId = parent.lineageId;
       const lin = this.lineages.get(org.lineageId);
@@ -249,6 +277,72 @@ export class World {
     this.occupancy[i] = this.organisms.length - 1;
     this.refreshFitness(org);
     return org;
+  }
+
+  /** Find the strain whose founding genome matches, or create "Souche n". */
+  strainFor(genome: string, phenotype?: import("./mapping").Phenotype): Strain {
+    const signature = genomeSignature(genome);
+    for (const s of this.strains.values()) if (s.signature === signature && s.genome === genome) return s;
+    return this.defineStrain(genome, { phenotype });
+  }
+
+  /** Pre-define (or rename) a strain for a genome. Manual strains keep their name. */
+  defineStrain(genome: string, opts: { name?: string; manual?: boolean; phenotype?: import("./mapping").Phenotype } = {}): Strain {
+    const seq = decodeGenome(genome).sequence;
+    const signature = genomeSignature(seq);
+    for (const s of this.strains.values()) {
+      if (s.signature === signature && s.genome === seq) {
+        if (opts.name && (opts.manual || !s.manual)) s.name = opts.name;
+        if (opts.manual) s.manual = true;
+        return s;
+      }
+    }
+    const id = this.nextStrainId++;
+    const strain: Strain = {
+      id,
+      name: opts.name ?? `Souche ${id}`,
+      color: strainColor(id - 1),
+      genome: seq,
+      signature,
+      bornTick: this.tick,
+      manual: Boolean(opts.manual),
+      founderPhenotype: copyPhenotype(opts.phenotype ?? decodeGenome(seq).phenotype),
+    };
+    this.strains.set(id, strain);
+    return strain;
+  }
+
+  renameStrain(id: number, name: string): boolean {
+    const s = this.strains.get(id);
+    if (!s) return false;
+    s.name = name.trim() || s.name;
+    s.manual = true;
+    return true;
+  }
+
+  /** Keep the innovations that still have living descendants plus the most recent ones. */
+  private pruneInnovations(): void {
+    const alive = new Set<number>();
+    for (const l of this.lineages.values()) if (l.count > 0) alive.add(l.id);
+    const recent = this.innovations.slice(-300);
+    const keep = this.innovations.filter((i) => alive.has(i.lineageId) || this.lineageHasLivingDescendant(i.lineageId));
+    const ids = new Set(keep.map((i) => i.id));
+    for (const r of recent) if (!ids.has(r.id)) keep.push(r);
+    keep.sort((a, b) => a.id - b.id);
+    this.innovations = keep.slice(-900);
+  }
+
+  private lineageHasLivingDescendant(root: number): boolean {
+    for (const l of this.lineages.values()) {
+      if (l.count <= 0) continue;
+      let cur: LineageNode | undefined = l;
+      let guard = 0;
+      while (cur && guard++ < 10000) {
+        if (cur.id === root) return true;
+        cur = this.lineages.get(cur.parentId);
+      }
+    }
+    return false;
   }
 
   private createLineage(parentLineageId: number, org: Organism): number {
@@ -299,7 +393,11 @@ export class World {
       const o = orgs[i]!;
       o.age++;
       metabolize(o, this.fields, this.params);
+      if (o.energy <= 0 && !o.pendingDeath) {
+        o.pendingDeath = classifyEnergyDeath(o.ph, this.fields.sample(o.x, o.y));
+      }
       o.energy -= crowdingPenalty(o.x, o.y, this.occupancy, this.w, this.h);
+      if (o.energy <= 0 && !o.pendingDeath) o.pendingDeath = "crowding";
       this.refreshFitness(o);
     }
     const inter = interactNeighbors(
@@ -317,15 +415,28 @@ export class World {
       const cap = 3.2 + 1.2 * o.ph.size;
       if (o.energy > cap) o.energy = cap;
     }
-    const mv = moveOrganisms(
-      orgs,
-      this.occupancy,
-      this.terrain,
-      this.fields,
-      this.w,
-      this.h,
-      this.rng,
-    );
+    const mv =
+      this.brainsEnabled && this.brain
+        ? applyPolicyMoves(
+            orgs,
+            this.occupancy,
+            this.terrain,
+            this.fields,
+            this.w,
+            this.h,
+            this.rng,
+            this.tick,
+            this.brain,
+          )
+        : moveOrganisms(
+            orgs,
+            this.occupancy,
+            this.terrain,
+            this.fields,
+            this.w,
+            this.h,
+            this.rng,
+          );
     this.lastDisplacements = mv.displacements;
     this.reproduceAll();
     this.reap();
@@ -348,7 +459,10 @@ export class World {
     }
     if (tick >= CRASH_EVERY && tick % CRASH_EVERY === 0 && this.organisms.length > 280) {
       for (const o of this.organisms) {
-        if (rng.chance(0.07)) o.energy = 0;
+        if (rng.chance(0.07)) {
+          o.energy = 0;
+          o.pendingDeath = "crash";
+        }
       }
     }
   }
@@ -391,7 +505,12 @@ export class World {
       if (o.energy > 0 && o.age < maxAge) {
         kept.push(o);
         counts.set(o.lineageId, (counts.get(o.lineageId) ?? 0) + 1);
+        continue;
       }
+      const cause =
+        o.age >= maxAge ? "old-age" : (o.pendingDeath ?? (o.energy <= 0 ? "starvation" : "old-age"));
+      this.deaths.push(deathFromOrganism(o, this.tick, cause));
+      if (this.deaths.length > 250) this.deaths.splice(0, this.deaths.length - 200);
     }
     for (const lin of this.lineages.values()) {
       const next = counts.get(lin.id) ?? 0;
@@ -407,6 +526,16 @@ export class World {
 
   recordMetrics(): MetricsSample {
     const m = sampleMetrics(this.tick, this.organisms, this.lineages.values(), this.extinctions.length);
+    const strains: Record<string, number> = {};
+    const strategies: Record<string, number> = {};
+    for (const o of this.organisms) {
+      const sk = String(o.strainId);
+      strains[sk] = (strains[sk] ?? 0) + 1;
+      const st = strategyOf(o.ph, this.params.predationThreshold);
+      strategies[st] = (strategies[st] ?? 0) + 1;
+    }
+    m.strains = strains;
+    m.strategies = strategies;
     this.history.push(m);
     if (this.history.length > 4000) this.history.splice(0, this.history.length - 3000);
     return m;
@@ -432,14 +561,20 @@ export class World {
         if (brush === "lightBlob") this.fields.light[i] = Math.min(2, this.fields.light[i]! + amount);
         if (brush === "wipeOrgs") {
           const oi = this.occupancy[i]!;
-          if (oi >= 0 && this.organisms[oi]) this.organisms[oi]!.energy = 0;
+          if (oi >= 0 && this.organisms[oi]) {
+            this.organisms[oi]!.energy = 0;
+            this.organisms[oi]!.pendingDeath = "wipe";
+          }
         }
         if (brush === "erase" || (terrainKind === TERRAIN.barrier && brush === "barrier")) {
           // barrier paint already set; erase also clears occupancy optionally
         }
         if (brush === "barrier") {
           const oi = this.occupancy[i]!;
-          if (oi >= 0 && this.organisms[oi]) this.organisms[oi]!.energy = 0;
+          if (oi >= 0 && this.organisms[oi]) {
+            this.organisms[oi]!.energy = 0;
+            this.organisms[oi]!.pendingDeath = "wipe";
+          }
         }
       }
     }
@@ -495,6 +630,7 @@ export class World {
     }
     for (let k = target; k < order.length; k++) {
       this.organisms[order[k]!]!.energy = 0;
+      this.organisms[order[k]!]!.pendingDeath = "bottleneck";
     }
     this.reap();
     return this.organisms.length;
@@ -537,6 +673,11 @@ export class World {
       lineages: Array.from(this.lineages.values()).map((l) => ({ ...l })),
       extinctions: this.extinctions.map((e) => ({ ...e })),
       history: this.history.map((h) => ({ ...h })),
+      deaths: this.deaths.map((d) => ({ ...d })),
+      strains: Array.from(this.strains.values()).map((s) => ({ ...s, founderPhenotype: copyPhenotype(s.founderPhenotype) })),
+      nextStrainId: this.nextStrainId,
+      innovations: this.innovations.map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } })),
+      nextInnovationId: this.nextInnovationId,
     };
   }
 
@@ -545,15 +686,26 @@ export class World {
     this.tick = snap.tick;
     this.fields.fromArrays(snap);
     this.terrain.set(snap.terrain);
+    this.strains = new Map((snap.strains ?? []).map((s) => [s.id, { ...s, founderPhenotype: copyPhenotype(s.founderPhenotype) }]));
+    this.nextStrainId = snap.nextStrainId ?? (Math.max(0, ...this.strains.keys()) + 1);
+    this.innovations = (snap.innovations ?? []).map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } }));
+    this.nextInnovationId = snap.nextInnovationId ?? (Math.max(0, ...this.innovations.map((i) => i.id)) + 1);
     this.organisms = snap.organisms.map((o) => ({
       ...o,
       ph: copyPhenotype(o.ph),
+      strainId: o.strainId ?? 0,
     }));
+    // Older snapshots carry no strain tags: rebuild them from founders' genomes where possible.
+    for (const o of this.organisms) {
+      if (o.strainId) continue;
+      if (o.parentId < 0) o.strainId = this.strainFor(o.genome, o.ph).id;
+    }
     this.nextOrgId = snap.nextOrgId;
     this.nextLineageId = snap.nextLineageId;
     this.lineages = new Map(snap.lineages.map((l) => [l.id, { ...l }]));
     this.extinctions = snap.extinctions.map((e) => ({ ...e }));
     this.history = snap.history.map((h) => ({ ...h }));
+    this.deaths = (snap.deaths ?? []).map((d) => ({ ...d }));
     this.randomTerrain = Boolean(snap.params.randomTerrain);
     this.disturbances = Boolean(snap.params.disturbances);
     this.rebuildOccupancy();

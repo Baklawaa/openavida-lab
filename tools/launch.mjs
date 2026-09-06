@@ -30,10 +30,13 @@ async function probe(page, label) {
     }
   });
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForSelector("#gl", { timeout: 20000 });
+  await page.waitForSelector("#gl", { state: "attached", timeout: 20000 });
   await page.waitForFunction(() => window.__openavida && window.__openavida.population >= 0, null, {
     timeout: 20000,
   });
+  if (/view3d=1/.test(url) || (await page.evaluate(() => window.__openavida?.surface === "3d"))) {
+    await page.waitForSelector("#gl3d.on", { timeout: 20000 });
+  }
   await page.waitForTimeout(400);
   const pop0 = await page.evaluate(() => window.__openavida?.population ?? -1);
   await page.locator("#btn-pause").click();
@@ -64,7 +67,8 @@ async function probe(page, label) {
   });
 
   const pixel = await page.evaluate(() => {
-    const c = document.getElementById("gl");
+    const c3 = document.getElementById("gl3d");
+    const c = c3 && c3.classList.contains("on") ? c3 : document.getElementById("gl");
     const gl = c.getContext("webgl2") || c.getContext("webgl");
     if (!gl) return { error: "no webgl", filled: 0, bbox: 0 };
     const w = gl.drawingBufferWidth;
@@ -104,7 +108,8 @@ async function probe(page, label) {
 
   const org = await page.evaluate(() => {
     const pick = window.__openavidaOrgPixel;
-    const c = document.getElementById("gl");
+    const c3 = document.getElementById("gl3d");
+    const c = c3 && c3.classList.contains("on") ? c3 : document.getElementById("gl");
     if (!pick || !c) return null;
     const box = c.getBoundingClientRect();
     let best = null;
@@ -126,7 +131,8 @@ async function probe(page, label) {
   if (org) {
     await page.mouse.click(org.x, org.y);
   } else {
-    const box = await page.locator("#gl").boundingBox();
+    const vis = (await page.locator("#gl3d.on").count()) ? "#gl3d" : "#gl";
+    const box = await page.locator(vis).boundingBox();
     if (box) await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
   }
   await page.waitForFunction(
@@ -221,11 +227,14 @@ const summary = {
 writeFileSync(resolve(scratch, "launch.json"), JSON.stringify(summary, null, 2));
 console.log(JSON.stringify(summary, null, 2));
 
-const ok = results.every(
-  (r) =>
+const ok = results.every((r) => {
+  const three = r.after.probe?.surface === "3d";
+  const pixels = three
+    ? r.pixel.painted > 2000 && r.pixel.frac > 0.02
+    : r.pixel.frac > 0.5 && r.pixel.bbox > 0.8;
+  return (
     r.errors.length === 0 &&
-    r.pixel.frac > 0.5 &&
-    r.pixel.bbox > 0.8 &&
+    pixels &&
     r.pixel.w === r.pixel.canvasW &&
     r.after.g.length > 0 &&
     r.after.p.length > 0 &&
@@ -235,6 +244,8 @@ const ok = results.every(
     r.hover?.["btn-pause"]?.titleMatches === true &&
     r.hover?.["tool-place"]?.titleMatches === true &&
     r.pop0 === 0 &&
-    r.placed === true,
-);
+    r.placed === true &&
+    (!three || r.after.probe?.view3d === true)
+  );
+});
 process.exit(ok ? 0 : 2);

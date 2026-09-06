@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { TRAIT_NAMES } from "../src/sim/index";
 import { CONTROL_HELP, LAB_CONTROL_IDS, attachControlHelp } from "../src/ui/help";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const appSrc = readFileSync(resolve(root, "src/app.ts"), "utf8");
+const appSrc = ["src/app.ts", "src/ui/layout.ts", "src/ui/dnaEditor.ts", "src/ui/speciesPanel.ts", "src/ui/goalPanel.ts"].map(path => readFileSync(resolve(root, path), "utf8")).join("\n");
 
 describe("control help catalog", () => {
   it("covers every labeled lab control with a non-empty explanation", () => {
@@ -15,6 +16,12 @@ describe("control help catalog", () => {
       const text = CONTROL_HELP[id];
       expect(text, id).toBeTruthy();
       expect(text!.trim().length, id).toBeGreaterThan(12);
+      if (id.startsWith("gene-add-")) {
+        const trait = id.slice("gene-add-".length);
+        expect(appSrc.includes("gene-add-"), `gene-add buttons in UI`).toBe(true);
+        expect((TRAIT_NAMES as readonly string[]).includes(trait), `trait ${trait}`).toBe(true);
+        continue;
+      }
       const token = id.startsWith("brush-")
         ? id.slice("brush-".length)
         : id.startsWith("kit-")

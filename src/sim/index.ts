@@ -32,6 +32,7 @@ export {
   mutate,
   pointMutate,
   randomGenome,
+  sanitizeSequence,
   toGenomeTrack,
   type DecodedGenome,
   type GenomeTrack,
@@ -74,8 +75,125 @@ export {
   shannonFromCounts,
 } from "./metrics";
 export { DEFAULT_PARAMS, World } from "./world";
-export { TERRAIN, normalizeParams, type BrushKind, type SimParams, type WorldSnapshot } from "./types";
-
-// PHASE 2 HOOK: 3D continuum / Lenia PDE stepper — swap Fields for a volume.
-// PHASE 2 HOOK: mass multiplayer — World is a pure state machine; wrap DualWorld in a room.
-// PHASE 2 HOOK: LLM creature brains — attach a policy field on Organism; keep it off the hot path.
+export { TERRAIN, normalizeParams, type BrushKind, type DeathCause, type SimParams, type WorldSnapshot } from "./types";
+export {
+  CAUSE_COLOR,
+  CAUSE_LABEL,
+  CAUSE_SHORT,
+  classifyEnergyDeath,
+  dnaSnippet,
+  strongestLiving,
+  tallyDeaths,
+} from "./deaths";
+export {
+  GENE_LABEL,
+  addBlock,
+  blocksFromGenome,
+  genomeFromBlocks,
+  geneColor,
+  geneHint,
+  moveBlock,
+  removeBlock,
+  setBlockStrength,
+  type GeneBlock,
+} from "./builder";
+export {
+  EditHistory,
+  annotateSequence,
+  appendGene,
+  bumpGene,
+  deleteRange,
+  duplicateRange,
+  findOpenOrf,
+  geneStrength,
+  insertAt,
+  insertGeneAt,
+  moveGene,
+  phenotypeDelta,
+  removeGene,
+  replaceRange,
+  setBase,
+  setGeneStrength,
+  validateSequence,
+  type CodonCell,
+  type CodonRole,
+  type DnaAnnotation,
+  type DnaIssue,
+} from "./dnaEdit";
+export {
+  INNOVATION_THRESHOLD,
+  STRAIN_COLORS,
+  STRATEGIES,
+  STRATEGY_COLOR,
+  STRATEGY_LABEL,
+  groupStats,
+  innovationSpread,
+  keyInnovations,
+  phenotypeChanges,
+  strainColor,
+  strategyOf,
+  traitDrift,
+  type GroupStats,
+  type Innovation,
+  type Strain,
+  type Strategy,
+  type TraitChange,
+} from "./species";
+export {
+  GOAL_TRAITS,
+  evaluateGoalMetric,
+  goalHolds,
+  replicateSeeds,
+  runTrial,
+  summarizeTrials,
+  worldForTrial,
+  type Goal,
+  type GoalMetric,
+  type GoalOp,
+  type TrialConfig,
+  type TrialResult,
+  type TrialSummary,
+} from "./goals";
+export {
+  DEFAULT_FLAGS,
+  flagsEqual,
+  flagsFromQuery,
+  flagsToQuery,
+  type FeatureFlags,
+} from "./flags";
+export {
+  ENZYMES,
+  MOLECULES,
+  PATHWAYS,
+  enzymesFromDecoded,
+  inspectBiochem,
+  moleculeAmounts,
+  pathwayFluxes,
+  pathwaysHtml,
+  type BiochemInspect,
+} from "./biochem";
+export {
+  BrainRuntime,
+  applyPolicyMoves,
+  baselinePolicy,
+  baselinePolicyWith,
+  collectPercept,
+  llmPolicy,
+  tracesHtml,
+  type Ablation,
+  type BrainTrace,
+  type LlmAdapter,
+  type Percept,
+} from "./brains";
+export {
+  RoomSession,
+  applyRoomOp,
+  canDriveClock,
+  canMutateWorld,
+  cloneOp,
+  handleIncoming,
+  peerColor,
+  type PeerPresence,
+  type PeerRole,
+  type RoomOp,
+} from "./net";

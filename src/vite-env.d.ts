@@ -13,6 +13,18 @@ interface OpenAvidaProbe {
   lastStepMs: number;
   seed: number;
   world: "A" | "B";
+  deathCount: number;
+  lastDeathCause: string;
+  topFit: number;
+  builderGenes: number;
+  surface: "2d" | "3d";
+  view3d: boolean;
+  brains: boolean;
+  llmBrains: boolean;
+  multiplayer: boolean;
+  pathways: string;
+  brainTraces: number;
+  roomPeers: number;
 }
 
 interface Window {

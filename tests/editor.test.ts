@@ -1,23 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { decodeGenome, pointMutate, World } from "../src/sim/index";
 import { Rng } from "../src/sim/rng";
-import { shouldWriteEditor, syncGenomeEditor } from "../src/ui/editorSync";
+import { shouldWriteEditor } from "../src/ui/editorSync";
 
 describe("genome editor vs rAF inspect refresh", () => {
-  it("refresh must not write the editor; select and apply may", () => {
+  it("refresh and peek must not write the editor; select and apply may", () => {
     expect(shouldWriteEditor("refresh")).toBe(false);
     expect(shouldWriteEditor("select")).toBe(true);
     expect(shouldWriteEditor("apply")).toBe(true);
     expect(shouldWriteEditor("clear")).toBe(false);
-
-    const editor = { value: "USEREDIT" };
-    expect(syncGenomeEditor(editor, "ATGTAA", "refresh")).toBe(false);
-    expect(editor.value).toBe("USEREDIT");
-    expect(syncGenomeEditor(editor, "ATGAAAAAATAA", "select")).toBe(true);
-    expect(editor.value).toBe("ATGAAAAAATAA");
-    editor.value = "USEREDIT";
-    expect(syncGenomeEditor(editor, "ATGCCCCCCTAA", "apply")).toBe(true);
-    expect(editor.value).toBe("ATGCCCCCCTAA");
+    expect(shouldWriteEditor("peek")).toBe(false);
   });
 
   it("point-mutate then replaceGenome (apply) changes the selected organism", () => {

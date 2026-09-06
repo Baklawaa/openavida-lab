@@ -25,18 +25,18 @@ uniform vec4 uCropB;
 out vec4 fragColor;
 
 vec3 fieldColor(vec4 f) {
-  vec3 bg = vec3(0.012, 0.02, 0.038);
+  vec3 bg = vec3(0.035, 0.065, 0.062);
   vec3 nut = vec3(0.05, 0.95, 0.78) * pow(max(f.r, 0.0), 0.65);
   vec3 tox = vec3(0.98, 0.12, 0.58) * pow(max(f.g, 0.0), 0.62);
   vec3 cold = vec3(0.12, 0.32, 0.95);
   vec3 hot = vec3(0.98, 0.32, 0.06);
   vec3 tmp = mix(cold, hot, clamp(f.b, 0.0, 1.0)) * (0.16 + 0.5 * f.b);
   vec3 lit = vec3(1.0, 0.9, 0.55) * pow(max(f.a, 0.0), 1.15) * 0.28;
-  if (uMode == 1) return bg + nut * 1.85;
-  if (uMode == 2) return bg + tox * 1.85;
-  if (uMode == 3) return bg + tmp * 2.0;
-  if (uMode == 4) return bg + lit * 2.4;
-  return bg + nut * 1.25 + tox * 1.05 + tmp + lit;
+  if (uMode == 1) return bg + nut * 0.8;
+  if (uMode == 2) return bg + tox * 0.8;
+  if (uMode == 3) return bg + tmp * 0.85;
+  if (uMode == 4) return bg + lit * 1.4;
+  return bg + nut * 0.42 + tox * 0.38 + tmp * 0.19 + lit * 0.25;
 }
 
 vec2 applyCrop(vec2 local, vec4 crop) {
@@ -68,7 +68,16 @@ void main() {
     plate = texture(uPlate, tuv);
   }
   vec3 col = fieldColor(f);
-  if (plate.a > 0.02) col = mix(col, plate.rgb, min(0.58, plate.a));
+  vec2 cell = fract(tuv * uWorld) - 0.5;
+  // Opaque bright cells are organisms; terrain retains its square footprint.
+  if (plate.a > 0.85 && max(plate.r, max(plate.g, plate.b)) > 0.25) {
+    float body = 1.0 - smoothstep(0.28, 0.48, length(cell));
+    col = mix(col, plate.rgb, body);
+  } else if (plate.a > 0.02) {
+    col = mix(col, plate.rgb, min(0.8, plate.a));
+  }
+  float edge = max(abs(cell.x), abs(cell.y));
+  col *= 1.0 - smoothstep(0.46, 0.5, edge) * 0.08;
   float vig = smoothstep(1.15, 0.22, length(uv - 0.5));
   col *= 0.86 + 0.14 * vig;
   float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
@@ -78,6 +87,40 @@ void main() {
     col = mix(col, vec3(0.25, 0.85, 0.75), line * 0.55);
   }
   fragColor = vec4(col, 1.0);
+}
+`;
+
+const VS_ORGANISM = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aPosition;
+layout(location=1) in vec3 aColor;
+layout(location=2) in float aSelected;
+uniform float uSize;
+uniform float uDpr;
+out vec3 vColor;
+out float vSelected;
+void main() {
+  gl_Position = vec4(aPosition, 0.0, 1.0);
+  gl_PointSize = uSize + aSelected * 6.0 * uDpr;
+  vColor = aColor;
+  vSelected = aSelected;
+}
+`;
+
+const FS_ORGANISM = `#version 300 es
+precision highp float;
+in vec3 vColor;
+in float vSelected;
+out vec4 fragColor;
+void main() {
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  if (d > 1.0) discard;
+  float body = 1.0 - smoothstep(0.65, 1.0, d);
+  if (vSelected > 0.5) {
+    float ring = smoothstep(0.68, 0.77, d) * (1.0 - smoothstep(0.88, 1.0, d));
+    body = 1.0 - smoothstep(0.35, 0.5, d);
+    fragColor = vec4(mix(vColor, vec3(0.88, 1.0, 0.92), ring), max(body, ring));
+  } else fragColor = vec4(vColor, body);
 }
 `;
 
@@ -151,6 +194,9 @@ export class LabRenderer {
   readonly canvas: HTMLCanvasElement;
   readonly gl: WebGL2RenderingContext;
   private fieldProg: WebGLProgram;
+  private organismProg: WebGLProgram;
+  private organismBuffer: WebGLBuffer;
+  private organismVao: WebGLVertexArrayObject;
   private texA: WebGLTexture;
   private texB: WebGLTexture;
   private plateA: WebGLTexture;
@@ -161,8 +207,11 @@ export class LabRenderer {
   fieldMode: FieldMode = 0;
   view: ViewMode = "A";
   selectedId = -1;
+  selectedWorld: "A" | "B" = "A";
   /** 1 = whole 128×128 plate. User-controlled; does not chase biomass. */
   zoom = 1;
+  /** Color organisms by founding strain instead of guild + lineage. */
+  colorByStrain = false;
   private cropA: [number, number, number, number] = [0, 0, 1, 1];
   private cropB: [number, number, number, number] = [0, 0, 1, 1];
 
@@ -178,6 +227,16 @@ export class LabRenderer {
     if (!gl) throw new Error("WebGL2 required");
     this.gl = gl;
     this.fieldProg = program(gl, VS_FIELD, FS_FIELD);
+    this.organismProg = program(gl, VS_ORGANISM, FS_ORGANISM);
+    this.organismBuffer = gl.createBuffer()!;
+    this.organismVao = gl.createVertexArray()!;
+    gl.bindVertexArray(this.organismVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.organismBuffer);
+    for (const [index, size, offset] of [[0, 2, 0], [1, 3, 8], [2, 1, 20]]) {
+      gl.enableVertexAttribArray(index!);
+      gl.vertexAttribPointer(index!, size!, gl.FLOAT, false, 24, offset!);
+    }
+    gl.bindVertexArray(null);
     this.texA = this.makeTex(false);
     this.texB = this.makeTex(false);
     this.plateA = this.makeTex(true);
@@ -268,15 +327,6 @@ export class LabRenderer {
         out[o + 3] = 110;
       }
     }
-    for (const org of world.organisms) {
-      const i = (org.y * world.w + org.x) * 4;
-      const [r, g, b] = organismRgb(org.ph, org.lineageId);
-      const sel = org.id === this.selectedId;
-      out[i] = sel ? 230 : Math.round(r * 255);
-      out[i + 1] = sel ? 255 : Math.round(g * 255);
-      out[i + 2] = sel ? 245 : Math.round(b * 255);
-      out[i + 3] = sel ? 230 : 148;
-    }
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, world.w, world.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, out);
@@ -299,6 +349,7 @@ export class LabRenderer {
     }
 
     gl.disable(gl.BLEND);
+    gl.bindVertexArray(null);
     gl.useProgram(this.fieldProg);
     gl.uniform2f(gl.getUniformLocation(this.fieldProg, "uRes"), this.canvas.width, this.canvas.height);
     gl.uniform2f(gl.getUniformLocation(this.fieldProg, "uWorld"), primary.w, primary.h);
@@ -322,6 +373,37 @@ export class LabRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.plateB);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uPlateB"), 3);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.drawOrganisms(split ? [worldA, worldB] : [primary]);
+  }
+
+  private drawOrganisms(worlds: World[]): void {
+    const gl = this.gl;
+    const data: number[] = [];
+    const crop = this.cropA;
+    for (let side = 0; side < worlds.length; side++) {
+      const world = worlds[side]!;
+      for (const org of world.organisms) {
+        const u = ((org.x + .5) / world.w - crop[0]) / (crop[2] - crop[0]);
+        const v = ((org.y + .5) / world.h - crop[1]) / (crop[3] - crop[1]);
+        if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+        const strain = this.colorByStrain ? world.strains.get(org.strainId) : undefined;
+        const color = strain ? hexRgb(strain.color) : organismRgb(org.ph, org.lineageId);
+        data.push((u + side) / worlds.length * 2 - 1, 1 - v * 2, ...color, org.id === this.selectedId && (worlds.length === 1 || (side === 0 ? "A" : "B") === this.selectedWorld) ? 1 : 0);
+      }
+    }
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cell = Math.min(this.canvas.width / worlds.length / worlds[0]!.w, this.canvas.height / worlds[0]!.h) / this.zoom;
+    gl.useProgram(this.organismProg);
+    gl.bindVertexArray(this.organismVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.organismBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+    gl.uniform1f(gl.getUniformLocation(this.organismProg, "uSize"), Math.max(4 * dpr, Math.min(16 * dpr, cell * .9)));
+    gl.uniform1f(gl.getUniformLocation(this.organismProg, "uDpr"), dpr);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArrays(gl.POINTS, 0, data.length / 6);
+    gl.bindVertexArray(null);
+    gl.disable(gl.BLEND);
   }
 
   canvasToGrid(clientX: number, clientY: number, world: World): { x: number; y: number } | null {
@@ -347,7 +429,9 @@ export class LabRenderer {
     const u = (tu - crop[0]) / Math.max(1e-6, crop[2] - crop[0]);
     const v = (tv - crop[1]) / Math.max(1e-6, crop[3] - crop[1]);
     const rect = this.canvas.getBoundingClientRect();
-    return { x: rect.left + u * rect.width, y: rect.top + v * rect.height };
+    const split = this.view === "split";
+    const offset = split && this.selectedWorld === "B" ? 0.5 : 0;
+    return { x: rect.left + (u / (split ? 2 : 1) + offset) * rect.width, y: rect.top + v * rect.height };
   }
 
   pickWorld(clientX: number): "A" | "B" {

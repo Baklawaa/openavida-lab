@@ -126,6 +126,7 @@ export function interactNeighbors(
       const meal = other.energy * (0.35 + 0.4 * pred.ph.aggression);
       pred.energy += meal;
       other.energy = 0;
+      other.pendingDeath = "predation";
       predationEvents++;
       kills++;
     }
@@ -219,6 +220,7 @@ export function moveOrganisms(
     if (org.fitness > other.fitness) {
       occupancy[other.y * w + other.x] = -1;
       other.energy = 0;
+      other.pendingDeath = "competition";
       occupancy[org.y * w + org.x] = -1;
       org.x = nx;
       org.y = ny;

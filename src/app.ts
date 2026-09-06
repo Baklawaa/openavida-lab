@@ -1,54 +1,77 @@
 import { drawFitness, drawPhylogeny, drawShannon } from "./render/charts";
 import { GenomeBrowser, genesHtml, phenotypeTableHtml } from "./render/genomeBrowser";
+import { DnaEditor } from "./ui/dnaEditor";
+import { SpeciesPanel } from "./ui/speciesPanel";
+import { GoalPanel } from "./ui/goalPanel";
 import { LabRenderer, type FieldMode, type ViewMode } from "./render/webgl";
+import { View3D } from "./render/view3d";
 import {
   DualWorld,
   World,
+  BrainRuntime,
   applyBottleneck,
+  baselinePolicy,
   buildShareURL,
+  canDriveClock,
+  canMutateWorld,
+  handleIncoming,
   decodeGenome,
-  duplicateMutate,
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,
+  CAUSE_COLOR,
+  CAUSE_LABEL,
   DNA_KITS,
+  dnaSnippet,
+  flagsFromQuery,
+  flagsToQuery,
   founderHeterotroph,
   genomeForKit,
-  indelMutate,
   injectStrain,
-  kitById,
+  inspectBiochem,
+  llmPolicy,
   mappingLegend,
   paintTerrain,
   parseJSONSnapshot,
-  phenotypeForKit,
+  pathwaysHtml,
   placeOrganismAt,
+  RoomSession,
+  strongestLiving,
+  tallyDeaths,
+  tracesHtml,
   parseShareURL,
-  pointMutate,
+  peerColor,
   restoreSnapshot,
   takeSnapshot,
   toGenomeTrack,
   type BrushKind,
+  type DeathCause,
+  type FeatureFlags,
+  type PeerRole,
+  type RoomOp,
   type SimParams,
   type WorldSnapshot,
 } from "./sim/index";
-import { Rng } from "./sim/rng";
-import { syncGenomeEditor, type EditorSyncReason } from "./ui/editorSync";
+import { shouldWriteEditor, type EditorSyncReason } from "./ui/editorSync";
 import { formatSpeed, ticksDue } from "./ui/speed";
 import { CONTROL_HELP, attachControlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
+import { makeSelf, openRoomChannel } from "./ui/roomChannel";
+import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
+import { DEATH_LABEL } from "./ui/labels";
 
 const BRUSHES: { id: BrushKind; label: string }[] = [
-  { id: "nutrientBlob", label: "nutrient" },
-  { id: "toxinBlob", label: "toxin" },
-  { id: "heatBlob", label: "heat" },
-  { id: "lightBlob", label: "light" },
-  { id: "barrier", label: "wall" },
-  { id: "erase", label: "erase" },
-  { id: "nutrientVent", label: "N-vent" },
-  { id: "toxinVent", label: "T-vent" },
-  { id: "thermalVent", label: "hot-vent" },
-  { id: "shade", label: "shade" },
-  { id: "wipeOrgs", label: "wipe" },
+  { id: "nutrientBlob", label: "Nutriments" },
+  { id: "toxinBlob", label: "Toxines" },
+  { id: "heatBlob", label: "Chaleur" },
+  { id: "lightBlob", label: "Lumière" },
+  { id: "barrier", label: "Obstacle" },
+  { id: "erase", label: "Gomme" },
+  { id: "nutrientVent", label: "Source nutritive" },
+  { id: "toxinVent", label: "Source toxique" },
+  { id: "thermalVent", label: "Source de chaleur" },
+  { id: "shade", label: "Ombre" },
+  { id: "wipeOrgs", label: "Retirer la vie" },
 ];
 
 
@@ -77,7 +100,8 @@ function download(filename: string, text: string, mime: string): void {
 }
 
 export function mount(root: HTMLElement): void {
-  const initial = parseShareURL(typeof location !== "undefined" ? location.search : "");
+  const q = typeof location !== "undefined" ? location.search : "";
+  const initial = parseShareURL(q);
   const dual = new DualWorld(initial);
   const state = {
     view: "A" as ViewMode,
@@ -92,213 +116,300 @@ export function mount(root: HTMLElement): void {
     selectedId: -1,
     snapshot: null as WorldSnapshot | null,
     lastUi: 0,
+    flags: flagsFromQuery(q) as FeatureFlags,
+    surface: "2d" as "2d" | "3d",
+    room: null as RoomSession | null,
+    roomPost: null as ((op: RoomOp) => void) | null,
+    roomClose: null as (() => void) | null,
   };
+  if (state.flags.view3d) state.surface = "3d";
 
-  root.innerHTML = "";
-  const header = el("header", { class: "top" });
-  header.innerHTML = `
-    <div class="brand">OPENAVIDA <span>LAB</span></div>
-    <div class="stat teal"><i>tick</i><b id="m-tick">0</b></div>
-    <div class="stat"><i>N</i><b id="m-pop">0</b></div>
-    <div class="stat"><i>lineages</i><b id="m-lin">0</b></div>
-    <div class="stat violet"><i>H′</i><b id="m-h">0</b></div>
-    <div class="stat amber"><i>fit</i><b id="m-fit">0</b></div>
-    <div class="stat"><i>fixed</i><b id="m-fix">—</b></div>
-    <div class="stat"><i>extinct</i><b id="m-ex">0</b></div>
-    <div class="stat"><i>step</i><b id="m-ms">—</b></div>
-    <div class="speed-ctl">
-      <label class="tiny" for="speed-top">speed</label>
-      <input id="speed-top" type="range" min="0" max="60" step="1" value="2" />
-      <b id="spd-lab-top">2 /s</b>
-    </div>
-    <div class="speed-ctl">
-      <label class="tiny" for="zoom-top">zoom</label>
-      <input id="zoom-top" type="range" min="30" max="100" step="1" value="100" />
-      <b id="zoom-lab-top">100%</b>
-    </div>
-    <div class="spacer"></div>
-    <div class="clock" id="m-seed"></div>
-  `;
-  const viz = el("div", { class: "viz" });
-  const canvas = el("canvas", { id: "gl" });
-  const hud = el("div", { class: "viz-hud" });
-  hud.innerHTML = `
-    <button type="button" id="tool-inspect">inspect</button>
-    <button type="button" id="tool-paint">paint</button>
-    <button type="button" id="tool-place" class="active">place organism</button>
-  `;
-  viz.append(canvas, hud);
-  const side = el("aside", { class: "side" });
-  const charts = el("footer", { class: "charts" });
-  const cFit = el("canvas", { id: "chart-fit" });
-  const cShan = el("canvas", { id: "chart-shan" });
-  const cPhy = el("canvas", { id: "chart-phy" });
-  charts.append(cFit, cShan, cPhy);
-  root.append(header, viz, side, charts);
+  const { viz, stage, canvas, canvas3d, hud, cursors, side, cFit, cShan, cPhy } = createLabLayout(root);
+  type Panel = "organisms" | "environment" | "analysis" | "species" | "experiment";
+  const PANELS: readonly Panel[] = ["organisms", "environment", "analysis", "species", "experiment"];
+  const openTab = (panel: Panel) => {
+    if (panel === "experiment" || panel === "species") openPanel(panel);
+    else setTool(panel === "environment" ? "paint" : panel === "analysis" ? "inspect" : "place");
+  };
+  function openPanel(panel: Panel, focus = false): void {
+    root.querySelectorAll<HTMLElement>("[role=tabpanel]").forEach(p => p.hidden = p.id !== "panel-" + panel);
+    root.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach(b => {
+      const active = b.dataset.panel === panel;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", String(active));
+      b.tabIndex = active ? 0 : -1;
+      if (active && focus) b.focus();
+    });
+    root.querySelector(".side-scroll")!.scrollTop = 0;
+    requestAnimationFrame(layout);
+  }
+  root.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach(b => {
+    b.addEventListener("click", () => openTab(b.dataset.panel as Panel));
+    b.addEventListener("keydown", ev => {
+      const n = PANELS.length;
+      const index = PANELS.indexOf(b.dataset.panel as Panel);
+      const next = ev.key === "ArrowRight" ? (index + 1) % n : ev.key === "ArrowLeft" ? (index + n - 1) % n : ev.key === "Home" ? 0 : ev.key === "End" ? n - 1 : -1;
+      if (next >= 0) {
+        ev.preventDefault();
+        const panel = PANELS[next]!;
+        openTab(panel);
+        root.querySelector<HTMLButtonElement>("#tab-" + panel)!.focus();
+      }
+    });
+  });
+  const helpDialog = root.querySelector<HTMLDialogElement>("#help-dialog")!;
+  root.querySelector("#btn-help")!.addEventListener("click", () => helpDialog.showModal());
+  root.querySelector(".brand")!.addEventListener("click", ev => { ev.preventDefault(); openPanel("organisms"); });
+  root.querySelector("#btn-focus")!.addEventListener("click", () => {
+    const focused = root.classList.toggle("focus-mode");
+    root.querySelector("#btn-focus")!.setAttribute("aria-pressed", String(focused));
+    root.querySelector("#btn-focus")!.setAttribute("aria-label", focused ? "Rétablir l’interface complète" : "Agrandir la visualisation");
+    layout();
+  });
+  side.addEventListener("toggle", () => requestAnimationFrame(layout), true);
 
-  side.innerHTML = `
-    <section class="block">
-      <h2>DNA kit</h2>
-      <p class="muted" id="place-hint" style="margin:0 0 8px;font-size:12px">Pick a kit, then click an empty cell on the plate.</p>
-      <div id="dna-kits" class="kit-grid"></div>
-      <div id="kit-blurb" class="muted" style="margin-top:8px;font-size:12px"></div>
-      <div id="kit-traits" class="kit-focus"></div>
-      <details id="dna-advanced" style="margin-top:10px">
-        <summary class="tiny">Advanced sequence</summary>
-        <div class="stack" style="margin-top:8px">
-          <textarea id="genome-edit" spellcheck="false" placeholder="ACGT sequence — ORFs ATG…TAA"></textarea>
-          <div class="row">
-            <button type="button" id="btn-point">point</button>
-            <button type="button" id="btn-indel">indel</button>
-            <button type="button" id="btn-dup">duplication</button>
-            <button type="button" id="btn-apply">apply to selected</button>
-          </div>
-          <div class="row">
-            <select id="founder">
-              <option value="heterotroph">heterotroph</option>
-              <option value="phototroph">phototroph</option>
-              <option value="resistant">resistant</option>
-              <option value="predator">predator</option>
-              <option value="mutualist">mutualist</option>
-            </select>
-            <button type="button" id="btn-load-founder">load founder</button>
-            <button type="button" id="btn-inject">inject ×24</button>
-          </div>
-        </div>
-      </details>
-    </section>
-    <section class="block">
-      <h2>Inspect</h2>
-      <div id="inspect-meta" class="muted">Blank plate. Choose a DNA kit, then click an empty cell.</div>
-      <div id="inspect-genome"></div>
-      <div id="inspect-phenotype"></div>
-      <div id="inspect-genes"></div>
-    </section>
-    <section class="block">
-      <h2>Genome browser</h2>
-      <div id="browser-wrap"><canvas id="gbrowser"></canvas></div>
-    </section>
-    <section class="block">
-      <h2>Sandbox</h2>
-      <div class="row" id="brushes"></div>
-      <label class="tiny">brush radius <span id="rad-lab">3</span></label>
-      <input id="radius" type="range" min="0" max="12" value="3" />
-      <label class="tiny">speed <span id="spd-lab">2 /s</span></label>
-      <input id="speed" type="range" min="0" max="60" step="1" value="2" />
-      <div class="row" style="margin-top:8px">
-        <label class="tiny" id="opt-terrain"><input type="checkbox" /> random vents & walls</label>
-        <label class="tiny" id="opt-disturb"><input type="checkbox" /> random events</label>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button type="button" id="btn-pause">pause</button>
-        <button type="button" id="btn-slow">slow</button>
-        <button type="button" id="btn-step-once">1 tick</button>
-      </div>
-      <div class="row">
-        <button type="button" id="view-A" data-view="A" class="view active">world A</button>
-        <button type="button" id="view-B" data-view="B" class="view">world B</button>
-        <button type="button" id="view-split" data-view="split" class="view">A | B</button>
-      </div>
-      <div class="row">
-        <button type="button" id="btn-step-a">step A</button>
-        <button type="button" id="btn-step-b">step B</button>
-        <button type="button" id="btn-step-both">step both</button>
-      </div>
-      <div class="row">
-        <button type="button" id="btn-snap">snapshot</button>
-        <button type="button" id="btn-restore">restore</button>
-        <button type="button" id="btn-bottle" class="danger">bottleneck 10%</button>
-      </div>
-      <div class="row">
-        <label class="tiny">seed</label>
-        <input id="seed" type="number" />
-        <button type="button" id="btn-reseed">reseed</button>
-        <button type="button" id="btn-share">copy URL</button>
-      </div>
-      <div class="row">
-        <button type="button" id="btn-json">export JSON</button>
-        <button type="button" id="btn-csv">export CSV</button>
-        <button type="button" id="btn-phylo">export phylogeny</button>
-        <button type="button" id="btn-import">import JSON</button>
-      </div>
-      <input id="import-file" type="file" accept="application/json" hidden />
-      <div id="status-line"></div>
-    </section>
-    <section class="block">
-      <h2>Field overlay</h2>
-      <div class="row">
-        <button type="button" id="fm-0" data-fm="0" class="fm active">composite</button>
-        <button type="button" id="fm-1" data-fm="1" class="fm">nutrient</button>
-        <button type="button" id="fm-2" data-fm="2" class="fm">toxin</button>
-        <button type="button" id="fm-3" data-fm="3" class="fm">temp</button>
-        <button type="button" id="fm-4" data-fm="4" class="fm">light</button>
-      </div>
-    </section>
-    <section class="block">
-      <h2>Gene → trait map</h2>
-      <p class="muted" style="font-size:11px;margin:0 0 8px">
-        ORFs start at ATG, stop at TAA/TAG/TGA. Each codon adds a documented delta.
-        Hue is display-only and is not a fitness input.
-      </p>
-      <div class="mapping-legend" id="legend"></div>
-    </section>
-  `;
-
-  const brushRow = side.querySelector("#brushes")!;
+  const brushRow = root.querySelector("#brushes")!;
   for (const b of BRUSHES) {
     const btn = el("button", { type: "button", id: "brush-" + b.id, "data-brush": b.id }, b.label);
     if (b.id === state.brush) btn.classList.add("active");
     brushRow.append(btn);
   }
-  const kitRow = side.querySelector("#dna-kits")!;
+  const kitRow = root.querySelector("#dna-kits")!;
   const showKit = (id: string) => {
     state.kit = id;
-    kitRow.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "kit-" + id));
-    const kit = kitById(id);
-    (side.querySelector("#kit-blurb") as HTMLElement).textContent = kit.blurb;
-    const ph = phenotypeForKit(id);
-    const focus = kit.focus;
-    (side.querySelector("#kit-traits") as HTMLElement).textContent =
-      `${focus} ${Number(ph[focus]).toFixed(2)} · uptake ${ph.uptake.toFixed(2)} · resist ${ph.resist.toFixed(2)}`;
-    (side.querySelector("#genome-edit") as HTMLTextAreaElement).value = genomeForKit(id);
-    (side.querySelector("#founder") as HTMLSelectElement).value = id;
+    kitRow.querySelectorAll("button").forEach((b) => { b.classList.toggle("active", b.id === "kit-" + id); b.setAttribute("aria-pressed", String(b.id === "kit-" + id)); });
+    (root.querySelector("#kit-blurb") as HTMLElement).textContent = KIT_COPY[id]!.description;
+    (root.querySelector("#founder") as HTMLSelectElement).value = id;
+    const p = decodeGenome(genomeForKit(id)).phenotype;
+    (root.querySelector("#kit-traits") as HTMLElement).textContent =
+      `Lumière ${p.photo.toFixed(2)} · Nutrition ${p.uptake.toFixed(2)} · Résist. ${p.resist.toFixed(2)}`;
+    dna.load(genomeForKit(id));
   };
   for (const kit of DNA_KITS) {
-    const btn = el("button", { type: "button", id: "kit-" + kit.id, class: "kit-btn" }, kit.label);
+    const btn = el("button", { type: "button", id: "kit-" + kit.id, class: "kit-btn" }, `${icon(KIT_COPY[kit.id]!.icon)}<span><strong>${KIT_COPY[kit.id]!.label}</strong><small>${KIT_COPY[kit.id]!.short}</small></span><span class="kit-check">✓</span>`);
     kitRow.append(btn);
   }
   kitRow.addEventListener("click", (ev) => {
-    const t = ev.target as HTMLElement;
+    const t = (ev.target as HTMLElement).closest<HTMLButtonElement>(".kit-btn");
+    if (!t) return;
     const id = t.id.startsWith("kit-") ? t.id.slice(4) : "";
     if (id) {
       selectKit(id);
     }
   });
-  const legend = side.querySelector("#legend")!;
+  const legend = root.querySelector("#legend")!;
   legend.innerHTML = mappingLegend()
     .map((r) => `<div>${r.codon} ${r.aa} → ${r.trait} ${r.delta >= 0 ? "+" : ""}${r.delta}</div>`)
     .join("");
 
   const renderer = new LabRenderer(canvas);
-  const gbCanvas = side.querySelector("#gbrowser") as HTMLCanvasElement;
+  let view3d: View3D | null = null;
+  function ensure3d(): View3D {
+    if (view3d) return view3d;
+    view3d = new View3D(canvas3d);
+    view3d.fieldMode = renderer.fieldMode;
+    view3d.selectedId = state.selectedId;
+    const r = viz.getBoundingClientRect();
+    view3d.resize(r.width, r.height);
+    return view3d;
+  }
+  function setSurface(which: "2d" | "3d"): void {
+    state.surface = which;
+    state.flags.view3d = which === "3d";
+    canvas.classList.toggle("off", which === "3d");
+    canvas3d.classList.toggle("on", which === "3d");
+    root.querySelector("#view-2d")!.classList.toggle("active", which === "2d");
+    root.querySelector("#view-3d")!.classList.toggle("active", which === "3d");
+    root.querySelector("#view-2d")!.setAttribute("aria-pressed", String(which === "2d"));
+    root.querySelector("#view-3d")!.setAttribute("aria-pressed", String(which === "3d"));
+    (root.querySelector("#zoom-top") as HTMLInputElement).disabled = which === "3d";
+    root.querySelector("#view-hint")!.textContent = which === "3d" ? "Glisser : tourner · Molette : zoomer · Clic : outil actif" : root.querySelector("#place-hint")!.textContent;
+    if (which === "3d" && state.view === "split") setView(dual.active);
+    (root.querySelector("#opt-view3d input") as HTMLInputElement).checked = which === "3d";
+    if (which === "3d") {
+      const v = ensure3d();
+      const r = viz.getBoundingClientRect();
+      v.resize(r.width, r.height);
+    }
+    layout();
+  }
+  const gbCanvas = root.querySelector("#gbrowser") as HTMLCanvasElement;
   const browser = new GenomeBrowser(gbCanvas);
-  (side.querySelector("#seed") as HTMLInputElement).value = String(dual.a.params.seed);
+  (root.querySelector("#seed") as HTMLInputElement).value = String(dual.a.params.seed);
 
-  const current = (): World => (state.view === "B" ? dual.b : dual.a);
+  const current = (): World => ((state.view === "split" ? dual.active : state.view) === "B" ? dual.b : dual.a);
 
   function status(msg: string): void {
-    (side.querySelector("#status-line") as HTMLElement).textContent = msg;
+    (root.querySelector("#status-line") as HTMLElement).textContent = msg;
+  }
+
+  function emitOp(op: RoomOp): void {
+    if (!state.room || !state.roomPost) return;
+    if (op.kind === "cursor" || op.kind === "hello" || op.kind === "bye" || op.kind === "role" || op.kind === "pause") {
+      state.roomPost(op);
+      return;
+    }
+    if (state.room.isHost) {
+      state.roomPost({ kind: "snapshot", snap: current().snapshot() });
+      return;
+    }
+    state.roomPost(op);
+  }
+
+  function emitCursor(x: number, y: number): void {
+    if (!state.room) return;
+    const op = state.room.setCursor(x, y);
+    if (op) emitOp(op);
+  }
+
+  function paintPeers(): void {
+    const host = root.querySelector("#mp-peers")!;
+    if (!state.room) {
+      host.textContent = "Activez la session partagée pour ouvrir un salon.";
+      cursors.innerHTML = "";
+      return;
+    }
+    const rows = [...state.room.peers.values()].map((p) => `${p.name} (${p.role})`);
+    host.textContent = rows.join(" · ") || "no peers";
+    cursors.innerHTML = "";
+    const w = current();
+    for (const p of state.room.peers.values()) {
+      if (p.id === state.room.selfId) continue;
+      const pos = renderer.gridToCanvas(p.x, p.y, w);
+      const d = el("div", { class: "mp-cursor" });
+      d.style.left = `${pos.x}px`;
+      d.style.top = `${pos.y}px`;
+      d.style.borderColor = p.color;
+      d.title = p.name;
+      cursors.append(d);
+    }
+  }
+
+  const dna = new DnaEditor(root.querySelector<HTMLElement>("#dna-editor")!, {
+    status,
+    selectedGenome: () => {
+      const org = current().organisms.find((o) => o.id === state.selectedId);
+      return org ? { id: org.id, genome: org.genome } : null;
+    },
+    onApply: (seq) => {
+      if (state.selectedId < 0) {
+        status("Sélectionnez d’abord un organisme avec Inspecter, ou placez-en un avec ce génome.");
+        return;
+      }
+      current().replaceGenome(state.selectedId, seq);
+      selectOrganism(current(), state.selectedId, "apply");
+      status("Génome appliqué à la sélection : nouvelle lignée créée.");
+    },
+    onPlace: () => {
+      setTool("place");
+      status("Cliquez dans le monde pour placer un organisme avec ce génome.");
+    },
+  });
+  const editorGenome = (): string => dna.sequence || genomeForKit(state.kit);
+  const goals = new GoalPanel(root.querySelector<HTMLElement>("#panel-goals")!, {
+    status,
+    world: () => current(),
+    activeWorld: () => dual.active,
+    restoreInto: (target, snap) => {
+      if (target === "B") {
+        restoreSnapshot(dual.b, snap);
+        setView("B");
+      } else {
+        restoreSnapshot(current(), snap);
+        selectOrganism(current(), -1);
+      }
+      paintFeeds();
+      refreshMetrics();
+    },
+  });
+  /** Name the strain after its kit when the genome is an unmodified kit genome. */
+  function tagStrain(world: World, seq: string): void {
+    const kit = DNA_KITS.find((k) => genomeForKit(k.id) === seq);
+    world.defineStrain(seq, kit ? { name: KIT_COPY[kit.id]!.label } : {});
+  }
+  const species = new SpeciesPanel(root.querySelector<HTMLElement>("#panel-species")!, {
+    status,
+    world: () => current(),
+    editorGenome: () => dna.sequence,
+    loadGenome: (seq, label) => {
+      dna.load(seq);
+      setTool("place");
+      status(`Génome de « ${label} » chargé. Cliquez sur une cellule libre pour le placer.`);
+    },
+    inject: (seq, n) => {
+      tagStrain(current(), seq);
+      const placed = injectStrain(current(), seq, n);
+      status(`${placed} organismes injectés dans le monde ${dual.active}.`);
+      paintFeeds();
+      refreshMetrics();
+    },
+    onColorByStrain: (on) => {
+      renderer.colorByStrain = on;
+      status(on ? "Couleur des organismes : souche fondatrice (vue 2D)." : "Couleur des organismes : guilde et lignée.");
+    },
+  });
+
+  function loadSeqIntoBuilder(seq: string): void {
+    dna.load(seq);
+    (root.querySelector("#dna-builder") as HTMLDetailsElement).open = true;
+  }
+
+  function paintFeeds(): void {
+    const w = current();
+    const board = root.querySelector("#leaderboard")!;
+    const top = strongestLiving(w.organisms, 8);
+    if (top.length === 0) {
+      board.innerHTML = `<p class="muted">Aucun organisme vivant.</p>`;
+    } else {
+      board.innerHTML = top
+        .map((o, i) => {
+          const ph = o.ph;
+          return `<button type="button" class="feed-row" data-org="${o.id}">
+            <div class="feed-head"><b>#${i + 1}</b> Fitness ${o.fitness.toFixed(3)} · Énergie ${o.energy.toFixed(2)}</div>
+            <div class="muted">Lignée ${o.lineageId} · Lumière ${ph.photo.toFixed(2)} · Nutrition ${ph.uptake.toFixed(2)}</div>
+            <div class="dna">${dnaSnippet(o.genome)}</div>
+            <span class="use-dna" data-use="${o.id}">Modifier cet ADN</span>
+          </button>`;
+        })
+        .join("");
+    }
+    const tally = tallyDeaths(w.deaths);
+    const tallyEl = root.querySelector("#death-tally")!;
+    const causes = Object.keys(CAUSE_LABEL) as DeathCause[];
+    const parts = causes
+      .filter((k) => (tally[k] ?? 0) > 0)
+      .map((k) => `<span style="color:${CAUSE_COLOR[k]}">${DEATH_LABEL[k]} : ${tally[k]}</span>`);
+    tallyEl.innerHTML = parts.length ? parts.join(" · ") : `<span class="muted">Aucun décès pour le moment</span>`;
+    const log = root.querySelector("#death-log")!;
+    const recent = w.deaths.slice(-16).reverse();
+    if (recent.length === 0) {
+      log.innerHTML = `<p class="muted">Aucun décès enregistré.</p>`;
+    } else {
+      log.innerHTML = recent
+        .map((d) => {
+          return `<button type="button" class="feed-row" data-genome="${d.genome}">
+            <div class="feed-head" style="color:${CAUSE_COLOR[d.cause]}">${DEATH_LABEL[d.cause]}</div>
+            <div class="muted">Pas ${d.tick} · N° ${d.orgId} · Lignée ${d.lineageId} · Fitness ${d.fitness.toFixed(3)}</div>
+            <div class="dna">${dnaSnippet(d.genome)}</div>
+          </button>`;
+        })
+        .join("");
+    }
   }
 
   function setTool(tool: LabTool): void {
     const next = applyTool(tool);
     state.tool = next.tool;
     state.paintMode = next.paintMode;
-    hud.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "tool-" + tool));
-    const hint = side.querySelector("#place-hint") as HTMLElement;
-    if (tool === "place") hint.textContent = "Pick a kit, then click an empty cell on the plate.";
-    else if (tool === "paint") hint.textContent = "Click or drag to paint the selected substance (nutrient, toxin, wall…).";
-    else hint.textContent = "Click an organism to inspect its genome.";
+    hud.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("active", b.id === "tool-" + tool);
+      b.setAttribute("aria-pressed", String(b.id === "tool-" + tool));
+    });
+    const hint = tool === "place" ? "Clic sur une cellule libre : place un organisme avec le génome de l’éditeur." : tool === "paint" ? "Clic ou glisser : applique le pinceau sélectionné." : "Clic sur un organisme : génome, phénotype, métabolisme.";
+    root.querySelector("#place-hint")!.textContent = hint;
+    root.querySelector("#view-hint")!.textContent = state.surface === "3d" ? "Glisser : tourner · Molette : zoomer · Clic : outil actif" : hint;
+    canvas.style.cursor = tool === "inspect" ? "crosshair" : "cell";
+    openPanel(tool === "paint" ? "environment" : tool === "inspect" ? "analysis" : "organisms");
   }
 
   function selectKit(id: string): void {
@@ -309,53 +420,110 @@ export function mount(root: HTMLElement): void {
   function selectOrganism(world: World, id: number, reason: EditorSyncReason = "select"): void {
     state.selectedId = id;
     renderer.selectedId = id;
+    renderer.selectedWorld = world === dual.b ? "B" : "A";
+    if (view3d) view3d.selectedId = id;
     const org = world.organisms.find((o) => o.id === id) ?? null;
-    const meta = side.querySelector("#inspect-meta")!;
-    const gEl = side.querySelector("#inspect-genome")!;
-    const pEl = side.querySelector("#inspect-phenotype")!;
-    const genesEl = side.querySelector("#inspect-genes")!;
-    const ta = side.querySelector("#genome-edit") as HTMLTextAreaElement;
+    const meta = root.querySelector("#inspect-meta")!;
+    const gEl = root.querySelector("#inspect-genome")!;
+    const pEl = root.querySelector("#inspect-phenotype")!;
+    const genesEl = root.querySelector("#inspect-genes")!;
+    const pwEl = root.querySelector("#inspect-pathways")!;
+    const brEl = root.querySelector("#inspect-brain")!;
+    const actions = root.querySelector("#inspect-actions") as HTMLElement;
     if (!org) {
-      if (reason === "select") {
-        meta.textContent = "Click an organism on the plate.";
+      if (reason === "select" || reason === "peek") {
+        root.querySelector("#selection-tag")!.textContent = "AUCUN";
+        actions.hidden = true;
+        meta.textContent = "Cliquez sur un organisme dans le monde.";
         gEl.textContent = "";
         pEl.innerHTML = "";
         genesEl.innerHTML = "";
+        pwEl.innerHTML = "";
+        brEl.innerHTML = "";
         browser.clear();
       }
       return;
     }
-    meta.innerHTML = `id ${org.id} · lin ${org.lineageId} · parent ${org.parentId} · E ${org.energy.toFixed(2)} · fit ${org.fitness.toFixed(3)} · (${org.x},${org.y})`;
+    root.querySelector("#selection-tag")!.textContent = `N° ${org.id}`;
+    actions.hidden = false;
+    meta.innerHTML = `<div class="selection-metrics"><span>Énergie<b>${org.energy.toFixed(2)}</b></span><span>Fitness<b>${org.fitness.toFixed(3)}</b></span></div><div class="selection-info">Lignée ${org.lineageId} · Position (${org.x}, ${org.y}) · Parent ${org.parentId < 0 ? "fondateur" : org.parentId}</div>`;
     if (reason === "refresh") return;
     const decoded = decodeGenome(org.genome);
     const track = toGenomeTrack(decoded);
     gEl.textContent = org.genome;
     pEl.innerHTML = phenotypeTableHtml(org.ph);
     genesEl.innerHTML = genesHtml(track);
-    syncGenomeEditor(ta, org.genome, reason);
+    const env = world.fields.sample(org.x, org.y);
+    pwEl.innerHTML = pathwaysHtml(inspectBiochem(decoded, env, org));
+    brEl.innerHTML = tracesHtml(world.brain?.traces ?? [], org.id);
+    if (shouldWriteEditor(reason)) dna.load(org.genome);
     browser.setSequence(org.genome);
+    if (view3d) view3d.selectedId = id;
   }
 
-  function layout(): void {
-    const r = viz.getBoundingClientRect();
-    renderer.resize(r.width, r.height);
-    const br = gbCanvas.parentElement!.getBoundingClientRect();
-    browser.resize(br.width, 108);
-    const cr = charts.getBoundingClientRect();
-    const cw = cr.width / 3;
-    const ch = cr.height;
-    drawFitness(cFit, cw, ch, current().history);
-    drawShannon(cShan, cw, ch, current().history);
-    drawPhylogeny(cPhy, cw, ch, current().lineages.values(), current().tick);
+  function drawCharts(): void {
+    if (root.classList.contains("charts-collapsed") && !root.classList.contains("wide-workspace")) return;
+    const w = current();
+    const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
+    const size = (c: HTMLCanvasElement) => [c.parentElement!.clientWidth - 28, Math.max(75, c.parentElement!.clientHeight - 42)] as const;
+    drawFitness(cFit, ...size(cFit), hist);
+    drawShannon(cShan, ...size(cShan), hist);
+    drawPhylogeny(cPhy, ...size(cPhy), w.lineages.values(), w.tick);
   }
+
+  const workspace = root.querySelector<HTMLElement>(".workspace")!;
+  function layout(): void {
+    const ws = workspace.getBoundingClientRect();
+    const wide = window.innerWidth > 900 && !root.classList.contains("focus-mode") && ws.width / Math.max(1, ws.height) > 1.9;
+    if (root.classList.contains("wide-workspace") !== wide) {
+      root.classList.toggle("wide-workspace", wide);
+      requestAnimationFrame(layout);
+      return;
+    }
+    const r = stage.getBoundingClientRect();
+    let height = Math.max(1, r.height);
+    let width = Math.max(1, r.width);
+    if (state.surface !== "3d") {
+      // Letterbox: the plate keeps its cell aspect (square, or two squares side by side).
+      const w = current();
+      const aspect = (w.w / w.h) * (state.view === "split" ? 2 : 1);
+      if (width / height > aspect) width = Math.max(1, Math.floor(height * aspect));
+      else height = Math.max(1, Math.floor(width / aspect));
+    }
+    viz.style.width = `${width}px`;
+    viz.style.height = `${height}px`;
+    renderer.resize(width, height);
+    if (view3d) view3d.resize(width, height);
+    const br = gbCanvas.parentElement!.getBoundingClientRect();
+    if (br.width > 0) browser.resize(br.width, 108);
+    drawCharts();
+    if (!(root.querySelector("#panel-species") as HTMLElement).hidden) species.layout();
+    if (!(root.querySelector("#panel-experiment") as HTMLElement).hidden) goals.layout();
+  }
+  const chartsBtn = root.querySelector<HTMLButtonElement>("#btn-charts")!;
+  function setChartsCollapsed(collapsed: boolean): void {
+    root.classList.toggle("charts-collapsed", collapsed);
+    chartsBtn.textContent = collapsed ? "Afficher" : "Réduire";
+    chartsBtn.setAttribute("aria-expanded", String(!collapsed));
+    try { localStorage.setItem("openavida.charts", collapsed ? "0" : "1"); } catch { /* storage unavailable */ }
+    layout();
+  }
+  chartsBtn.addEventListener("click", () => setChartsCollapsed(!root.classList.contains("charts-collapsed")));
 
   function refreshMetrics(): void {
     const w = current();
     const last = w.history[w.history.length - 1];
     const set = (id: string, v: string) => {
       const n = document.getElementById(id);
-      if (n) n.textContent = v;
+      if (n && n.textContent !== v) n.textContent = v;
     };
+    const activeWorld = w === dual.b ? "B" : "A";
+    set("chart-world", `MONDE ${activeWorld} · HISTORIQUE`);
+    set("world-size", `${w.w} × ${w.h}`);
+    set("stage-label", state.view === "split" ? `A · ${dual.a.organisms.length} organismes${activeWorld === "A" ? " · sélectionné" : ""}` : `MONDE ${activeWorld}`);
+    set("stage-label-b", `B · ${dual.b.organisms.length} organismes${activeWorld === "B" ? " · sélectionné" : ""}`);
+    (root.querySelector("#stage-label-b") as HTMLElement).hidden = state.view !== "split";
+    (root.querySelector("#empty-world") as HTMLElement).hidden = state.tool !== "place" || state.view === "split" || w.organisms.length > 0;
     set("m-tick", String(w.tick));
     set("m-pop", String(w.organisms.length));
     set("m-lin", String(last?.lineageCount ?? 0));
@@ -371,31 +539,50 @@ export function mount(root: HTMLElement): void {
     }
     if (state.selectedId >= 0) {
       const org = w.organisms.find((o) => o.id === state.selectedId);
-      if (org) selectOrganism(w, org.id, "refresh");
+      if (!org) {
+        selectOrganism(w, -1);
+        root.querySelector("#inspect-meta")!.textContent = "Cet organisme n’est plus vivant. Consultez le journal des décès ci-dessous.";
+      }
     }
     const now = performance.now();
     if (now - state.lastUi > 250) {
-      const cr = charts.getBoundingClientRect();
-      const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
-      drawFitness(cFit, cr.width / 3, cr.height, hist);
-      drawShannon(cShan, cr.width / 3, cr.height, hist);
-      drawPhylogeny(cPhy, cr.width / 3, cr.height, w.lineages.values(), w.tick);
+      drawCharts();
+      paintFeeds();
+      if (state.selectedId >= 0) selectOrganism(w, state.selectedId, "refresh");
+      species.refresh();
+      goals.refresh();
+      updatePlayback();
       state.lastUi = now;
     }
-    const gl = renderer.gl;
+    const gl = state.surface === "3d" && view3d ? view3d.gl : renderer.gl;
+    const lastDeath = w.deaths[w.deaths.length - 1];
+    const top = strongestLiving(w.organisms, 1)[0];
+    const pw = (document.getElementById("inspect-pathways") as HTMLElement | null)?.textContent ?? "";
     window.__openavida = {
       tick: w.tick,
       population: w.organisms.length,
       selectedGenome: (document.getElementById("inspect-genome") as HTMLElement).textContent ?? "",
       selectedPhenotype: (document.getElementById("inspect-phenotype") as HTMLElement).textContent ?? "",
       editorValue: (document.getElementById("genome-edit") as HTMLTextAreaElement | null)?.value ?? "",
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
+      canvasWidth: state.surface === "3d" ? canvas3d.width : canvas.width,
+      canvasHeight: state.surface === "3d" ? canvas3d.height : canvas.height,
       drawingBufferWidth: gl.drawingBufferWidth,
       drawingBufferHeight: gl.drawingBufferHeight,
       lastStepMs: w.lastStepMs,
       seed: w.params.seed,
-      world: state.view === "B" ? "B" : "A",
+      world: activeWorld,
+      deathCount: w.deaths.length,
+      lastDeathCause: lastDeath?.cause ?? "",
+      topFit: top?.fitness ?? 0,
+      builderGenes: dna.geneCount,
+      surface: state.surface,
+      view3d: state.flags.view3d,
+      brains: state.flags.brains,
+      llmBrains: state.flags.llmBrains,
+      multiplayer: state.flags.multiplayer,
+      pathways: pw,
+      brainTraces: w.brain?.traces.length ?? 0,
+      roomPeers: state.room?.metrics.peers ?? 0,
     };
   }
 
@@ -413,10 +600,14 @@ export function mount(root: HTMLElement): void {
   };
 
   function paintAt(ev: PointerEvent): void {
+    if (state.room && !canMutateWorld(state.room.self.role)) return;
     const sidePick = renderer.pickWorld(ev.clientX);
     const world = sidePick === "B" ? dual.b : dual.a;
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
-    if (grid) paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+    if (grid) {
+      paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+      emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
+    }
   }
 
   function onPointer(ev: PointerEvent, down: boolean): void {
@@ -424,6 +615,11 @@ export function mount(root: HTMLElement): void {
     const world = sidePick === "B" ? dual.b : dual.a;
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
     if (!grid) return;
+    if (dual.active !== sidePick) {
+      dual.active = sidePick;
+      selectOrganism(world, -1);
+    }
+    emitCursor(grid.x, grid.y);
     const action = pointerAction({
       tool: state.tool,
       paintMode: state.paintMode,
@@ -432,26 +628,38 @@ export function mount(root: HTMLElement): void {
       buttons: ev.buttons,
     });
     if (action === "paint") {
+      if (state.room && !canMutateWorld(state.room.self.role)) {
+        status("spectator — inspect only");
+        return;
+      }
       state.painting = true;
       paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+      emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
       return;
     }
     if (!down) return;
     if (action === "place") {
-      const seq = (side.querySelector("#genome-edit") as HTMLTextAreaElement).value || genomeForKit(state.kit);
+      if (state.room && !canMutateWorld(state.room.self.role)) {
+        status("spectator — inspect only");
+        return;
+      }
+      const seq = editorGenome();
+      tagStrain(world, seq);
       const child = placeOrganismAt(world, grid.x, grid.y, seq);
       if (child) {
         dual.active = sidePick;
-        selectOrganism(world, child.id, "select");
-        status(`placed ${kitById(state.kit).label} at (${grid.x},${grid.y})`);
+        selectOrganism(world, child.id, "peek");
+        status(`Organisme placé en (${grid.x}, ${grid.y}).`);
+        emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
+        paintFeeds();
         refreshMetrics();
       } else {
         const occ = world.organismAt(grid.x, grid.y);
         if (occ) {
           dual.active = sidePick;
-          selectOrganism(world, occ.id);
+          selectOrganism(world, occ.id, "peek");
           refreshMetrics();
-        } else status("cell blocked");
+        } else status("Cette cellule est bloquée par un obstacle.");
       }
       return;
     }
@@ -468,6 +676,16 @@ export function mount(root: HTMLElement): void {
     onPointer(ev, true);
   });
   canvas.addEventListener("pointermove", (ev) => {
+    const sidePick = renderer.pickWorld(ev.clientX);
+    const world = sidePick === "B" ? dual.b : dual.a;
+    const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
+    if (grid) {
+      emitCursor(grid.x, grid.y);
+      const f = world.fields.sample(grid.x, grid.y);
+      const readout = root.querySelector<HTMLElement>("#cell-readout")!;
+      readout.hidden = false;
+      readout.textContent = `(${grid.x}, ${grid.y}) · Nutr. ${f.nutrient.toFixed(2)} · Tox. ${f.toxin.toFixed(2)} · Temp. ${f.temperature.toFixed(2)} · Lum. ${f.light.toFixed(2)}`;
+    }
     if (ev.buttons === 0) return;
     const action = pointerAction({
       tool: state.tool,
@@ -481,55 +699,102 @@ export function mount(root: HTMLElement): void {
   canvas.addEventListener("pointerup", () => {
     state.painting = false;
   });
+  canvas.addEventListener("pointerleave", () => { root.querySelector<HTMLElement>("#cell-readout")!.hidden = true; });
   canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
 
-  side.querySelector("#brushes")!.addEventListener("click", (ev) => {
+  canvas3d.addEventListener("pointerdown", (ev) => {
+    canvas3d.setPointerCapture(ev.pointerId);
+    ensure3d().pointerDown(ev);
+  });
+  canvas3d.addEventListener("pointermove", (ev) => {
+    if (!view3d) return;
+    view3d.pointerMove(ev);
+    const g = view3d.pick(ev.clientX, ev.clientY, current());
+    if (g) emitCursor(g.x, g.y);
+  });
+  canvas3d.addEventListener("pointerup", (ev) => {
+    if (!view3d) return;
+    const clicked = view3d.pointerUp();
+    if (!clicked) return;
+    const world = current();
+    const grid = view3d.pick(ev.clientX, ev.clientY, world);
+    if (!grid) return;
+    const org = world.nearestOrganism(grid.x, grid.y, 2);
+    if (state.tool === "place" && !org) {
+      const seq = editorGenome();
+      if (state.room && !canMutateWorld(state.room.self.role)) return;
+      tagStrain(world, seq);
+      const child = placeOrganismAt(world, grid.x, grid.y, seq);
+      if (child) {
+        selectOrganism(world, child.id, "peek");
+        emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
+        refreshMetrics();
+      }
+    } else if (state.tool === "paint") {
+      if (state.room && !canMutateWorld(state.room.self.role)) return;
+      paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+      emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
+    } else if (org) {
+      selectOrganism(world, org.id, state.tool === "inspect" ? "select" : "peek");
+      refreshMetrics();
+    }
+  });
+  canvas3d.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    ensure3d().zoomBy(ev.deltaY);
+  }, { passive: false });
+  canvas3d.addEventListener("contextmenu", (ev) => ev.preventDefault());
+
+  root.querySelector("#brushes")!.addEventListener("click", (ev) => {
     const t = ev.target as HTMLElement;
     const id = t.getAttribute("data-brush") as BrushKind | null;
     if (!id) return;
     state.brush = id;
-    side.querySelectorAll("[data-brush]").forEach((b) => b.classList.toggle("active", b.getAttribute("data-brush") === id));
+    root.querySelectorAll("[data-brush]").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-brush") === id);
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-brush") === id));
+    });
+    setTool("paint");
   });
-  (side.querySelector("#radius") as HTMLInputElement).addEventListener("input", (ev) => {
+  (root.querySelector("#radius") as HTMLInputElement).addEventListener("input", (ev) => {
     state.radius = Number((ev.target as HTMLInputElement).value);
-    (side.querySelector("#rad-lab") as HTMLElement).textContent = String(state.radius);
+    (root.querySelector("#rad-lab") as HTMLElement).textContent = String(state.radius);
   });
-  const speedTop = header.querySelector("#speed-top") as HTMLInputElement;
-  const speedSide = side.querySelector("#speed") as HTMLInputElement;
-  const setSpeed = (n: number, from?: "top" | "side") => {
-    const v = Math.max(0, Math.min(60, n));
-    state.speed = v;
-    if (v > 0) state.paused = false;
-    else state.paused = true;
-    const label = formatSpeed(v);
-    (header.querySelector("#spd-lab-top") as HTMLElement).textContent = label;
-    (side.querySelector("#spd-lab") as HTMLElement).textContent = label;
-    if (from !== "top") speedTop.value = String(v);
-    if (from !== "side") speedSide.value = String(v);
-    (side.querySelector("#btn-pause") as HTMLElement).textContent = state.paused ? "run" : "pause";
+  const speedTop = root.querySelector("#speed-top") as HTMLInputElement;
+  function updatePlayback(): void {
+    const paused = state.paused || state.speed <= 0;
+    const button = root.querySelector<HTMLElement>("#btn-pause")!;
+    if (button.dataset.paused !== String(paused)) {
+      button.innerHTML = `${icon(paused ? "play" : "pause")}<span>${paused ? "Reprendre" : "Pause"}</span>`;
+      button.setAttribute("aria-label", paused ? "Reprendre la simulation" : "Mettre en pause");
+      button.dataset.paused = String(paused);
+    }
+    const label = root.querySelector("#run-state")!;
+    const text = !canDriveClock(state.room) ? "Session suivie" : paused ? "En pause" : "En cours";
+    if (label.textContent !== text) label.innerHTML = `<i></i>${text}`;
+    label.classList.toggle("paused", paused);
+  }
+  const setSpeed = (n: number) => {
+    state.speed = Math.max(0, Math.min(60, n));
+    state.paused = state.speed <= 0;
+    speedTop.value = String(state.speed);
+    root.querySelector("#spd-lab-top")!.textContent = formatSpeed(state.speed);
+    updatePlayback();
   };
-  speedTop.addEventListener("input", () => setSpeed(Number(speedTop.value), "top"));
-  speedSide.addEventListener("input", () => setSpeed(Number(speedSide.value), "side"));
-  const zoomTop = header.querySelector("#zoom-top") as HTMLInputElement;
+  speedTop.addEventListener("input", () => setSpeed(Number(speedTop.value)));
+  const zoomTop = root.querySelector("#zoom-top") as HTMLInputElement;
   zoomTop.addEventListener("input", () => {
     const pct = Math.max(30, Math.min(100, Number(zoomTop.value)));
     renderer.zoom = pct / 100;
-    (header.querySelector("#zoom-lab-top") as HTMLElement).textContent = `${pct}%`;
+    root.querySelector("#zoom-lab-top")!.textContent = `${pct}%`;
   });
-  side.querySelector("#btn-pause")!.addEventListener("click", () => {
-    if (state.paused || state.speed <= 0) {
-      if (state.speed <= 0) setSpeed(2, "top");
-      else {
-        state.paused = false;
-        (side.querySelector("#btn-pause") as HTMLElement).textContent = "pause";
-      }
-    } else {
-      state.paused = true;
-      (side.querySelector("#btn-pause") as HTMLElement).textContent = "run";
-    }
+  root.querySelector("#btn-pause")!.addEventListener("click", () => {
+    if (state.speed <= 0) setSpeed(2);
+    else state.paused = !state.paused;
+    updatePlayback();
   });
-  const terrainBox = side.querySelector("#opt-terrain input") as HTMLInputElement;
-  const disturbBox = side.querySelector("#opt-disturb input") as HTMLInputElement;
+  const terrainBox = root.querySelector("#opt-terrain input") as HTMLInputElement;
+  const disturbBox = root.querySelector("#opt-disturb input") as HTMLInputElement;
   terrainBox.checked = dual.a.randomTerrain;
   disturbBox.checked = dual.a.disturbances;
   terrainBox.addEventListener("change", () => {
@@ -548,163 +813,279 @@ export function mount(root: HTMLElement): void {
     dual.b.disturbances = disturbBox.checked;
     status(disturbBox.checked ? "random events on" : "random events off");
   });
-  side.querySelector("#btn-slow")!.addEventListener("click", () => setSpeed(2));
-  side.querySelector("#btn-step-once")!.addEventListener("click", () => {
+  const box3d = root.querySelector("#opt-view3d input") as HTMLInputElement;
+  const boxBrains = root.querySelector("#opt-brains input") as HTMLInputElement;
+  const boxLlm = root.querySelector("#opt-llm input") as HTMLInputElement;
+  const boxMp = root.querySelector("#opt-mp input") as HTMLInputElement;
+  box3d.checked = state.flags.view3d;
+  boxBrains.checked = state.flags.brains;
+  boxLlm.checked = state.flags.llmBrains;
+  boxMp.checked = state.flags.multiplayer;
+  function policyForFlags() {
+    return state.flags.llmBrains ? llmPolicy(null) : baselinePolicy;
+  }
+  function setBrains(on: boolean): void {
+    state.flags.brains = on;
+    boxBrains.checked = on;
+    for (const w of [dual.a, dual.b]) {
+      w.brainsEnabled = on;
+      if (on) w.brain = new BrainRuntime(policyForFlags());
+    }
+    status(on ? (state.flags.llmBrains ? "LLM brains on (fallback baseline if no adapter)" : "baseline brains on") : "brains off — phase-1 movement");
+  }
+  box3d.addEventListener("change", () => setSurface(box3d.checked ? "3d" : "2d"));
+  boxBrains.addEventListener("change", () => setBrains(boxBrains.checked));
+  boxLlm.addEventListener("change", () => {
+    state.flags.llmBrains = boxLlm.checked;
+    if (state.flags.brains) setBrains(true);
+  });
+  function joinRoom(asHost: boolean): void {
+    state.roomClose?.();
+    const roomId = (root.querySelector("#mp-room") as HTMLInputElement).value.trim() || "lab";
+    const role = (root.querySelector("#mp-role") as HTMLSelectElement).value as PeerRole;
+    const self = makeSelf(asHost ? "host" : "peer", state.room?.peers.size ?? 0);
+    self.role = asHost ? "host" : role === "host" ? "experimenter" : role;
+    self.color = peerColor(asHost ? 0 : 1);
+    state.room = new RoomSession(self, { claimHost: asHost });
+    state.flags.multiplayer = true;
+    boxMp.checked = true;
+    const ch = openRoomChannel(roomId, state.room, (op) => {
+      if (!state.room) return;
+      handleIncoming(state.room, op, current(), (reply) => state.roomPost?.(reply));
+      paintPeers();
+    });
+    state.roomPost = ch.post;
+    state.roomClose = ch.close;
+    paintPeers();
+    status(asHost ? `hosting room ${roomId}` : `joined room ${roomId} as ${self.role}`);
+  }
+  boxMp.addEventListener("change", () => {
+    state.flags.multiplayer = boxMp.checked;
+    if (boxMp.checked) joinRoom(true);
+    else {
+      state.roomClose?.();
+      state.room = null;
+      state.roomPost = null;
+      paintPeers();
+      status("multiplayer off");
+    }
+  });
+  root.querySelector("#btn-mp-host")!.addEventListener("click", () => joinRoom(true));
+  root.querySelector("#btn-mp-join")!.addEventListener("click", () => joinRoom(false));
+  root.querySelector("#btn-slow")!.addEventListener("click", () => setSpeed(2));
+  root.querySelector("#btn-step-once")!.addEventListener("click", () => {
     state.paused = true;
-    (side.querySelector("#btn-pause") as HTMLElement).textContent = "run";
+    updatePlayback();
     if (state.view === "split") dual.step("both");
     else if (state.view === "B") dual.b.step();
     else dual.a.step();
+    paintFeeds();
     refreshMetrics();
   });
-  side.querySelectorAll(".view").forEach((b) => {
-    b.addEventListener("click", () => {
-      state.view = ((b as HTMLElement).dataset.view ?? "A") as ViewMode;
-      renderer.view = state.view;
-      dual.active = state.view === "B" ? "B" : "A";
-      side.querySelectorAll(".view").forEach((x) => x.classList.toggle("active", x === b));
-      refreshMetrics();
+  function setView(view: ViewMode): void {
+    state.view = view;
+    renderer.view = view;
+    dual.active = view === "B" ? "B" : "A";
+    state.selectedId = -1;
+    selectOrganism(current(), -1);
+    if (view === "split" && state.surface === "3d") setSurface("2d");
+    root.querySelectorAll<HTMLElement>(".view").forEach(b => {
+      const active = b.dataset.view === view;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
     });
-  });
-  side.querySelectorAll(".fm").forEach((b) => {
-    b.addEventListener("click", () => {
-      renderer.fieldMode = Number((b as HTMLElement).dataset.fm) as FieldMode;
-      side.querySelectorAll(".fm").forEach((x) => x.classList.toggle("active", x === b));
+    layout();
+    refreshMetrics();
+  }
+  root.querySelectorAll<HTMLElement>(".view").forEach(b => b.addEventListener("click", () => setView(b.dataset.view as ViewMode)));
+  function setField(mode: FieldMode): void {
+    renderer.fieldMode = mode;
+    if (view3d) view3d.fieldMode = mode;
+    root.querySelectorAll<HTMLElement>(".fm").forEach(b => {
+      const active = Number(b.dataset.fm) === mode;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
     });
-  });
-  side.querySelector("#btn-step-a")!.addEventListener("click", () => {
+    const legends = [
+      '<i class="dot nutrient"></i>Nutriments <i class="dot toxin"></i>Toxines <i class="dot light"></i>Lumière',
+      'Nutriments <span class="legend-scale nutrient-scale"></span> faible → élevé',
+      'Toxines <span class="legend-scale toxin-scale"></span> faible → élevé',
+      'Température <span class="legend-scale temperature-scale"></span> froid → chaud',
+      'Lumière <span class="legend-scale light-scale"></span> faible → élevée',
+    ];
+    root.querySelector("#field-legend")!.innerHTML = legends[mode]!;
+  }
+  root.querySelectorAll<HTMLElement>(".fm").forEach(b => b.addEventListener("click", () => setField(Number(b.dataset.fm) as FieldMode)));
+  root.querySelector("#btn-step-a")!.addEventListener("click", () => {
+    state.paused = true;
     dual.a.step();
     refreshMetrics();
   });
-  side.querySelector("#btn-step-b")!.addEventListener("click", () => {
+  root.querySelector("#btn-step-b")!.addEventListener("click", () => {
+    state.paused = true;
     dual.b.step();
     refreshMetrics();
   });
-  side.querySelector("#btn-step-both")!.addEventListener("click", () => {
+  root.querySelector("#btn-step-both")!.addEventListener("click", () => {
+    state.paused = true;
     dual.step("both");
     refreshMetrics();
   });
-  side.querySelector("#btn-snap")!.addEventListener("click", () => {
+  root.querySelector("#btn-snap")!.addEventListener("click", () => {
     state.snapshot = takeSnapshot(current());
-    status(`snapshot t=${current().tick} N=${current().organisms.length}`);
+    (root.querySelector("#btn-restore") as HTMLButtonElement).disabled = false;
+    root.querySelector("#snapshot-info")!.textContent = `Monde ${dual.active} · pas ${current().tick} · ${current().organisms.length} organismes`;
+    status("État mémorisé. Vous pouvez le restaurer depuis Expérience.");
   });
-  side.querySelector("#btn-restore")!.addEventListener("click", () => {
+  root.querySelector("#btn-restore")!.addEventListener("click", () => {
     if (!state.snapshot) {
       status("no snapshot");
       return;
     }
     restoreSnapshot(current(), state.snapshot);
-    status(`restored t=${current().tick}`);
+    selectOrganism(current(), -1);
+    status(`Monde restauré au pas ${current().tick}.`);
     refreshMetrics();
   });
-  side.querySelector("#btn-bottle")!.addEventListener("click", () => {
+  root.querySelector("#btn-bottle")!.addEventListener("click", () => {
     const n = applyBottleneck(current(), 0.1);
-    status(`bottleneck → N=${n}`);
+    status(`Goulot d’étranglement : ${n} organismes conservés.`);
+    paintFeeds();
     refreshMetrics();
   });
-  side.querySelector("#btn-reseed")!.addEventListener("click", () => {
-    const seed = Number((side.querySelector("#seed") as HTMLInputElement).value) >>> 0 || 1;
+  root.querySelector("#btn-reseed")!.addEventListener("click", () => {
+    const seed = Number((root.querySelector("#seed") as HTMLInputElement).value) >>> 0 || 1;
     const p: Partial<SimParams> = { ...current().params, seed };
     dual.a = new World(p);
     dual.b = new World({ ...p, seed: (seed ^ 0x9e3779b9) >>> 0 || 1 });
     state.selectedId = -1;
-    status(`reseeded ${seed}`);
+    selectOrganism(current(), -1);
+    status(`Mondes A et B réinitialisés avec la graine ${seed}.`);
     refreshMetrics();
   });
-  side.querySelector("#btn-share")!.addEventListener("click", async () => {
-    const url = buildShareURL(current().params);
+  root.querySelector("#btn-share")!.addEventListener("click", async () => {
+    const url = (() => {
+      const base = buildShareURL(current().params);
+      const f = flagsToQuery(state.flags);
+      if (!f) return base;
+      return base + (base.includes("?") ? "&" : "?") + f;
+    })();
     try {
       await navigator.clipboard.writeText(url);
-      status("URL copied");
+      status("Lien de configuration copié. Pour partager l’état actuel, exportez le monde.");
     } catch {
       status(url);
     }
     history.replaceState(null, "", "?" + url.split("?")[1]);
   });
-  side.querySelector("#btn-json")!.addEventListener("click", () => {
+  root.querySelector("#btn-json")!.addEventListener("click", () => {
     download(`openavida-t${current().tick}.json`, exportJSON(current()), "application/json");
   });
-  side.querySelector("#btn-csv")!.addEventListener("click", () => {
+  root.querySelector("#btn-csv")!.addEventListener("click", () => {
     download(`openavida-metrics-t${current().tick}.csv`, exportMetricsCSV(current().history), "text/csv");
   });
-  side.querySelector("#btn-phylo")!.addEventListener("click", () => {
+  root.querySelector("#btn-phylo")!.addEventListener("click", () => {
     download(`openavida-phylo-t${current().tick}.csv`, exportPhylogenyCSV(current()), "text/csv");
   });
-  side.querySelector("#btn-import")!.addEventListener("click", () => {
-    (side.querySelector("#import-file") as HTMLInputElement).click();
+  root.querySelector("#btn-import")!.addEventListener("click", () => {
+    (root.querySelector("#import-file") as HTMLInputElement).click();
   });
-  (side.querySelector("#import-file") as HTMLInputElement).addEventListener("change", async (ev) => {
+  (root.querySelector("#import-file") as HTMLInputElement).addEventListener("change", async (ev) => {
     const file = (ev.target as HTMLInputElement).files?.[0];
     if (!file) return;
-    const text = await file.text();
-    restoreSnapshot(current(), parseJSONSnapshot(text));
-    status("imported JSON");
-    refreshMetrics();
+    try {
+      const text = await file.text();
+      restoreSnapshot(current(), parseJSONSnapshot(text));
+      selectOrganism(current(), -1);
+      status("Monde importé avec succès.");
+      refreshMetrics();
+    } catch {
+      status("Import impossible : choisissez un fichier JSON exporté depuis OpenAvida.");
+    } finally {
+      (ev.target as HTMLInputElement).value = "";
+    }
   });
 
-  const ta = () => side.querySelector("#genome-edit") as HTMLTextAreaElement;
-  const mutRng = new Rng(0x51ed);
-  side.querySelector("#btn-point")!.addEventListener("click", () => {
-    ta().value = pointMutate(ta().value || founderHeterotroph(), mutRng);
-  });
-  side.querySelector("#btn-indel")!.addEventListener("click", () => {
-    ta().value = indelMutate(ta().value || founderHeterotroph(), mutRng);
-  });
-  side.querySelector("#btn-dup")!.addEventListener("click", () => {
-    ta().value = duplicateMutate(ta().value || founderHeterotroph(), mutRng).seq;
-  });
-  side.querySelector("#btn-apply")!.addEventListener("click", () => {
-    const seq = ta().value;
-    if (state.selectedId < 0) {
-      status("select an organism first");
+  root.querySelector("#btn-edit-selected")!.addEventListener("click", () => {
+    const org = current().organisms.find((o) => o.id === state.selectedId);
+    if (!org) {
+      status("Cet organisme n’est plus vivant.");
       return;
     }
-    current().replaceGenome(state.selectedId, seq);
-    selectOrganism(current(), state.selectedId, "apply");
-    status("genome applied (new lineage)");
+    loadSeqIntoBuilder(org.genome);
+    setTool("place");
+    root.querySelector("#dna-editor")!.scrollIntoView({ block: "start", behavior: "smooth" });
+    status(`ADN de l’organisme ${org.id} ouvert dans l’éditeur. Modifiez-le, puis appliquez-le ou placez un nouvel organisme.`);
   });
-  side.querySelector("#btn-load-founder")!.addEventListener("click", () => {
-    const key = (side.querySelector("#founder") as HTMLSelectElement).value;
-    ta().value = genomeForKit(key);
+  root.querySelector("#leaderboard")!.addEventListener("click", (ev) => {
+    const t = ev.target as HTMLElement;
+    const use = t.closest("[data-use]") as HTMLElement | null;
+    if (use) {
+      const id = Number(use.getAttribute("data-use"));
+      const org = current().organisms.find((o) => o.id === id);
+      if (org) {
+        loadSeqIntoBuilder(org.genome);
+        setTool("place");
+        status(`ADN de l’organisme ${id} chargé dans l’éditeur.`);
+      }
+      return;
+    }
+    const row = t.closest("[data-org]") as HTMLElement | null;
+    if (!row) return;
+    const id = Number(row.getAttribute("data-org"));
+    selectOrganism(current(), id, "select");
+    refreshMetrics();
   });
-  side.querySelector("#btn-inject")!.addEventListener("click", () => {
-    const seq = ta().value || founderHeterotroph();
+  root.querySelector("#death-log")!.addEventListener("click", (ev) => {
+    const row = (ev.target as HTMLElement).closest("[data-genome]") as HTMLElement | null;
+    if (!row) return;
+    const seq = row.getAttribute("data-genome") ?? "";
+    if (!seq) return;
+    loadSeqIntoBuilder(seq);
+    setTool("place");
+    status("ADN chargé : modifiez-le ou placez un nouvel organisme.");
+  });
+  root.querySelector("#btn-start")!.addEventListener("click", () => (root.querySelector("#btn-inject") as HTMLButtonElement).click());
+  root.querySelector("#btn-inject")!.addEventListener("click", () => {
+    const seq = dna.sequence || founderHeterotroph();
+    tagStrain(current(), seq);
     const n = injectStrain(current(), seq, 24);
-    status(`injected ${n}`);
+    status(`${n} organismes ajoutés au monde ${dual.active}.`);
+    paintFeeds();
     refreshMetrics();
   });
 
   window.addEventListener("keydown", (ev) => {
-    if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement) return;
-    if (ev.code === "Space") {
+    if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLSelectElement || (ev.target instanceof HTMLElement && (ev.target.isContentEditable || ev.target.closest("[data-own-keys]"))) || ev.metaKey || ev.ctrlKey || ev.altKey || helpDialog.open) return;
+    if (ev.code === "Space" && !(ev.target instanceof HTMLElement && ev.target.closest("button, summary, a"))) {
       ev.preventDefault();
-      (side.querySelector("#btn-pause") as HTMLElement).click();
+      (root.querySelector("#btn-pause") as HTMLElement).click();
     }
-    if (ev.key === "[") setSpeed(Math.max(0, state.speed - 1));
-    if (ev.key === "]") setSpeed(Math.min(60, state.speed + 1));
-    if (ev.key === "s") {
-      state.snapshot = takeSnapshot(current());
-      status("snapshot");
-    }
-    if (ev.key === "1") renderer.fieldMode = 0;
-    if (ev.key === "2") renderer.fieldMode = 1;
-    if (ev.key === "3") renderer.fieldMode = 2;
-    if (ev.key === "4") renderer.fieldMode = 3;
-    if (ev.key === "5") renderer.fieldMode = 4;
+    if (ev.key === "[") setSpeed(state.speed - 1);
+    if (ev.key === "]") setSpeed(state.speed + 1);
+    if (ev.key.toLowerCase() === "s") (root.querySelector("#btn-snap") as HTMLElement).click();
+    if (ev.key.toLowerCase() === "i") setTool("inspect");
+    if (ev.key.toLowerCase() === "o") setTool("place");
+    if (ev.key.toLowerCase() === "p") setTool("paint");
+    if (/^[1-5]$/.test(ev.key)) setField((Number(ev.key) - 1) as FieldMode);
+    if (ev.key === "Escape" && root.classList.contains("focus-mode")) (root.querySelector("#btn-focus") as HTMLElement).click();
   });
 
   window.addEventListener("resize", layout);
+  new ResizeObserver(() => layout()).observe(stage);
 
   hud.querySelector("#tool-inspect")!.addEventListener("click", () => setTool("inspect"));
   hud.querySelector("#tool-paint")!.addEventListener("click", () => setTool("paint"));
   hud.querySelector("#tool-place")!.addEventListener("click", () => setTool("place"));
+  root.querySelector("#view-2d")!.addEventListener("click", () => setSurface("2d"));
+  root.querySelector("#view-3d")!.addEventListener("click", () => setSurface("3d"));
 
   window.__openavidaPlaceAt = (x: number, y: number) => {
     const w = current();
-    const seq = (side.querySelector("#genome-edit") as HTMLTextAreaElement).value || genomeForKit(state.kit);
-    const child = placeOrganismAt(w, x, y, seq);
+    tagStrain(w, editorGenome());
+    const child = placeOrganismAt(w, x, y, editorGenome());
     if (!child) return false;
-    selectOrganism(w, child.id, "select");
+    selectOrganism(w, child.id, "peek");
     refreshMetrics();
     return true;
   };
@@ -725,7 +1106,7 @@ export function mount(root: HTMLElement): void {
   const loop = (now: number) => {
     const dt = Math.min(100, now - lastFrame);
     lastFrame = now;
-    if (!state.paused && state.speed > 0) {
+    if (!state.paused && state.speed > 0 && canDriveClock(state.room)) {
       const due = ticksDue(tickAccum, dt, state.speed, 3);
       tickAccum = due.accumMs;
       let used = 0;
@@ -739,7 +1120,14 @@ export function mount(root: HTMLElement): void {
     } else {
       tickAccum = 0;
     }
-    renderer.draw(dual.a, dual.b, now / 1000);
+    if (state.surface === "3d") {
+      ensure3d().draw(current());
+    } else {
+      renderer.draw(dual.a, dual.b, now / 1000);
+    }
+    if (state.room?.isHost && !state.paused && state.speed > 0 && current().tick % 10 === 0) {
+      state.roomPost?.({ kind: "snapshot", snap: current().snapshot() });
+    }
     refreshMetrics();
     requestAnimationFrame(loop);
   };
@@ -750,9 +1138,16 @@ export function mount(root: HTMLElement): void {
   attachControlHelp(root, tip);
   window.__openavidaHelp = CONTROL_HELP;
 
-  layout();
+  let chartsPref = "1";
+  try { chartsPref = localStorage.getItem("openavida.charts") ?? "1"; } catch { /* storage unavailable */ }
+  setChartsCollapsed(chartsPref === "0");
   browser.clear();
   showKit(state.kit);
   setTool("place");
+  paintPeers();
+  if (state.flags.view3d) setSurface("3d");
+  else setSurface("2d");
+  if (state.flags.brains) setBrains(true);
+  if (state.flags.multiplayer) joinRoom(true);
   requestAnimationFrame(loop);
 }
