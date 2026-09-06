@@ -225,6 +225,13 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Tests: 61 sense, GAT→TAT on the phototroph raises photo, lists sorted, every hit is a coding cell.
 - GATES: tsc ok; vitest 133/133 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/landscape-desktop.png`.
 
+## Task 8 — Genome alignment (2026-09-07)
+
+- `alignSequences` in `dnaEdit.ts`: banded Needleman–Wunsch, match +1, mismatch −1, gap −1, band 48 (widened to `|n−m|` when lengths differ more). Returns gapped strings plus matches / mismatches / gaps / score.
+- Explorateur: « Comparer à… » picker (organism id, saved, plate selection); two aligned DNA strips; « Charger la comparaison » → editor `diffAgainst`.
+- Decision: widen the band to `|n−m|` so a global alignment always exists when lengths differ by more than 48.
+- GATES: tsc ok; vitest 134/134 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/align-detail.png`.
+
 ## Metrics (gating)
 
 | Check | Result |

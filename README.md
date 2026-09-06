@@ -52,6 +52,8 @@ Charts use actual tick positions and a shared fitness scale, including negative 
 
 The editor in Organismes keeps the ACGT sequence as the single source of truth; everything else is decoded from it live (`src/sim/dnaEdit.ts` is the pure model, `src/ui/dnaEditor.ts` the DOM). **Paysage** lists the 10 best and 10 worst single-codon substitutions inside ORFs, scored with `fitness(phenotype, env, zeroNeighbors)` at the selected cell (or the plate centre). Clicking a row applies it through `replaceRange` (undoable).
 
+**Comparer à…** in the Explorateur aligns two genomes (banded Needleman–Wunsch, match +1 / mismatch −1 / gap −1, band 48) and draws both sequences as matched columns. « Charger la comparaison » opens the second in the editor with `diffAgainst` the first.
+
 - **Gene cards**: one per ORF read from the sequence. Strength is the codon count; the slider and +/− insert or remove codons of the gene’s dominant trait inside that ORF, so manual base edits elsewhere survive. Reorder or delete genes; append a cassette per trait.
 - **Base strip**: every base as a tile, grouped by codon, with colored rails per gene, gene numbers on the start codon and amino-acid letters above coding codons. Click selects a base, double-click a codon, drag or Shift+click a range. Type A/C/G/T to replace, Backspace to delete, ⌘D to duplicate, ⌘Z / ⌘⇧Z to undo and redo, ⌘A to select all.
 - **Codon palette**: per trait, each codon with its amino acid and delta; inserts after the selection. Start and stop codons are in the first group.

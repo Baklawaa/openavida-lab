@@ -454,10 +454,16 @@ export function mount(root: HTMLElement): void {
       renderer.highlightLineage = id;
       drawCharts();
     },
-    loadGenome: (seq, label) => {
-      dna.load(seq);
+    loadGenome: (seq, label, opts) => {
+      dna.load(seq, opts?.diffAgainst !== undefined ? { diffAgainst: opts.diffAgainst } : {});
       setTool("place");
-      status(`Génome de ${label} chargé dans l’éditeur.`);
+      status(opts?.diffAgainst !== undefined
+        ? `Génome de ${label} chargé, comparé à la référence.`
+        : `Génome de ${label} chargé dans l’éditeur.`);
+    },
+    plateSelection: () => {
+      const org = viewWorld().organisms.find((o) => o.id === state.selectedId);
+      return org ? { id: org.id, genome: org.genome } : null;
     },
     restoreInto: (_target, snap) => {
       host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });

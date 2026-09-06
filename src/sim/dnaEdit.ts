@@ -62,6 +62,101 @@ export interface SeqHunk {
  * hunk: internal matches inside the changed region are not split (a middle
  * duplication therefore shows as one `sub` or `ins`, not two).
  */
+export interface Alignment {
+  a: string;
+  b: string;
+  matches: number;
+  mismatches: number;
+  gaps: number;
+  score: number;
+}
+
+const ALIGN_MATCH = 1;
+const ALIGN_MISMATCH = -1;
+const ALIGN_GAP = -1;
+export const ALIGN_BAND = 48;
+const ALIGN_NEG = -1_000_000;
+
+/**
+ * Banded Needleman–Wunsch (match +1, mismatch −1, gap −1, band 48).
+ * The band is widened to |n − m| when the lengths differ by more than 48
+ * so a global alignment always exists.
+ */
+export function alignSequences(seqA: string, seqB: string, band = ALIGN_BAND): Alignment {
+  const a = seqA;
+  const b = seqB;
+  const n = a.length;
+  const m = b.length;
+  const W = Math.max(1, band, Math.abs(n - m));
+  const cols = m + 1;
+  const S = new Int32Array((n + 1) * cols);
+  const P = new Uint8Array((n + 1) * cols);
+  const at = (i: number, j: number) => i * cols + j;
+  S.fill(ALIGN_NEG);
+  S[0] = 0;
+  for (let i = 1; i <= n && i <= W; i++) {
+    S[at(i, 0)] = i * ALIGN_GAP;
+    P[at(i, 0)] = 1;
+  }
+  for (let j = 1; j <= m && j <= W; j++) {
+    S[at(0, j)] = j * ALIGN_GAP;
+    P[at(0, j)] = 2;
+  }
+  for (let i = 1; i <= n; i++) {
+    const j0 = Math.max(1, i - W);
+    const j1 = Math.min(m, i + W);
+    for (let j = j0; j <= j1; j++) {
+      const diag = S[at(i - 1, j - 1)]! + (a[i - 1] === b[j - 1] ? ALIGN_MATCH : ALIGN_MISMATCH);
+      const up = S[at(i - 1, j)]! + ALIGN_GAP;
+      const left = S[at(i, j - 1)]! + ALIGN_GAP;
+      let best = diag;
+      let ptr = 0;
+      if (up > best) {
+        best = up;
+        ptr = 1;
+      }
+      if (left > best) {
+        best = left;
+        ptr = 2;
+      }
+      S[at(i, j)] = best;
+      P[at(i, j)] = ptr;
+    }
+  }
+  let i = n;
+  let j = m;
+  let ra = "";
+  let rb = "";
+  while (i > 0 || j > 0) {
+    const ptr = P[at(i, j)]!;
+    if (i > 0 && j > 0 && ptr === 0) {
+      ra = a[i - 1] + ra;
+      rb = b[j - 1] + rb;
+      i--;
+      j--;
+    } else if (i > 0 && (j === 0 || ptr === 1)) {
+      ra = a[i - 1] + ra;
+      rb = "-" + rb;
+      i--;
+    } else if (j > 0) {
+      ra = "-" + ra;
+      rb = b[j - 1] + rb;
+      j--;
+    } else break;
+  }
+  let matches = 0;
+  let mismatches = 0;
+  let gaps = 0;
+  for (let k = 0; k < ra.length; k++) {
+    const ca = ra[k]!;
+    const cb = rb[k]!;
+    if (ca === "-" || cb === "-") gaps++;
+    else if (ca === cb) matches++;
+    else mismatches++;
+  }
+  return { a: ra, b: rb, matches, mismatches, gaps, score: S[at(n, m)]! };
+}
+
 export function sequenceDiff(a: string, b: string): SeqHunk[] {
   if (a === b) return [];
   let i = 0;

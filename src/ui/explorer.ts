@@ -18,6 +18,7 @@ import {
   TRAIT_COLOR,
   TRAIT_NAMES,
   World,
+  alignSequences,
   ancestry,
   applyFilter,
   biggestChanges,
@@ -56,7 +57,9 @@ export interface ExplorerOptions {
   /** Select an organism in the visible world (living organisms only). */
   selectOrganism(id: number): void;
   highlightLineage(id: number): void;
-  loadGenome(seq: string, label: string): void;
+  loadGenome(seq: string, label: string, opts?: { diffAgainst?: string }): void;
+  /** Organism currently selected on the plate, if any. */
+  plateSelection(): { id: number; genome: string } | null;
   restoreInto(target: "B", snapshot: WorldSnapshot): void;
 }
 
@@ -176,6 +179,7 @@ export class Explorer {
   private tree: LineageTreeView | null = null;
   private treeFocus = -1;
   private treeObserver: ResizeObserver | null = null;
+  private compare: { first: string; second: string; firstLabel: string; secondLabel: string } | null = null;
 
   constructor(dialog: HTMLDialogElement, opts: ExplorerOptions) {
     this.dialog = dialog;
@@ -313,10 +317,72 @@ export class Explorer {
     return this.entries.find((e) => e.id === id && e.alive === alive) ?? this.entries.find((e) => e.id === id);
   }
 
+  private async fillCompareSaved(): Promise<void> {
+    const sel = this.dialog.querySelector<HTMLSelectElement>("#ex-compare-saved");
+    if (!sel) return;
+    this.saved = await this.opts.store.listOrganisms();
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">—</option>` + this.saved.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+    if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  }
+
+  private async runCompareFromPicker(): Promise<void> {
+    const savedId = this.dialog.querySelector<HTMLSelectElement>("#ex-compare-saved")?.value ?? "";
+    if (savedId) {
+      const rec = await this.opts.store.loadOrganism(savedId);
+      if (!rec) {
+        this.opts.status("Organisme enregistré introuvable.");
+        return;
+      }
+      this.runCompare(rec.entry.genome, rec.name);
+      return;
+    }
+    const id = Number(this.dialog.querySelector<HTMLInputElement>("#ex-compare-id")?.value);
+    if (Number.isInteger(id) && id > 0) {
+      const e = this.entries.find((x) => x.id === id);
+      if (!e) {
+        this.opts.status(`Organisme n° ${id} absent du catalogue.`);
+        return;
+      }
+      this.runCompare(e.genome, `organisme n° ${e.id}`);
+      return;
+    }
+    this.opts.status("Indiquez un n° d’organisme, un enregistrement, ou l’organisme sélectionné sur la plaque.");
+  }
+
+  private runCompare(second: string, secondLabel: string): void {
+    const first = this.selected;
+    if (!first) return;
+    const al = alignSequences(first.genome, second);
+    this.compare = { first: first.genome, second, firstLabel: `organisme n° ${first.id}`, secondLabel };
+    const host = this.dialog.querySelector("#ex-align");
+    if (!host) return;
+    let rowA = "";
+    let rowB = "";
+    for (let i = 0; i < al.a.length; i++) {
+      const ca = al.a[i]!;
+      const cb = al.b[i]!;
+      const cls = ca === "-" || cb === "-" ? "gap" : ca === cb ? "match" : "mis";
+      rowA += `<span class="${cls}">${ca}</span>`;
+      rowB += `<span class="${cls}">${cb}</span>`;
+    }
+    host.innerHTML = `<div class="align-block">
+      <div class="tiny">${esc(this.compare.firstLabel)}</div>
+      <div class="align-strip" aria-label="Séquence de référence">${rowA}</div>
+      <div class="tiny">${esc(secondLabel)}</div>
+      <div class="align-strip" aria-label="Séquence comparée">${rowB}</div>
+      <p class="micro">${al.matches} identités · ${al.mismatches} substitutions · ${al.gaps} gaps · score ${al.score}</p>
+      <button type="button" data-act="compare-load">Charger la comparaison</button>
+    </div>`;
+    this.opts.status(`Alignement : ${al.matches} identités, ${al.mismatches} substitutions, ${al.gaps} gaps.`);
+  }
+
   private showOrganism(e: CatalogEntry): void {
     this.selected = e;
     this.setTab("organisms");
     this.q("#ex-detail").innerHTML = this.organismDetailHtml(e);
+    this.compare = null;
+    void this.fillCompareSaved();
     this.dialog.querySelectorAll(".ex-row.selected").forEach((r) => r.classList.remove("selected"));
     this.dialog.querySelector(`.ex-row[data-id="${e.id}"][data-alive="${e.alive ? 1 : 0}"]`)?.classList.add("selected");
   }
@@ -347,8 +413,17 @@ export class Explorer {
         <button type="button" data-act="tree" data-lineage="${e.lineageId}">${icon("chart")}Voir dans l’arbre</button>
         <button type="button" data-act="highlight" data-lineage="${e.lineageId}">Surligner la lignée</button>
         <button type="button" data-act="dna" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("dna")}Charger l’ADN</button>
+        <button type="button" data-act="compare-toggle">${icon("dna")}Comparer à…</button>
         <button type="button" class="primary" data-act="save" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("save")}Enregistrer…</button>
       </div>
+      <div id="ex-compare" class="ex-compare" hidden>
+        <label class="tiny" for="ex-compare-id">Organisme n°</label>
+        <input id="ex-compare-id" type="number" min="1" step="1" placeholder="n°">
+        <label class="tiny" for="ex-compare-saved">Enregistré</label>
+        <select id="ex-compare-saved"><option value="">—</option></select>
+        <div class="row"><button type="button" data-act="compare-plate">Organisme sélectionné</button><button type="button" class="primary" data-act="compare-run">Aligner</button></div>
+      </div>
+      <div id="ex-align"></div>
       <div id="ex-save-form" hidden></div>
       ${phenotypeTableHtml(e.ph)}
       <div class="ex-genome mono">${e.genome}</div>
@@ -677,6 +752,30 @@ export class Explorer {
         return;
       case "dna":
         if (entry) this.opts.loadGenome(entry.genome, `organisme n° ${entry.id}`);
+        return;
+      case "compare-toggle": {
+        const box = this.dialog.querySelector<HTMLElement>("#ex-compare");
+        if (box) box.hidden = !box.hidden;
+        if (box && !box.hidden) void this.fillCompareSaved();
+        return;
+      }
+      case "compare-plate": {
+        const sel = this.opts.plateSelection();
+        if (!sel) {
+          this.opts.status("Aucun organisme sélectionné sur la plaque.");
+          return;
+        }
+        this.runCompare(sel.genome, `organisme n° ${sel.id} (plaque)`);
+        return;
+      }
+      case "compare-run":
+        void this.runCompareFromPicker();
+        return;
+      case "compare-load":
+        if (this.compare) {
+          this.opts.loadGenome(this.compare.second, this.compare.secondLabel, { diffAgainst: this.compare.first });
+          this.opts.status(`Génome de ${this.compare.secondLabel} chargé, comparé à ${this.compare.firstLabel}.`);
+        }
         return;
       case "dna-org": {
         const o = this.opts.world().organisms.find((x) => x.id === Number(el.dataset.id));

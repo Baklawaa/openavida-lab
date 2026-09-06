@@ -20,6 +20,7 @@ import {
   duplicateMutate,
   indelMutate,
   pointMutate,
+  alignSequences,
   sequenceDiff,
   validateSequence,
 } from "../src/sim/index";
@@ -152,5 +153,32 @@ describe("DNA editor model", () => {
     const dd = sequenceDiff(src, dup);
     expect(dd).toHaveLength(1);
     expect(dd[0]!.kind === "ins" || dd[0]!.kind === "sub").toBe(true);
+  });
+
+  it("aligns identical sequences, substitutions, insertions and deletions", () => {
+    const same = alignSequences("ATGCAT", "ATGCAT");
+    expect(same.a).toBe("ATGCAT");
+    expect(same.b).toBe("ATGCAT");
+    expect(same.matches).toBe(6);
+    expect(same.mismatches).toBe(0);
+    expect(same.gaps).toBe(0);
+    expect(same.score).toBe(6);
+
+    const sub = alignSequences("ACGT", "ACCT");
+    expect(sub.a.replace(/-/g, "")).toBe("ACGT");
+    expect(sub.b.replace(/-/g, "")).toBe("ACCT");
+    expect(sub.mismatches).toBe(1);
+    expect(sub.matches).toBe(3);
+
+    const ins = alignSequences("ACGT", "ACGGT");
+    expect(ins.a.replace(/-/g, "")).toBe("ACGT");
+    expect(ins.b.replace(/-/g, "")).toBe("ACGGT");
+    expect(ins.gaps).toBe(1);
+    expect(ins.a.includes("-")).toBe(true);
+
+    const del = alignSequences("ACGGT", "ACGT");
+    expect(del.b.includes("-")).toBe(true);
+    expect(del.gaps).toBe(1);
+    expect(del.a.replace(/-/g, "")).toBe("ACGGT");
   });
 });

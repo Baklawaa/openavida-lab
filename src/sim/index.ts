@@ -119,7 +119,9 @@ export {
   type GeneBlock,
 } from "./builder";
 export {
+  ALIGN_BAND,
   EditHistory,
+  alignSequences,
   annotateSequence,
   appendGene,
   bumpGene,
@@ -137,6 +139,7 @@ export {
   sequenceDiff,
   setGeneStrength,
   validateSequence,
+  type Alignment,
   type CodonCell,
   type CodonRole,
   type DnaAnnotation,

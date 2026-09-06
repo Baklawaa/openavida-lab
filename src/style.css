@@ -424,6 +424,15 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .replay-row { margin-top: 10px; }
 .replay-info { margin-top: 10px; padding: 9px 11px; font-size: 10px; line-height: 1.6; color: var(--muted); background: #13211b; border: 1px solid #2f4a3b; border-radius: 6px; }
 
+.ex-compare { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 8px; background: #13211b; border-radius: 6px; }
+.ex-compare[hidden] { display: none; }
+.align-block { margin: 8px 0; }
+.align-strip { display: flex; flex-wrap: wrap; font: 11px var(--mono); line-height: 1.4; margin: 2px 0 8px; }
+.align-strip span { width: 1.1em; text-align: center; border-radius: 2px; }
+.align-strip .match { color: var(--muted); }
+.align-strip .mis { color: var(--rose); background: #3a1e24; }
+.align-strip .gap { color: var(--gold, #eac789); background: #2a2418; }
+
 #dna-landscape { margin: 10px 0 8px; }
 #dna-landscape summary { cursor: pointer; font-size: 12px; }
 .landscape-list { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 8px; max-height: 160px; overflow: auto; scrollbar-width: thin; }
