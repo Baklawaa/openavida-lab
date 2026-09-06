@@ -341,9 +341,11 @@ export function mount(root: HTMLElement): void {
     },
     replayInto: (snap) => {
       host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
-      state.paused = true;
-      updatePlayback();
       setView("B");
+      // A replay is meant to be watched: start playing at once (observation speed if the clock was stopped).
+      if (state.speed <= 0) setSpeed(2);
+      state.paused = false;
+      updatePlayback();
       paintFeeds();
       refreshMetrics();
     },

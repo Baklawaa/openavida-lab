@@ -42,7 +42,7 @@ export interface GoalPanelOptions {
   activeWorld(): "A" | "B";
   /** Restore a snapshot into the active world or into world B (and show it). */
   restoreInto(target: "active" | "B", snapshot: WorldSnapshot): void;
-  /** Replace world B with a start state, show it paused, so a replicate can be watched from its first step. */
+  /** Replace world B with a start state and start playing it, so a replicate is watched from its first step. */
   replayInto(snapshot: WorldSnapshot): void;
   setRecording(on: boolean): void;
   applyRecipe(recipe: Recipe, target: "active" | "B"): void;
@@ -246,7 +246,7 @@ function template(): string {
 
       <div class="goal-step" id="replay-step">
         <span class="eyebrow">5 · REJOUER UN RÉPLICAT DANS LE MONDE B</span>
-        <p class="micro">Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, en pause. Lecture : la simulation reproduit le réplicat pas pour pas.</p>
+        <p class="micro">Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, puis la lecture démarre : la simulation reproduit le réplicat pas pour pas. Un nouveau clic repart du début.</p>
         <div class="row replay-row"><input id="replay-seed" type="text" inputmode="numeric" pattern="[0-9]*" spellcheck="false" placeholder="Graine du réplicat"><button type="button" id="btn-replay-seed" class="primary">${icon("play")}Rejouer dans B</button></div>
         <div id="replay-info" class="replay-info" hidden></div>
       </div>
@@ -1008,8 +1008,8 @@ export class GoalPanel {
             ? `Dans la course, l’objectif est devenu impossible après ${known.ticks} pas.`
             : `Dans la course, ce réplicat n’a pas atteint l’objectif en ${known.ticks} pas (valeur finale ${known.finalValue.toFixed(3)}).`;
     const o = config.overrides ?? {};
-    this.showReplayInfo(`<b>Monde B prêt, en pause</b> · ${label} · départ ${this.lastRun.label}, pas ${w.tick}, ${w.organisms.length} organismes<br>Graine <span class="mono">${config.seed}</span> · mutation ${o.mutationRate ?? w.params.mutationRate} · pop. max ${o.maxPopulation ?? w.params.maxPopulation} · perturbations ${(o.disturbances ?? w.disturbances) ? "oui" : "non"}<br>${expected}<br>Appuyez sur Reprendre (ou Espace) : le monde B rejoue ce réplicat pas pour pas.`);
-    this.opts.status(`Monde B : ${label} rejoué (graine ${config.seed}). Lecture en pause.`);
+    this.showReplayInfo(`<b>Monde B relancé, lecture en cours</b> · ${label} · départ ${this.lastRun.label}, pas ${w.tick}, ${w.organisms.length} organismes<br>Graine <span class="mono">${config.seed}</span> · mutation ${o.mutationRate ?? w.params.mutationRate} · pop. max ${o.maxPopulation ?? w.params.maxPopulation} · perturbations ${(o.disturbances ?? w.disturbances) ? "oui" : "non"}<br>${expected}<br>Le monde B rejoue ce réplicat pas pour pas ; Espace met en pause, un nouveau clic sur Rejouer repart du pas ${w.tick}.`);
+    this.opts.status(`Monde B : ${label} rejoué (graine ${config.seed}), lecture en cours.`);
   }
 
   private showReplayInfo(html: string): void {

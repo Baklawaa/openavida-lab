@@ -102,7 +102,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "goal-sort": "Ordre du tableau : réussites les plus rapides ou les plus lentes, échecs les plus précoces ou les plus tardifs, valeur ou population finale.",
   "goal-results": "Tous les réplicats, triés. Cliquez sur une graine ou sur ▶ pour rejouer ce réplicat dans le monde B ; « fin » ouvre son état final.",
   "replay-seed": "Graine d’un réplicat à rejouer, telle qu’affichée dans le tableau ou la colonne seed du CSV (entier entre 1 et 4294967295).",
-  "btn-replay-seed": "Reconstruit l’état de départ de la dernière course avec cette graine et ses paramètres dans le monde B, en pause. La lecture reproduit le réplicat exactement.",
+  "btn-replay-seed": "Reconstruit l’état de départ de la dernière course avec cette graine et ses paramètres dans le monde B, puis lance la lecture : elle reproduit le réplicat exactement. Un nouveau clic repart du début.",
   "btn-charts": "Réduit ou affiche les séries temporelles pour donner plus de hauteur au monde. Le choix est mémorisé.",
   "view-A": "Affiche le monde A. Les indicateurs et les actions concernent ce monde.",
   "view-B": "Affiche le monde B, une expérience indépendante avec une autre graine.",

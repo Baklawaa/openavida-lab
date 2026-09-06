@@ -225,7 +225,12 @@ try {
   await page.locator('#goal-results [data-replay="0"]').click();
   await page.waitForFunction(() => window.__openavida.world === 'B');
   assert.equal(await page.locator('#replay-seed').inputValue(), String(replaySeed), 'Replay fills the seed field');
-  assert.match(await page.locator('#run-state').textContent(), /En pause/, 'Replay opens B paused');
+  assert.match(await page.locator('#run-state').textContent(), /En cours/, 'Replay starts playing B');
+  const replayTick = (await probe()).tick;
+  await page.waitForFunction(t => window.__openavida.tick > t, replayTick, { timeout: 10000 });
+  await page.locator('#goal-results [data-replay="0"]').click(); // a second replay restarts from the start tick
+  await page.waitForFunction(t => window.__openavida.tick <= t + 3, replayTick, { timeout: 5000 });
+  await page.locator('#btn-pause').click();
   assert.equal((await probe()).seed, replaySeed, 'World B carries the replicate seed');
   await page.locator('#tab-experiment').click();
   const csvEvent = page.waitForEvent('download');
