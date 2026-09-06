@@ -120,6 +120,15 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - `View3D.colorByStrain` reads `world.strains.get(org.strainId)?.color` (same hex as 2D). `app.ts` sets it with the 2D renderer; a late-created 3D view copies the flag.
 - `opt-color-strain` help now covers both surfaces. `launch.mjs ?view3d=1` still required.
 
+## Task 7 — visible simulation in a worker (2026-09-06)
+
+- `src/sim/simHost.ts`: `SimHost` interface, `SimOp` union and `applySimOp` (single implementation of every mutation: paint, place, inject, define/rename strain, replaceGenome, restore, replaceWorld, bottleneck, reseed, terrain preset, disturbances, brains, recording, setParams), `stepSides`, `frameFromWorld` / `applyFrame` (typed-array fields transferred; incremental history; lineages every 6th frame; innovations when their count changes), `InlineHost` (default; honours the 10 ms step budget).
+- `src/sim/simWorker.ts` owns the authoritative `DualWorld`; every reply carries the request `seq`. `src/ui/workerHost.ts` keeps the mirror, applies ops optimistically, and after each frame replays the ops the worker has not yet acknowledged on the sides that frame overwrote (an earlier "drop stale frames" rule lost innovations/history rows because the worker's incremental bookkeeping assumes every frame is applied).
+- `src/app.ts` no longer touches worlds directly: `host.apply(op)` / `host.step(which, n, budget)`; the rAF loop sends one step batch per frame with backpressure (`pendingSteps() < 2`). Panels mutate through app callbacks (`defineStrain` / `renameStrain` added to `SpeciesPanel` options). Probes: `__openavida.host`, `__openavidaStep(n)`, `__openavidaHash()`; `__openavidaMutate` is async.
+- Flag `worker` in `src/sim/flags.ts` (`?worker=1`). Inline stays the default.
+- Gates: Vitest 100/100 (`tests/simHost.test.ts` adds 4: op parity with direct calls by hash, frame round trip by hash, incremental history, InlineHost), perf hash **9d4c0f2b**; `tools/verify-worker.mjs` → identical hash in both hosts after 48 steps; `verify-interface.mjs` passes inline and with `?worker=1`; `launch.mjs` passes inline, `?worker=1`, and `?view3d=1&worker=1`; build emits `simWorker-*.js`.
+- Known limits: multiplayer host snapshots and the room protocol read the mirror (not the authoritative snapshot); in worker mode `takeSnapshot` for restore points also reads the mirror (its RNG state is carried by frames, so it is exact between frames but can lag one batch).
+
 ## Metrics (gating)
 
 | Check | Result |

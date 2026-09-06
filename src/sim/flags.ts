@@ -8,6 +8,8 @@ export interface FeatureFlags {
   multiplayer: boolean;
   brains: boolean;
   llmBrains: boolean;
+  /** Run the visible simulation in a Web Worker (`?worker=1`). */
+  worker: boolean;
 }
 
 export const DEFAULT_FLAGS: FeatureFlags = {
@@ -15,6 +17,7 @@ export const DEFAULT_FLAGS: FeatureFlags = {
   multiplayer: false,
   brains: false,
   llmBrains: false,
+  worker: false,
 };
 
 function truthy(s: string | null): boolean {
@@ -32,6 +35,7 @@ export function flagsFromQuery(qs: string): FeatureFlags {
     multiplayer: truthy(usp.get("mp")),
     brains: truthy(usp.get("brains")),
     llmBrains: truthy(usp.get("llm")),
+    worker: truthy(usp.get("worker")),
   };
 }
 
@@ -41,6 +45,7 @@ export function flagsToQuery(f: FeatureFlags): string {
   if (f.multiplayer) usp.set("mp", "1");
   if (f.brains) usp.set("brains", "1");
   if (f.llmBrains) usp.set("llm", "1");
+  if (f.worker) usp.set("worker", "1");
   return usp.toString();
 }
 
@@ -49,6 +54,7 @@ export function flagsEqual(a: FeatureFlags, b: FeatureFlags): boolean {
     a.view3d === b.view3d &&
     a.multiplayer === b.multiplayer &&
     a.brains === b.brains &&
-    a.llmBrains === b.llmBrains
+    a.llmBrains === b.llmBrains &&
+    a.worker === b.worker
   );
 }

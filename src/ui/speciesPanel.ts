@@ -25,6 +25,7 @@ import {
   type DeathCause,
 
   type GroupStats,
+  type Strain,
   type Strategy,
   type Innovation,
   type TraitChange,
@@ -44,6 +45,9 @@ export interface SpeciesPanelOptions {
   /** Load a genome into the DNA editor and arm the Place tool. */
   loadGenome(seq: string, label: string): void;
   inject(seq: string, count: number): void;
+  /** Mutations go through the app's SimHost so worker and mirror agree. */
+  defineStrain(genome: string, name: string): Strain;
+  renameStrain(id: number, name: string): boolean;
   onColorByStrain(on: boolean): void;
   openMutation(innovation: Innovation): void;
 }
@@ -288,7 +292,7 @@ export class SpeciesPanel {
       }
       const w = this.opts.world();
       const name = input.value.trim() || `Souche ${w.nextStrainId}`;
-      const s = w.defineStrain(seq, { name, manual: true });
+      const s = this.opts.defineStrain(seq, name);
       input.value = "";
       this.lastListKey = "";
       this.refresh(true);
@@ -311,8 +315,7 @@ export class SpeciesPanel {
     list.addEventListener("change", (ev) => {
       const input = ev.target as HTMLInputElement;
       if (!input.classList.contains("group-name")) return;
-      const w = this.opts.world();
-      if (w.renameStrain(Number(input.dataset.strain), input.value)) {
+      if (this.opts.renameStrain(Number(input.dataset.strain), input.value)) {
         this.lastListKey = "";
         this.opts.status(`Souche renommée : ${input.value.trim()}.`);
       }

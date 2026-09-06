@@ -3,14 +3,13 @@ import { GenomeBrowser, genesHtml, phenotypeTableHtml } from "./render/genomeBro
 import { DnaEditor } from "./ui/dnaEditor";
 import { SpeciesPanel } from "./ui/speciesPanel";
 import { GoalPanel } from "./ui/goalPanel";
+import { WorkerHost } from "./ui/workerHost";
 import { LabRenderer, type FieldMode, type ViewMode } from "./render/webgl";
 import { View3D } from "./render/view3d";
 import {
   DualWorld,
+  InlineHost,
   World,
-  BrainRuntime,
-  applyBottleneck,
-  baselinePolicy,
   applyRecipe,
   buildShareURL,
   canDriveClock,
@@ -28,14 +27,10 @@ import {
   flagsToQuery,
   founderHeterotroph,
   genomeForKit,
-  injectStrain,
   inspectBiochem,
-  llmPolicy,
   mappingLegend,
-  paintTerrain,
   parseJSONSnapshot,
   pathwaysHtml,
-  placeOrganismAt,
   RoomSession,
   strongestLiving,
   tallyDeaths,
@@ -43,7 +38,6 @@ import {
   parseShareURL,
   recipeFromQuery,
   peerColor,
-  restoreSnapshot,
   takeSnapshot,
   toGenomeTrack,
   type BrushKind,
@@ -52,7 +46,10 @@ import {
   type FeatureFlags,
   type PeerRole,
   type RoomOp,
+  type Side,
+  type SimHost,
   type SimParams,
+  type StepSide,
   type WorldSnapshot,
 } from "./sim/index";
 import { shouldWriteEditor, type EditorSyncReason } from "./ui/editorSync";
@@ -106,8 +103,20 @@ export function mount(root: HTMLElement): void {
   const q = typeof location !== "undefined" ? location.search : "";
   const sharedRecipe = recipeFromQuery(q);
   const initial = sharedRecipe ? sharedRecipe.params : parseShareURL(q);
-  const dual = new DualWorld(initial);
-  if (sharedRecipe) dual.a = applyRecipe(sharedRecipe);
+  const flags = flagsFromQuery(q) as FeatureFlags;
+  const recipeWorld = sharedRecipe ? applyRecipe(sharedRecipe) : null;
+  // The host owns where the simulation runs; app code only reads `dual` and sends ops/steps through `host`.
+  const host: SimHost =
+    flags.worker && typeof Worker !== "undefined"
+      ? new WorkerHost(initial, recipeWorld ? { snapshotA: recipeWorld.snapshot(), recordingA: recipeWorld.recording } : {})
+      : new InlineHost(
+          (() => {
+            const d = new DualWorld(initial);
+            if (recipeWorld) d.a = recipeWorld;
+            return d;
+          })(),
+        );
+  const dual = host.dual;
   const state = {
     view: "A" as ViewMode,
     paused: false,
@@ -121,7 +130,7 @@ export function mount(root: HTMLElement): void {
     selectedId: -1,
     snapshot: null as WorldSnapshot | null,
     lastUi: 0,
-    flags: flagsFromQuery(q) as FeatureFlags,
+    flags,
     surface: "2d" as "2d" | "3d",
     room: null as RoomSession | null,
     roomPost: null as ((op: RoomOp) => void) | null,
@@ -244,6 +253,8 @@ export function mount(root: HTMLElement): void {
   (root.querySelector("#seed") as HTMLInputElement).value = String(dual.a.params.seed);
 
   const current = (): World => ((state.view === "split" ? dual.active : state.view) === "B" ? dual.b : dual.a);
+  const sideOf = (w: World): Side => (w === dual.b ? "B" : "A");
+  const stepWhich = (): StepSide => (state.view === "split" ? "both" : state.view === "B" ? "B" : "A");
 
   function status(msg: string): void {
     (root.querySelector("#status-line") as HTMLElement).textContent = msg;
@@ -302,7 +313,7 @@ export function mount(root: HTMLElement): void {
         status("Sélectionnez d’abord un organisme avec Inspecter, ou placez-en un avec ce génome.");
         return;
       }
-      current().replaceGenome(state.selectedId, seq);
+      host.apply({ kind: "replaceGenome", which: sideOf(current()), orgId: state.selectedId, genome: seq });
       selectOrganism(current(), state.selectedId, "apply");
       status("Génome appliqué à la sélection : nouvelle lignée créée.");
     },
@@ -318,31 +329,22 @@ export function mount(root: HTMLElement): void {
     activeWorld: () => dual.active,
     restoreInto: (target, snap) => {
       if (target === "B") {
-        restoreSnapshot(dual.b, snap);
+        host.apply({ kind: "restore", which: "B", snapshot: snap });
         setView("B");
       } else {
-        restoreSnapshot(current(), snap);
+        host.apply({ kind: "restore", which: sideOf(current()), snapshot: snap });
         selectOrganism(current(), -1);
       }
       paintFeeds();
       refreshMetrics();
     },
-    setRecording: (on) => {
-      const w = current();
-      w.recording = on ? (w.recording ?? []) : null;
-    },
+    setRecording: (on) => host.apply({ kind: "recording", which: sideOf(current()), on }),
     applyRecipe: (recipe: Recipe, target) => {
       const next = applyRecipe(recipe);
-      if (target === "B") {
-        dual.b = next;
-        setView("B");
-      } else if (dual.active === "B") {
-        dual.b = next;
-        selectOrganism(current(), -1);
-      } else {
-        dual.a = next;
-        selectOrganism(current(), -1);
-      }
+      const which: Side = target === "B" ? "B" : sideOf(current());
+      host.apply({ kind: "replaceWorld", which, snapshot: next.snapshot(), recording: next.recording });
+      if (target === "B") setView("B");
+      else selectOrganism(current(), -1);
       paintFeeds();
       refreshMetrics();
     },
@@ -353,7 +355,7 @@ export function mount(root: HTMLElement): void {
   /** Name the strain after its kit when the genome is an unmodified kit genome. */
   function tagStrain(world: World, seq: string): void {
     const kit = DNA_KITS.find((k) => genomeForKit(k.id) === seq);
-    world.defineStrain(seq, kit ? { name: KIT_COPY[kit.id]!.label } : {});
+    host.apply({ kind: "defineStrain", which: sideOf(world), genome: seq, name: kit ? KIT_COPY[kit.id]!.label : undefined });
   }
   const species = new SpeciesPanel(root.querySelector<HTMLElement>("#panel-species")!, {
     status,
@@ -366,11 +368,13 @@ export function mount(root: HTMLElement): void {
     },
     inject: (seq, n) => {
       tagStrain(current(), seq);
-      const placed = injectStrain(current(), seq, n);
+      const placed = host.apply({ kind: "inject", which: sideOf(current()), genome: seq, count: n }).count ?? 0;
       status(`${placed} organismes injectés dans le monde ${dual.active}.`);
       paintFeeds();
       refreshMetrics();
     },
+    defineStrain: (genome, name) => host.apply({ kind: "defineStrain", which: sideOf(current()), genome, name, manual: true }).strain!,
+    renameStrain: (id, name) => host.apply({ kind: "renameStrain", which: sideOf(current()), id, name }).ok ?? false,
     onColorByStrain: (on) => {
       renderer.colorByStrain = on;
       if (view3d) view3d.colorByStrain = on;
@@ -623,6 +627,7 @@ export function mount(root: HTMLElement): void {
       pathways: pw,
       brainTraces: w.brain?.traces.length ?? 0,
       roomPeers: state.room?.metrics.peers ?? 0,
+      host: host.kind,
     };
   }
 
@@ -645,7 +650,7 @@ export function mount(root: HTMLElement): void {
     const world = sidePick === "B" ? dual.b : dual.a;
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
     if (grid) {
-      paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+      host.apply({ kind: "paint", which: sidePick, x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
       emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
     }
   }
@@ -673,7 +678,7 @@ export function mount(root: HTMLElement): void {
         return;
       }
       state.painting = true;
-      paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+      host.apply({ kind: "paint", which: sidePick, x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
       emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
       return;
     }
@@ -685,7 +690,7 @@ export function mount(root: HTMLElement): void {
       }
       const seq = editorGenome();
       tagStrain(world, seq);
-      const child = placeOrganismAt(world, grid.x, grid.y, seq);
+      const child = host.apply({ kind: "place", which: sidePick, x: grid.x, y: grid.y, genome: seq }).child ?? null;
       if (child) {
         dual.active = sidePick;
         selectOrganism(world, child.id, "peek");
@@ -764,7 +769,7 @@ export function mount(root: HTMLElement): void {
       const seq = editorGenome();
       if (state.room && !canMutateWorld(state.room.self.role)) return;
       tagStrain(world, seq);
-      const child = placeOrganismAt(world, grid.x, grid.y, seq);
+      const child = host.apply({ kind: "place", which: sideOf(world), x: grid.x, y: grid.y, genome: seq }).child ?? null;
       if (child) {
         selectOrganism(world, child.id, "peek");
         emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
@@ -772,7 +777,7 @@ export function mount(root: HTMLElement): void {
       }
     } else if (state.tool === "paint") {
       if (state.room && !canMutateWorld(state.room.self.role)) return;
-      paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
+      host.apply({ kind: "paint", which: sideOf(world), x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
       emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
     } else if (org) {
       selectOrganism(world, org.id, state.tool === "inspect" ? "select" : "peek");
@@ -838,20 +843,12 @@ export function mount(root: HTMLElement): void {
   terrainBox.checked = dual.a.randomTerrain;
   disturbBox.checked = dual.a.disturbances;
   terrainBox.addEventListener("change", () => {
-    if (terrainBox.checked) {
-      dual.a.seedRandomTerrain();
-      dual.b.seedRandomTerrain();
-      status("random vents & walls on");
-    } else {
-      dual.a.clearPresetTerrain();
-      dual.b.clearPresetTerrain();
-      status("cleared preset terrain — paint your own");
-    }
+    host.apply({ kind: "terrainPreset", on: terrainBox.checked });
+    status(terrainBox.checked ? "Relief aléatoire : sources, obstacles et ombre ajoutés." : "Relief prédéfini retiré.");
   });
   disturbBox.addEventListener("change", () => {
-    dual.a.disturbances = disturbBox.checked;
-    dual.b.disturbances = disturbBox.checked;
-    status(disturbBox.checked ? "random events on" : "random events off");
+    host.apply({ kind: "disturbances", on: disturbBox.checked });
+    status(disturbBox.checked ? "Perturbations aléatoires activées." : "Perturbations aléatoires désactivées.");
   });
   const box3d = root.querySelector("#opt-view3d input") as HTMLInputElement;
   const boxBrains = root.querySelector("#opt-brains input") as HTMLInputElement;
@@ -861,16 +858,10 @@ export function mount(root: HTMLElement): void {
   boxBrains.checked = state.flags.brains;
   boxLlm.checked = state.flags.llmBrains;
   boxMp.checked = state.flags.multiplayer;
-  function policyForFlags() {
-    return state.flags.llmBrains ? llmPolicy(null) : baselinePolicy;
-  }
   function setBrains(on: boolean): void {
     state.flags.brains = on;
     boxBrains.checked = on;
-    for (const w of [dual.a, dual.b]) {
-      w.brainsEnabled = on;
-      if (on) w.brain = new BrainRuntime(policyForFlags());
-    }
+    host.apply({ kind: "brains", on, llm: state.flags.llmBrains });
     status(on ? (state.flags.llmBrains ? "LLM brains on (fallback baseline if no adapter)" : "baseline brains on") : "brains off — phase-1 movement");
   }
   box3d.addEventListener("change", () => setSurface(box3d.checked ? "3d" : "2d"));
@@ -916,9 +907,7 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-step-once")!.addEventListener("click", () => {
     state.paused = true;
     updatePlayback();
-    if (state.view === "split") dual.step("both");
-    else if (state.view === "B") dual.b.step();
-    else dual.a.step();
+    host.step(stepWhich(), 1);
     paintFeeds();
     refreshMetrics();
   });
@@ -956,21 +945,13 @@ export function mount(root: HTMLElement): void {
     root.querySelector("#field-legend")!.innerHTML = legends[mode]!;
   }
   root.querySelectorAll<HTMLElement>(".fm").forEach(b => b.addEventListener("click", () => setField(Number(b.dataset.fm) as FieldMode)));
-  root.querySelector("#btn-step-a")!.addEventListener("click", () => {
-    state.paused = true;
-    dual.a.step();
-    refreshMetrics();
-  });
-  root.querySelector("#btn-step-b")!.addEventListener("click", () => {
-    state.paused = true;
-    dual.b.step();
-    refreshMetrics();
-  });
-  root.querySelector("#btn-step-both")!.addEventListener("click", () => {
-    state.paused = true;
-    dual.step("both");
-    refreshMetrics();
-  });
+  for (const [id, which] of [["#btn-step-a", "A"], ["#btn-step-b", "B"], ["#btn-step-both", "both"]] as const) {
+    root.querySelector(id)!.addEventListener("click", () => {
+      state.paused = true;
+      host.step(which, 1);
+      refreshMetrics();
+    });
+  }
   root.querySelector("#btn-snap")!.addEventListener("click", () => {
     state.snapshot = takeSnapshot(current());
     (root.querySelector("#btn-restore") as HTMLButtonElement).disabled = false;
@@ -982,22 +963,21 @@ export function mount(root: HTMLElement): void {
       status("no snapshot");
       return;
     }
-    restoreSnapshot(current(), state.snapshot);
+    host.apply({ kind: "restore", which: sideOf(current()), snapshot: state.snapshot });
     selectOrganism(current(), -1);
     status(`Monde restauré au pas ${current().tick}.`);
     refreshMetrics();
   });
   root.querySelector("#btn-bottle")!.addEventListener("click", () => {
-    const n = applyBottleneck(current(), 0.1);
+    const n = host.apply({ kind: "bottleneck", which: sideOf(current()), keep: 0.1 }).count ?? 0;
     status(`Goulot d’étranglement : ${n} organismes conservés.`);
     paintFeeds();
     refreshMetrics();
   });
   root.querySelector("#btn-reseed")!.addEventListener("click", () => {
     const seed = Number((root.querySelector("#seed") as HTMLInputElement).value) >>> 0 || 1;
-    const p: Partial<SimParams> = { ...current().params, seed };
-    dual.a = new World(p);
-    dual.b = new World({ ...p, seed: (seed ^ 0x9e3779b9) >>> 0 || 1 });
+    const p: SimParams = { ...current().params, seed };
+    host.apply({ kind: "reseed", params: p, seedB: (seed ^ 0x9e3779b9) >>> 0 || 1 });
     state.selectedId = -1;
     selectOrganism(current(), -1);
     status(`Mondes A et B réinitialisés avec la graine ${seed}.`);
@@ -1035,7 +1015,7 @@ export function mount(root: HTMLElement): void {
     if (!file) return;
     try {
       const text = await file.text();
-      restoreSnapshot(current(), parseJSONSnapshot(text));
+      host.apply({ kind: "restore", which: sideOf(current()), snapshot: parseJSONSnapshot(text) });
       selectOrganism(current(), -1);
       status("Monde importé avec succès.");
       refreshMetrics();
@@ -1089,7 +1069,7 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-inject")!.addEventListener("click", () => {
     const seq = dna.sequence || founderHeterotroph();
     tagStrain(current(), seq);
-    const n = injectStrain(current(), seq, 24);
+    const n = host.apply({ kind: "inject", which: sideOf(current()), genome: seq, count: 24 }).count ?? 0;
     status(`${n} organismes ajoutés au monde ${dual.active}.`);
     paintFeeds();
     refreshMetrics();
@@ -1120,23 +1100,30 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#view-2d")!.addEventListener("click", () => setSurface("2d"));
   root.querySelector("#view-3d")!.addEventListener("click", () => setSurface("3d"));
 
-  window.__openavidaMutate = (n = 40) => {
-    const w = current();
-    const prev = w.params.mutationRate;
-    Object.assign(w.params, { mutationRate: 1 });
+  window.__openavidaMutate = async (n = 40) => {
+    const which = sideOf(current());
+    const prev = current().params.mutationRate;
     const steps = Math.max(1, Math.min(400, n | 0));
-    for (let i = 0; i < steps; i++) w.step();
-    Object.assign(w.params, { mutationRate: prev });
+    host.apply({ kind: "setParams", which, params: { mutationRate: 1 } });
+    host.step(which, steps);
+    host.apply({ kind: "setParams", which, params: { mutationRate: prev } });
+    await host.flush();
     paintFeeds();
     refreshMetrics();
     species.refresh(true);
-    return w.innovations.length;
+    return current().innovations.length;
   };
+  window.__openavidaStep = async (n = 1) => {
+    host.step(stepWhich(), Math.max(1, n | 0));
+    await host.flush();
+    refreshMetrics();
+  };
+  window.__openavidaHash = () => host.hash(sideOf(current()));
 
   window.__openavidaPlaceAt = (x: number, y: number) => {
     const w = current();
     tagStrain(w, editorGenome());
-    const child = placeOrganismAt(w, x, y, editorGenome());
+    const child = host.apply({ kind: "place", which: sideOf(w), x, y, genome: editorGenome() }).child ?? null;
     if (!child) return false;
     selectOrganism(w, child.id, "peek");
     refreshMetrics();
@@ -1162,14 +1149,8 @@ export function mount(root: HTMLElement): void {
     if (!state.paused && state.speed > 0 && canDriveClock(state.room)) {
       const due = ticksDue(tickAccum, dt, state.speed, 3);
       tickAccum = due.accumMs;
-      let used = 0;
-      for (let i = 0; i < due.ticks && used < 10; i++) {
-        const t0 = performance.now();
-        if (state.view === "split") dual.step("both");
-        else if (state.view === "B") dual.b.step();
-        else dual.a.step();
-        used += performance.now() - t0;
-      }
+      // Backpressure: never queue more than two step batches ahead of the frames we have drawn.
+      if (due.ticks > 0 && host.pendingSteps() < 2) host.step(stepWhich(), due.ticks, 10);
     } else {
       tickAccum = 0;
     }

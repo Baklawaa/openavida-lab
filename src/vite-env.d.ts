@@ -25,6 +25,7 @@ interface OpenAvidaProbe {
   pathways: string;
   brainTraces: number;
   roomPeers: number;
+  host: "inline" | "worker";
 }
 
 interface Window {
@@ -32,6 +33,8 @@ interface Window {
   __openavidaSelectAt?: (x: number, y: number) => boolean;
   __openavidaOrgPixel?: (index?: number) => { x: number; y: number; id: number } | null;
   __openavidaPlaceAt?: (x: number, y: number) => boolean;
-  __openavidaMutate?: (n?: number) => number;
+  __openavidaMutate?: (n?: number) => Promise<number>;
+  __openavidaStep?: (n?: number) => Promise<void>;
+  __openavidaHash?: () => Promise<string>;
   __openavidaHelp?: Record<string, string>;
 }

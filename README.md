@@ -61,6 +61,17 @@ This checks placement, DNA editing, painting, 2D/3D, A/B, snapshots, Espèces (d
 
 ES modules will not load from `file://`. Use `npm run dev` or `npm run preview`.
 
+## Simulation in a worker
+
+`?worker=1` runs the visible simulation in a Web Worker. The app talks to a `SimHost` (`src/sim/simHost.ts`): the inline host steps the worlds on the main thread (default); the worker host (`src/ui/workerHost.ts`) keeps a mirror on the main thread that every panel reads, applies each mutation to the mirror immediately, forwards it to `src/sim/simWorker.ts`, and overwrites the mirror with the frames the worker streams back (field buffers are transferred). All mutations share one implementation, `applySimOp`, so inline, worker and mirror agree by construction. To check that:
+
+```bash
+node tools/verify-worker.mjs
+node tools/verify-interface.mjs 'http://127.0.0.1:5174/?worker=1'
+```
+
+The first runs the same setup and 48 steps in both hosts and requires identical world hashes.
+
 ## Production / Vercel
 
 ```bash

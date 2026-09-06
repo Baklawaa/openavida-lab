@@ -9,10 +9,12 @@ describe("phase-2 feature flags", () => {
     expect(DEFAULT_FLAGS.multiplayer).toBe(false);
     expect(DEFAULT_FLAGS.brains).toBe(false);
     expect(DEFAULT_FLAGS.llmBrains).toBe(false);
+    expect(DEFAULT_FLAGS.worker).toBe(false);
   });
 
   it("parses view3d/mp/brains/llm from the query string", () => {
-    const f = flagsFromQuery("?view3d=1&mp=true&brains=on&llm=1");
+    const f = flagsFromQuery("?view3d=1&mp=true&brains=on&llm=1&worker=1");
+    expect(f.worker).toBe(true);
     expect(f.view3d).toBe(true);
     expect(f.multiplayer).toBe(true);
     expect(f.brains).toBe(true);

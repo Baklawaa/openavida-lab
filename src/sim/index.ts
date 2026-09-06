@@ -179,6 +179,23 @@ export {
   type TrialSummary,
 } from "./goals";
 export {
+  InlineHost,
+  applyFrame,
+  applySimOp,
+  frameFromWorld,
+  opResetsHistory,
+  opSides,
+  stepSides,
+  worldOf,
+  type FrameOptions,
+  type Side,
+  type SimHost,
+  type SimOp,
+  type SimOpResult,
+  type StepSide,
+  type WorldFrame,
+} from "./simHost";
+export {
   DEFAULT_FLAGS,
   flagsEqual,
   flagsFromQuery,

@@ -26,6 +26,7 @@ try {
   await active('#kit-phototroph');
   await active('#view-A');
   await page.locator('#btn-pause').click();
+  await page.waitForTimeout(120); // a step batch may still be in flight in worker mode
   const tick = (await probe()).tick;
   await page.waitForTimeout(650);
   assert.equal((await probe()).tick, tick, 'Pause stops the clock');
@@ -176,7 +177,7 @@ try {
   await page.locator('#btn-restore').click();
   assert.equal((await probe()).population, snapshotPopulation);
   await page.locator('#btn-step-once').click();
-  assert.equal((await probe()).tick, tick + 1);
+  await page.waitForFunction(t => window.__openavida.tick === t + 1, tick, { timeout: 5000 }); // async in worker mode
   await page.waitForTimeout(600);
   assert.equal((await probe()).tick, tick + 1, 'Single-step remains paused');
   const downloadEvent = page.waitForEvent('download');
