@@ -31,12 +31,40 @@ export interface Goal {
   sustain: number;
 }
 
+export type SweepVariable =
+  | "mutationRate"
+  | "maxPopulation"
+  | "reproduceEnergy"
+  | "toxinScale"
+  | "nutrientScale"
+  | "temperatureScale"
+  | "lightScale";
+
+export const SWEEP_VARIABLES: readonly SweepVariable[] = [
+  "mutationRate",
+  "maxPopulation",
+  "reproduceEnergy",
+  "toxinScale",
+  "nutrientScale",
+  "temperatureScale",
+  "lightScale",
+];
+
+const SWEEP_FIELD: Partial<Record<SweepVariable, FieldName>> = {
+  toxinScale: "toxin",
+  nutrientScale: "nutrient",
+  temperatureScale: "temperature",
+  lightScale: "light",
+};
+
 export interface TrialConfig {
   seed: number;
   maxTicks: number;
   /** Record the metric every n ticks (plus the last tick). */
   sampleEvery: number;
-  overrides?: Partial<Pick<SimParams, "mutationRate" | "disturbances" | "maxPopulation" | "reproduceEnergy">>;
+  overrides?: Partial<Pick<SimParams, "mutationRate" | "disturbances" | "maxPopulation" | "reproduceEnergy">> & {
+    fieldScale?: Partial<Record<FieldName, number>>;
+  };
   keepSnapshot?: boolean;
 }
 
@@ -108,10 +136,24 @@ export function goalHolds(goal: Goal, value: number): boolean {
   return goal.op === ">=" ? value >= goal.target : value <= goal.target;
 }
 
+function scaleField(arr: Float32Array, k: number): void {
+  for (let i = 0; i < arr.length; i++) arr[i] = arr[i]! * k;
+}
+
 /** Build a fresh world from the snapshot with its own seed and overrides. */
 export function worldForTrial(snapshot: WorldSnapshot, config: TrialConfig): World {
   const w = worldFromSnapshot(snapshot);
-  if (config.overrides) Object.assign(w.params, config.overrides);
+  if (config.overrides) {
+    const { fieldScale, ...params } = config.overrides;
+    Object.assign(w.params, params);
+    if (fieldScale) {
+      for (const name of Object.keys(fieldScale) as FieldName[]) {
+        const k = fieldScale[name];
+        if (k === undefined || !Number.isFinite(k)) continue;
+        scaleField(w.fields[name], k);
+      }
+    }
+  }
   if (config.overrides?.disturbances !== undefined) w.disturbances = config.overrides.disturbances;
   w.rng = new Rng(config.seed >>> 0 || 1);
   return w;
@@ -188,6 +230,54 @@ export function replicateSeeds(base: number, n: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < n; i++) out.push(((base + i) >>> 0) || 1);
   return out;
+}
+
+/** Linear inclusive grid. `steps` is the number of values (≥ 2). */
+export function sweepValues(from: number, to: number, steps: number): number[] {
+  const n = Math.max(2, Math.round(steps));
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(from + ((to - from) * i) / (n - 1));
+  return out;
+}
+
+export function applySweepValue(base: TrialConfig, variable: SweepVariable, value: number): TrialConfig {
+  const overrides = { ...base.overrides, fieldScale: { ...base.overrides?.fieldScale } };
+  const field = SWEEP_FIELD[variable];
+  if (field) overrides.fieldScale = { ...overrides.fieldScale, [field]: value };
+  else if (variable === "mutationRate" || variable === "maxPopulation" || variable === "reproduceEnergy") {
+    overrides[variable] = value;
+  }
+  return { ...base, overrides };
+}
+
+/**
+ * One TrialConfig per (value, replicate). Seeds continue across values:
+ * value 0 uses base.seed … base.seed+R-1, value 1 uses the next R seeds, etc.
+ */
+export function sweepConfigs(
+  base: TrialConfig,
+  variable: SweepVariable,
+  values: readonly number[],
+  replicates: number,
+): TrialConfig[] {
+  const R = Math.max(1, Math.round(replicates));
+  const out: TrialConfig[] = [];
+  let seed = base.seed >>> 0 || 1;
+  for (const value of values) {
+    const seeds = replicateSeeds(seed, R);
+    seed = ((seeds[seeds.length - 1]! + 1) >>> 0) || 1;
+    for (const s of seeds) out.push(applySweepValue({ ...base, seed: s }, variable, value));
+  }
+  return out;
+}
+
+export interface SweepPoint {
+  value: number;
+  summary: TrialSummary;
+}
+
+export function summarizeSweep(values: readonly number[], resultsPerValue: readonly (readonly TrialResult[])[]): SweepPoint[] {
+  return values.map((value, i) => ({ value, summary: summarizeTrials(resultsPerValue[i] ?? []) }));
 }
 
 export const GOAL_TRAITS: readonly TraitName[] = TRAIT_NAMES;

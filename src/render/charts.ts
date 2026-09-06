@@ -202,3 +202,47 @@ export function drawTrialSeries(canvas: HTMLCanvasElement, w: number, h: number,
     ctx.strokeStyle = r.reached ? "#a2dfbdcc" : "#91a2a788"; ctx.lineWidth = 1.4; ctx.lineJoin = "round"; ctx.stroke();
   }
 }
+
+export interface SweepChartPoint {
+  value: number;
+  median: number | null;
+  min: number | null;
+  max: number | null;
+}
+
+/** Median ticks-to-goal vs sweep value, with a min–max band. */
+export function drawSweep(canvas: HTMLCanvasElement, w: number, h: number, points: SweepChartPoint[]): void {
+  const ctx = prepare(canvas, w, h);
+  if (w <= 0) return;
+  const usable = points.filter((p) => p.median !== null && p.min !== null && p.max !== null);
+  if (!usable.length) { empty(ctx, w, h, "Lancez un balayage pour tracer le délai"); return; }
+  const xs = points.map((p) => p.value);
+  const ys = usable.flatMap((p) => [p.min!, p.max!, p.median!]);
+  const x0 = Math.min(...xs);
+  const x1 = Math.max(...xs);
+  const [floor, ceiling] = chartDomain(ys);
+  axes(ctx, w, h, floor, ceiling, 0, 0);
+  ctx.fillStyle = INK;
+  ctx.textAlign = "left";
+  ctx.fillText(format(x0), PAD.left, h - 6);
+  ctx.textAlign = "right";
+  ctx.fillText(format(x1), w - PAD.right, h - 6);
+  const plotW = w - PAD.left - PAD.right;
+  const plotH = h - PAD.top - PAD.bottom;
+  const span = Math.max(1e-9, x1 - x0);
+  const X = (v: number) => PAD.left + ((v - x0) / span) * plotW;
+  const Y = (v: number) => PAD.top + (1 - (v - floor) / Math.max(1e-9, ceiling - floor)) * plotH;
+  ctx.beginPath();
+  usable.forEach((p, i) => { const x = X(p.value); if (i === 0) ctx.moveTo(x, Y(p.max!)); else ctx.lineTo(x, Y(p.max!)); });
+  for (let i = usable.length - 1; i >= 0; i--) ctx.lineTo(X(usable[i]!.value), Y(usable[i]!.min!));
+  ctx.closePath();
+  ctx.fillStyle = "#a2dfbd33";
+  ctx.fill();
+  ctx.beginPath();
+  usable.forEach((p, i) => { const x = X(p.value); if (i === 0) ctx.moveTo(x, Y(p.median!)); else ctx.lineTo(x, Y(p.median!)); });
+  ctx.strokeStyle = "#a2dfbd"; ctx.lineWidth = 1.7; ctx.lineJoin = "round"; ctx.stroke();
+  for (const p of usable) {
+    ctx.fillStyle = "#a2dfbd";
+    ctx.beginPath(); ctx.arc(X(p.value), Y(p.median!), 2.4, 0, Math.PI * 2); ctx.fill();
+  }
+}

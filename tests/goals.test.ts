@@ -7,9 +7,15 @@ import {
   goalHolds,
   replicateSeeds,
   runTrial,
+  summarizeSweep,
   summarizeTrials,
+  sweepConfigs,
+  sweepValues,
   takeSnapshot,
+  worldForTrial,
+  worldFromSnapshot,
   type Goal,
+  type TrialResult,
 } from "../src/sim/index";
 
 function toxinWorld(): World {
@@ -104,5 +110,52 @@ describe("goal metrics", () => {
     expect(s.extinctions).toBe(1);
     expect(summarizeTrials([]).medianTicks).toBe(null);
     expect(replicateSeeds(0xfffffffe, 3)).toEqual([0xfffffffe, 0xffffffff, 1]);
+  });
+
+  it("fieldScale multiplies the trial world fields and leaves the snapshot untouched", () => {
+    const w = new World({ width: 16, height: 16, seed: 5 });
+    w.fields.toxin.fill(0.4);
+    w.injectStrain(founderHeterotroph(), 4, 8, 8);
+    const snap = takeSnapshot(w);
+    const metric = { kind: "share-in-field" as const, field: "toxin" as const, min: 0.3 };
+    expect(evaluateGoalMetric(worldFromSnapshot(snap), metric)).toBe(1);
+    const scaled = worldForTrial(snap, { seed: 1, maxTicks: 1, sampleEvery: 1, overrides: { fieldScale: { toxin: 0.5 } } });
+    expect(evaluateGoalMetric(scaled, metric)).toBe(0);
+    expect(evaluateGoalMetric(worldFromSnapshot(snap), metric)).toBe(1);
+    const i = 8 * 16 + 8;
+    expect(scaled.fields.toxin[i]!).toBeCloseTo(0.2, 6);
+    expect(snap.toxin[i]!).toBeCloseTo(0.4, 6);
+  });
+
+  it("sweepConfigs is values × replicates with unique continuing seeds", () => {
+    const values = sweepValues(0.25, 1, 4);
+    expect(values).toHaveLength(4);
+    expect(values[0]).toBeCloseTo(0.25);
+    expect(values[3]).toBeCloseTo(1);
+    const base = { seed: 10, maxTicks: 50, sampleEvery: 5 };
+    const configs = sweepConfigs(base, "toxinScale", values, 3);
+    expect(configs).toHaveLength(12);
+    const seeds = configs.map((c) => c.seed);
+    expect(new Set(seeds).size).toBe(12);
+    expect(seeds.slice(0, 3)).toEqual([10, 11, 12]);
+    expect(seeds.slice(3, 6)).toEqual([13, 14, 15]);
+    expect(configs[0]!.overrides?.fieldScale?.toxin).toBeCloseTo(0.25);
+    expect(configs[9]!.overrides?.fieldScale?.toxin).toBeCloseTo(1);
+    const mut = sweepConfigs(base, "mutationRate", [0, 0.5], 2);
+    expect(mut[0]!.overrides?.mutationRate).toBe(0);
+    expect(mut[2]!.overrides?.mutationRate).toBe(0.5);
+  });
+
+  it("summarizeSweep reports one summary per value", () => {
+    const mk = (reached: number | null, extinct = false): TrialResult => ({
+      seed: 1, startTick: 0, ticks: 40, reachedTick: reached, finalValue: 1, finalPopulation: extinct ? 0 : 4, extinct, series: [],
+    });
+    const points = summarizeSweep([0.5, 1.5], [[mk(10), mk(20)], [mk(null), mk(null, true)]]);
+    expect(points).toHaveLength(2);
+    expect(points[0]!.value).toBe(0.5);
+    expect(points[0]!.summary.successes).toBe(2);
+    expect(points[0]!.summary.medianTicks).toBe(15);
+    expect(points[1]!.summary.successes).toBe(0);
+    expect(points[1]!.summary.extinctions).toBe(1);
   });
 });

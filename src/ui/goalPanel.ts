@@ -4,17 +4,23 @@
  * preset), a measurable goal, and run parameters; replicates run in workers
  * and report the tick at which the goal was reached.
  */
-import { drawTrialSeries } from "../render/charts";
+import { drawSweep, drawTrialSeries } from "../render/charts";
 import {
   FIELD_NAMES,
+  SWEEP_VARIABLES,
   TRAIT_NAMES,
   World,
   replicateSeeds,
+  summarizeSweep,
   summarizeTrials,
+  sweepConfigs,
+  sweepValues,
   type FieldName,
   type Goal,
   type GoalMetric,
   type Strain,
+  type SweepPoint,
+  type SweepVariable,
   type TraitName,
   type TrialConfig,
   type TrialResult,
@@ -34,6 +40,16 @@ export interface GoalPanelOptions {
 }
 
 const FIELD_LABEL: Record<FieldName, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
+
+const SWEEP_LABEL: Record<SweepVariable, string> = {
+  mutationRate: "Taux de mutation",
+  maxPopulation: "Population maximale",
+  reproduceEnergy: "Seuil énergétique de reproduction",
+  toxinScale: "Échelle des toxines",
+  nutrientScale: "Échelle des nutriments",
+  temperatureScale: "Échelle de température",
+  lightScale: "Échelle de lumière",
+};
 
 interface GoalTemplate {
   id: string;
@@ -141,6 +157,19 @@ function template(): string {
       <div id="goal-summary" class="goal-summary"></div>
       <div class="chart-card goal-chart"><div class="chart-heading"><h3>Mesure par réplicat</h3><span id="goal-chart-note"></span></div><canvas id="chart-goal" role="img" aria-label="Évolution de la mesure pour chaque réplicat"></canvas></div>
       <div id="goal-results" class="feed goal-results"></div>
+      <div class="section-heading" style="margin-top:18px"><h2>Balayage</h2><span class="tag">PARAMÈTRE</span></div>
+      <p class="muted">Répète l’objectif pour une grille linéaire d’une variable (ex. échelle des toxines). Les graines se suivent d’une valeur à l’autre.</p>
+      <label class="tiny" for="sweep-var">Variable</label>
+      <select id="sweep-var">${SWEEP_VARIABLES.map((v) => `<option value="${v}"${v === "toxinScale" ? " selected" : ""}>${SWEEP_LABEL[v]}</option>`).join("")}</select>
+      <div class="goal-config">
+        <label>De<input id="sweep-from" type="number" step="0.05" value="0.25"></label>
+        <label>À<input id="sweep-to" type="number" step="0.05" value="2"></label>
+        <label>Points<input id="sweep-steps" type="number" min="2" max="16" step="1" value="5"></label>
+        <label>Réplicats / valeur<input id="sweep-reps" type="number" min="1" max="16" step="1" value="4"></label>
+      </div>
+      <div class="row"><button type="button" id="btn-sweep-run">${icon("play")}Lancer le balayage</button><button type="button" id="btn-sweep-csv" class="quiet" disabled>${icon("save")}CSV du balayage</button></div>
+      <div id="sweep-table"></div>
+      <div class="chart-card goal-chart"><div class="chart-heading"><h3>Pas jusqu’à l’objectif vs valeur</h3><span id="sweep-chart-note"></span></div><canvas id="chart-sweep" role="img" aria-label="Médiane et étendue des pas jusqu’à l’objectif selon la variable"></canvas></div>
     </section>`;
 }
 
@@ -156,6 +185,8 @@ export class GoalPanel {
   private lastGoal: Goal | null = null;
   private lastStrains: Strain[] = [];
   private lastMetricKey = "";
+  private sweepPoints: SweepPoint[] = [];
+  private sweepVar: SweepVariable = "toxinScale";
 
   constructor(root: HTMLElement, opts: GoalPanelOptions) {
     this.root = root;
@@ -179,6 +210,7 @@ export class GoalPanel {
 
   layout(): void {
     this.drawChart();
+    this.drawSweepChart();
   }
 
   private syncDefaults(): void {
@@ -316,6 +348,7 @@ export class GoalPanel {
     this.results = new Array(reps);
     this.progress = new Array(reps).fill(0);
     this.q<HTMLButtonElement>("#btn-goal-run").disabled = true;
+    this.q<HTMLButtonElement>("#btn-sweep-run").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = true;
     this.q("#goal-summary").innerHTML = "";
@@ -338,11 +371,140 @@ export class GoalPanel {
     const all = await this.handle.promise;
     this.handle = null;
     this.q<HTMLButtonElement>("#btn-goal-run").disabled = false;
+    this.q<HTMLButtonElement>("#btn-sweep-run").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = all.length === 0;
     this.renderResults();
     const s = summarizeTrials(all);
     this.opts.status(`Réplicats terminés en ${((performance.now() - t0) / 1000).toFixed(1)} s : ${s.successes}/${s.n} atteignent l’objectif${s.medianTicks !== null ? ` (médiane ${s.medianTicks} pas)` : ""}.`);
+  }
+
+  private async runSweep(): Promise<void> {
+    if (this.handle) return;
+    const goal = this.currentGoal();
+    if (!goal) {
+      this.opts.status("Objectif incomplet : choisissez une mesure et une valeur cible.");
+      return;
+    }
+    const start = await this.startSnapshot();
+    if (!start) return;
+    if (start.snapshot.organisms.length === 0) {
+      this.opts.status("L’état de départ ne contient aucun organisme.");
+      return;
+    }
+    const variable = this.q<HTMLSelectElement>("#sweep-var").value as SweepVariable;
+    if (!(SWEEP_VARIABLES as readonly string[]).includes(variable)) return;
+    const from = Number(this.q<HTMLInputElement>("#sweep-from").value);
+    const to = Number(this.q<HTMLInputElement>("#sweep-to").value);
+    const steps = Math.max(2, Math.round(Number(this.q<HTMLInputElement>("#sweep-steps").value) || 2));
+    const perValue = Math.max(1, Math.min(16, Math.round(Number(this.q<HTMLInputElement>("#sweep-reps").value) || 1)));
+    if (!Number.isFinite(from) || !Number.isFinite(to)) {
+      this.opts.status("Bornes du balayage invalides.");
+      return;
+    }
+    const values = sweepValues(from, to, steps);
+    const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
+    const seed = Math.round(Number(this.q<HTMLInputElement>("#goal-seed").value)) >>> 0 || 1;
+    const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
+    const maxPopulation = Math.max(16, Math.round(Number(this.q<HTMLInputElement>("#goal-popmax").value) || 16));
+    const disturbances = this.q<HTMLInputElement>("#goal-disturb").checked;
+    const sampleEvery = Math.max(1, Math.round(maxTicks / 80));
+    const configs = sweepConfigs(
+      { seed, maxTicks, sampleEvery, overrides: { mutationRate, maxPopulation, disturbances }, keepSnapshot: false },
+      variable,
+      values,
+      perValue,
+    );
+    this.sweepVar = variable;
+    this.lastGoal = goal;
+    this.results = new Array(configs.length);
+    this.progress = new Array(configs.length).fill(0);
+    this.sweepPoints = [];
+    this.q<HTMLButtonElement>("#btn-goal-run").disabled = true;
+    this.q<HTMLButtonElement>("#btn-sweep-run").disabled = true;
+    this.q<HTMLButtonElement>("#btn-goal-stop").disabled = false;
+    this.q<HTMLButtonElement>("#btn-sweep-csv").disabled = true;
+    this.q("#sweep-table").innerHTML = "";
+    this.renderProgress(maxTicks);
+    this.opts.status(`Balayage ${SWEEP_LABEL[variable]} : ${values.length} valeurs × ${perValue} réplicats.`);
+    const t0 = performance.now();
+    this.handle = runReplicates(start.snapshot, goal, configs, {
+      onProgress: (i, tick) => {
+        this.progress[i] = tick - start.snapshot.tick;
+        this.renderProgress(maxTicks);
+      },
+      onResult: (i, r) => {
+        this.results[i] = r;
+        this.progress[i] = r.ticks;
+        this.renderProgress(maxTicks);
+      },
+    });
+    const all = await this.handle.promise;
+    this.handle = null;
+    this.q<HTMLButtonElement>("#btn-goal-run").disabled = false;
+    this.q<HTMLButtonElement>("#btn-sweep-run").disabled = false;
+    this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
+    const grouped = values.map((_, vi) => all.slice(vi * perValue, (vi + 1) * perValue).filter(Boolean));
+    this.sweepPoints = summarizeSweep(values, grouped);
+    this.q<HTMLButtonElement>("#btn-sweep-csv").disabled = this.sweepPoints.length === 0;
+    this.renderSweepTable();
+    this.drawSweepChart();
+    this.opts.status(`Balayage terminé en ${((performance.now() - t0) / 1000).toFixed(1)} s · ${values.length} valeurs.`);
+  }
+
+  private renderSweepTable(): void {
+    const host = this.q("#sweep-table");
+    if (!this.sweepPoints.length) {
+      host.innerHTML = "";
+      return;
+    }
+    const fmt = (v: number | null) => (v === null ? "—" : String(Math.round(v)));
+    host.innerHTML = `<table class="sweep-table"><thead><tr><th>Valeur</th><th>Réussite</th><th>Médiane</th><th>Min–max</th><th>Extinctions</th></tr></thead><tbody>${
+      this.sweepPoints.map((p) => {
+        const s = p.summary;
+        const range = s.minTicks === null ? "—" : `${s.minTicks}–${s.maxTicks}`;
+        return `<tr><td class="mono">${p.value.toPrecision(4)}</td><td>${s.successes}/${s.n}</td><td>${fmt(s.medianTicks)}</td><td>${range}</td><td>${s.extinctions}</td></tr>`;
+      }).join("")
+    }</tbody></table>`;
+  }
+
+  private drawSweepChart(): void {
+    const canvas = this.q<HTMLCanvasElement>("#chart-sweep");
+    const cw = canvas.parentElement!.clientWidth - 28;
+    if (cw <= 0) return;
+    drawSweep(canvas, cw, 120, this.sweepPoints.map((p) => ({
+      value: p.value,
+      median: p.summary.medianTicks,
+      min: p.summary.minTicks,
+      max: p.summary.maxTicks,
+    })));
+    this.q("#sweep-chart-note").textContent = this.sweepPoints.length
+      ? `${SWEEP_LABEL[this.sweepVar]} · médiane et étendue des pas`
+      : "";
+  }
+
+  private exportSweepCsv(): void {
+    const rows = [["value", "successes", "n", "success_rate", "median_ticks", "min_ticks", "max_ticks", "extinctions"]];
+    for (const p of this.sweepPoints) {
+      const s = p.summary;
+      rows.push([
+        p.value.toString(),
+        String(s.successes),
+        String(s.n),
+        s.successRate.toFixed(4),
+        s.medianTicks === null ? "" : String(s.medianTicks),
+        s.minTicks === null ? "" : String(s.minTicks),
+        s.maxTicks === null ? "" : String(s.maxTicks),
+        String(s.extinctions),
+      ]);
+    }
+    const text = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([text], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `openavida-sweep-${this.sweepVar}-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   private renderProgress(maxTicks: number): void {
@@ -435,11 +597,13 @@ export class GoalPanel {
     });
     for (const id of ["#goal-field-min", "#goal-op", "#goal-target", "#goal-sustain"]) this.q(id).addEventListener("input", () => this.updateGoalText());
     this.q("#btn-goal-run").addEventListener("click", () => void this.run());
+    this.q("#btn-sweep-run").addEventListener("click", () => void this.runSweep());
     this.q("#btn-goal-stop").addEventListener("click", () => {
       this.handle?.cancel();
       this.opts.status("Réplicats arrêtés.");
     });
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
+    this.q("#btn-sweep-csv").addEventListener("click", () => this.exportSweepCsv());
     this.q("#goal-results").addEventListener("click", (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-open]");
       if (!btn) return;

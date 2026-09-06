@@ -81,6 +81,13 @@ No code changes. GATES on the uncommitted tree:
 
 Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not product).
 
+## Task 1 — Parameter sweeps (2026-09-06)
+
+- `SweepVariable`, `fieldScale` on `TrialConfig.overrides`, `worldForTrial` multiplies snapshot field copies only.
+- `sweepValues` / `sweepConfigs` / `summarizeSweep`: seeds continue across values; count = values × replicates.
+- Expérience → Balayage: variable, de/à/points, réplicats/valeur, table + `drawSweep` (médiane, bande min–max), CSV.
+- Decision: default grid toxinScale 0.25–2, 5 points, 4 replicates; reuses `#goal-progress` and the same goal/budget as Expérience ciblée.
+
 ## Metrics (gating)
 
 | Check | Result |
