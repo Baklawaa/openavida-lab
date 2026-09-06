@@ -347,6 +347,17 @@ export function mount(root: HTMLElement): void {
       renderer.colorByStrain = on;
       status(on ? "Couleur des organismes : souche fondatrice (vue 2D)." : "Couleur des organismes : guilde et lignée.");
     },
+    openMutation: (inn) => {
+      if (!inn.genome) {
+        status("Séquence de la mutation absente (instantané ancien).");
+        return;
+      }
+      dna.load(inn.genome, { diffAgainst: inn.parentGenome ?? "" });
+      openTab("organisms");
+      root.querySelector("#dna-editor")?.scrollIntoView({ block: "nearest" });
+      (root.querySelector("#dna-strip-section") as HTMLDetailsElement | null)?.setAttribute("open", "");
+      status(`Mutation au pas ${inn.tick} · ${inn.kind} · génome comparé au parent.`);
+    },
   });
 
   function loadSeqIntoBuilder(seq: string): void {
@@ -1079,6 +1090,19 @@ export function mount(root: HTMLElement): void {
   hud.querySelector("#tool-place")!.addEventListener("click", () => setTool("place"));
   root.querySelector("#view-2d")!.addEventListener("click", () => setSurface("2d"));
   root.querySelector("#view-3d")!.addEventListener("click", () => setSurface("3d"));
+
+  window.__openavidaMutate = (n = 40) => {
+    const w = current();
+    const prev = w.params.mutationRate;
+    Object.assign(w.params, { mutationRate: 1 });
+    const steps = Math.max(1, Math.min(400, n | 0));
+    for (let i = 0; i < steps; i++) w.step();
+    Object.assign(w.params, { mutationRate: prev });
+    paintFeeds();
+    refreshMetrics();
+    species.refresh(true);
+    return w.innovations.length;
+  };
 
   window.__openavidaPlaceAt = (x: number, y: number) => {
     const w = current();

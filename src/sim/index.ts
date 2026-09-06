@@ -113,12 +113,14 @@ export {
   removeGene,
   replaceRange,
   setBase,
+  sequenceDiff,
   setGeneStrength,
   validateSequence,
   type CodonCell,
   type CodonRole,
   type DnaAnnotation,
   type DnaIssue,
+  type SeqHunk,
 } from "./dnaEdit";
 export {
   INNOVATION_THRESHOLD,

@@ -49,6 +49,38 @@ export interface DnaIssue {
   text: string;
 }
 
+export interface SeqHunk {
+  /** Inclusive start in `b`. */
+  a: number;
+  /** Exclusive end in `b`. Empty (`a === b`) for a pure deletion. */
+  b: number;
+  kind: "sub" | "ins" | "del";
+}
+
+/**
+ * Ranges in `b` that differ from `a`. Uses a single common-prefix / common-suffix
+ * hunk: internal matches inside the changed region are not split (a middle
+ * duplication therefore shows as one `sub` or `ins`, not two).
+ */
+export function sequenceDiff(a: string, b: string): SeqHunk[] {
+  if (a === b) return [];
+  let i = 0;
+  const n = Math.min(a.length, b.length);
+  while (i < n && a[i] === b[i]) i++;
+  let ja = a.length;
+  let jb = b.length;
+  while (ja > i && jb > i && a[ja - 1] === b[jb - 1]) {
+    ja--;
+    jb--;
+  }
+  const aLen = ja - i;
+  const bLen = jb - i;
+  if (aLen === 0 && bLen === 0) return [];
+  if (aLen === 0) return [{ a: i, b: jb, kind: "ins" }];
+  if (bLen === 0) return [{ a: i, b: i, kind: "del" }];
+  return [{ a: i, b: jb, kind: "sub" }];
+}
+
 /** Mirror decodeGenome's scan after the last closed gene to find a dangling ATG. */
 export function findOpenOrf(seq: string, from = 0): number {
   let i = from;

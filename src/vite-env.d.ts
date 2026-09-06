@@ -32,5 +32,6 @@ interface Window {
   __openavidaSelectAt?: (x: number, y: number) => boolean;
   __openavidaOrgPixel?: (index?: number) => { x: number; y: number; id: number } | null;
   __openavidaPlaceAt?: (x: number, y: number) => boolean;
+  __openavidaMutate?: (n?: number) => number;
   __openavidaHelp?: Record<string, string>;
 }

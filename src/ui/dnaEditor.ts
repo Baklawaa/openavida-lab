@@ -30,10 +30,12 @@ import {
   removeGene,
   replaceRange,
   sanitizeSequence,
+  sequenceDiff,
   setGeneStrength,
   validateSequence,
   type CodonCell,
   type DnaAnnotation,
+  type SeqHunk,
   type TraitName,
 } from "../sim/index";
 import { Rng } from "../sim/rng";
@@ -123,6 +125,8 @@ export class DnaEditor {
   private readonly opts: DnaEditorOptions;
   private readonly history = new EditHistory("");
   private reference = "";
+  private diffAgainst: string | null = null;
+  private diffHunks: SeqHunk[] = [];
   private ann: DnaAnnotation = annotateSequence("");
   private sel: Sel | null = null;
   private anchor = -1;
@@ -154,10 +158,13 @@ export class DnaEditor {
   }
 
   /** Load a genome from outside (kit, inspected organism, founder). Undo still restores the previous state. */
-  load(seq: string, opts: { reference?: boolean } = {}): void {
+  load(seq: string, opts: { reference?: boolean; diffAgainst?: string } = {}): void {
     const clean = sanitizeSequence(seq);
     this.history.push(clean);
-    if (opts.reference !== false) this.reference = clean;
+    this.diffAgainst = opts.diffAgainst !== undefined ? sanitizeSequence(opts.diffAgainst) : null;
+    this.diffHunks = this.diffAgainst ? sequenceDiff(this.diffAgainst, clean) : [];
+    if (this.diffAgainst) this.reference = this.diffAgainst;
+    else if (opts.reference !== false) this.reference = clean;
     this.sel = null;
     this.render();
   }
@@ -192,6 +199,19 @@ export class DnaEditor {
   private cellAt(i: number): CodonCell | null {
     for (const c of this.ann.cells) if (i >= c.start && i < c.start + c.bases.length) return c;
     return null;
+  }
+
+  private baseIsDiff(i: number): boolean {
+    for (const h of this.diffHunks) {
+      if (h.kind === "del") {
+        if (i === h.a || (h.a > 0 && i === h.a - 1)) return true;
+      } else if (i >= h.a && i < h.b) return true;
+    }
+    return false;
+  }
+
+  private diffCount(): number {
+    return this.diffHunks.reduce((s, h) => s + Math.max(1, h.b - h.a), 0);
   }
 
   private insertionPoint(): number {
@@ -231,7 +251,11 @@ export class DnaEditor {
     (this.q("#dna-undo") as HTMLButtonElement).disabled = !this.history.canUndo;
     (this.q("#dna-redo") as HTMLButtonElement).disabled = !this.history.canRedo;
     (this.q("#dna-revert") as HTMLButtonElement).disabled = !this.isDirty;
-    this.q("#dna-pheno-note").textContent = this.isDirty ? "comparé au génome chargé" : "identique au génome chargé";
+    this.q("#dna-pheno-note").textContent = this.diffAgainst
+      ? "comparé au génome parental"
+      : this.isDirty
+        ? "comparé au génome chargé"
+        : "identique au génome chargé";
   }
 
   private renderMinimap(): void {
@@ -324,7 +348,8 @@ export class DnaEditor {
         .map((b, k) => {
           const i = c.start + k;
           const on = sel && i >= sel.a && i < sel.b ? " sel" : "";
-          return `<span class="nt nt-${b}${on}" data-i="${i}">${b}</span>`;
+          const diff = this.baseIsDiff(i) ? " nt-diff" : "";
+          return `<span class="nt nt-${b}${on}${diff}" data-i="${i}">${b}</span>`;
         })
         .join("");
       const badge = c.role === "start" ? `<b class="gene-tag">${c.gene + 1}</b>` : "";
@@ -346,7 +371,8 @@ export class DnaEditor {
     const host = this.q("#dna-sel");
     const sel = this.sel;
     if (!sel) {
-      host.innerHTML = `<span class="muted">Cliquez sur une base pour la sélectionner. Double-clic : le codon entier. Glissez ou Maj + clic : une plage.</span>`;
+      const diff = this.diffAgainst ? `${this.diffCount()} bases modifiées par rapport au parent. ` : "";
+      host.innerHTML = `<span class="muted">${diff}Cliquez sur une base pour la sélectionner. Double-clic : le codon entier. Glissez ou Maj + clic : une plage.</span>`;
       return;
     }
     const n = sel.b - sel.a;
@@ -363,6 +389,7 @@ export class DnaEditor {
     } else {
       info = `Bases ${sel.a}–${sel.b - 1} · ${n} bases · ${this.sequence.slice(sel.a, Math.min(sel.b, sel.a + 12))}${n > 12 ? "…" : ""}`;
     }
+    if (this.diffAgainst) info += ` · ${this.diffCount()} bases modifiées par rapport au parent`;
     const bases = BASES.map((b) => `<button type="button" class="base-btn nt-${b}" data-set="${b}" aria-label="Remplacer par ${b}">${b}</button>`).join("");
     host.innerHTML = `<div class="sel-info mono">${info}</div>
       <div class="sel-ops">

@@ -17,8 +17,13 @@ import {
   removeGene,
   setBase,
   setGeneStrength,
+  duplicateMutate,
+  indelMutate,
+  pointMutate,
+  sequenceDiff,
   validateSequence,
 } from "../src/sim/index";
+import { Rng } from "../src/sim/rng";
 
 describe("DNA editor model", () => {
   it("annotates start / coding / stop / junk cells that tile the whole sequence", () => {
@@ -119,5 +124,33 @@ describe("DNA editor model", () => {
     h.reset("ATG");
     expect(h.present).toBe("ATG");
     expect(h.canUndo).toBe(false);
+  });
+
+  it("sequenceDiff reports a single prefix/suffix hunk in the child sequence", () => {
+    expect(sequenceDiff("ATGC", "ATGC")).toEqual([]);
+    const point = sequenceDiff("ATGAAATAA", "ATGACATAA");
+    expect(point).toEqual([{ a: 4, b: 5, kind: "sub" }]);
+    const ins = sequenceDiff("ATGTAA", "ATGCCCTAA");
+    expect(ins).toEqual([{ a: 3, b: 6, kind: "ins" }]);
+    const del = sequenceDiff("ATGCCCTAA", "ATGTAA");
+    expect(del).toEqual([{ a: 3, b: 3, kind: "del" }]);
+    const rng = new Rng(11);
+    const src = "ATGAAAAAATAACCCCGGGGTTTT";
+    const p = pointMutate(src, rng);
+    expect(p).not.toBe(src);
+    expect(p.length).toBe(src.length);
+    const pd = sequenceDiff(src, p);
+    expect(pd).toHaveLength(1);
+    expect(pd[0]!.kind).toBe("sub");
+    expect(pd[0]!.b - pd[0]!.a).toBe(1);
+    const id = indelMutate(src, new Rng(3));
+    const idd = sequenceDiff(src, id);
+    expect(idd).toHaveLength(1);
+    expect(["ins", "del"].includes(idd[0]!.kind)).toBe(true);
+    const dup = duplicateMutate(src, new Rng(7)).seq;
+    expect(dup.length).toBeGreaterThan(src.length);
+    const dd = sequenceDiff(src, dup);
+    expect(dd).toHaveLength(1);
+    expect(dd[0]!.kind === "ins" || dd[0]!.kind === "sub").toBe(true);
   });
 });

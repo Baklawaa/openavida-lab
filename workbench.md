@@ -88,6 +88,14 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - Expérience → Balayage: variable, de/à/points, réplicats/valeur, table + `drawSweep` (médiane, bande min–max), CSV.
 - Decision: default grid toxinScale 0.25–2, 5 points, 4 replicates; reuses `#goal-progress` and the same goal/budget as Expérience ciblée.
 
+## Task 2 — Show the mutation (2026-09-06)
+
+- `Innovation.parentGenome` / `genome` set at mutant birth, clipped to 384, optional on restore.
+- `sequenceDiff`: one prefix/suffix hunk in the child (`sub`/`ins`/`del`). Internal matches inside the hunk are not split.
+- DNA editor `load(seq, { diffAgainst })` outlines `.nt-diff`, compares phenotype to the parent.
+- Espèces → Changements clés → « Voir la mutation » opens Organismes and scrolls the editor.
+- Probe `window.__openavidaMutate(n)` steps with mutationRate 1 (test only). verify-interface asserts `#dna-strip .nt-diff` ≥ 1.
+
 ## Metrics (gating)
 
 | Check | Result |

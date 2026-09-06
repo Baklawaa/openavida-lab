@@ -46,6 +46,10 @@ export interface Innovation {
   changes: TraitChange[];
   /** Local environment where the mutant was born. */
   env: EnvSample;
+  /** Parent genome at birth (≤ MAX_GENOME). Optional on legacy snapshots. */
+  parentGenome?: string;
+  /** Mutant genome at birth (≤ MAX_GENOME). Optional on legacy snapshots. */
+  genome?: string;
 }
 
 export const STRAIN_COLORS = [

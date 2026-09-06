@@ -61,7 +61,13 @@ describe("strains (founding-genome groups)", () => {
     expect(w.innovations.length).toBeGreaterThan(0);
     const inn = w.innovations[0]!;
     expect(inn.changes.length).toBeGreaterThan(0);
+    expect(inn.genome).toBeTruthy();
+    expect(inn.parentGenome).toBeTruthy();
+    expect(inn.genome).not.toBe(inn.parentGenome);
     expect(inn.strainId).toBe(1);
+    const restored = worldFromSnapshot(takeSnapshot(w));
+    expect(restored.innovations[0]!.genome).toBe(inn.genome);
+    expect(restored.innovations[0]!.parentGenome).toBe(inn.parentGenome);
     expect(w.lineages.has(inn.lineageId)).toBe(true);
     const spread = innovationSpread(w.lineages, w.innovations);
     expect(spread.size).toBe(w.innovations.length);

@@ -61,6 +61,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "species-list": "Une carte par groupe : effectif, fitness, position moyenne, milieu local, phénotype moyen, dérive depuis le fondateur et mutations clés.",
   "strain-name": "Nom de la souche à créer à partir du génome courant de l’éditeur d’ADN.",
   "btn-strain-define": "Crée une souche nommée avec le génome de l’éditeur. Placez-la ou injectez-la depuis sa carte pour la comparer aux autres.",
+  "btn-see-mutation": "Charge le génome mutant dans l’éditeur d’ADN, bases divergentes du parent encadrées. Le phénotype est comparé au parent.",
   "preset-name": "Nom du préréglage à enregistrer.",
   "btn-preset-save": "Enregistre l’état complet du monde actif dans ce navigateur : champs, terrain, organismes, souches et historique.",
   "preset-list": "Préréglages enregistrés localement. Charger remplace le monde actif ; Point de départ le sélectionne pour l’expérience ciblée.",

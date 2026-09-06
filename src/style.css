@@ -204,6 +204,7 @@ textarea#genome-edit { width: 100%; min-height: 90px; resize: vertical; color: v
 .nt-A { background: #3ee0c0; } .nt-C { background: #6ea8ff; } .nt-G { background: #f0d35a; } .nt-T { background: #ff6b8a; }
 .codon .nt:hover { filter: brightness(1.12); }
 .nt.sel { box-shadow: 0 0 0 2px #0b1014, 0 0 0 4px var(--teal); position: relative; z-index: 1; }
+.nt-diff { outline: 2px solid #eac789; outline-offset: 1px; box-shadow: 0 0 0 1px #0b1014; position: relative; z-index: 1; }
 .gene-tag { position: absolute; left: 0; top: -11px; font: 700 8px var(--mono); color: #08121a; background: var(--g); border-radius: 3px; padding: 0 3px; line-height: 10px; }
 .aa-tag { position: absolute; right: 0; top: -10px; font: 600 8px var(--mono); font-style: normal; color: var(--g); line-height: 8px; }
 .dna-selection { margin-top: 8px; min-height: 30px; font-size: 10px; }
@@ -305,6 +306,7 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .group-innov ul { margin: 0; padding: 0; list-style: none; }
 .group-innov li { padding: 5px 0; border-top: 1px solid var(--line); }
 .group-innov li .tiny { font-size: 9px; }
+.group-innov .btn-see-mutation { margin-top: 6px; min-height: 24px; font-size: 10px; padding: 2px 8px; }
 .group-drift .up, .group-innov .up { color: var(--teal); }
 .group-drift .down, .group-innov .down { color: var(--rose); }
 .group-deaths { margin-top: 8px; font-size: 10px; line-height: 1.5; }

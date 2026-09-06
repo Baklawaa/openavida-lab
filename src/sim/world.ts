@@ -22,7 +22,7 @@ import {
   mutate,
   randomGenome,
 } from "./genome";
-import { copyPhenotype } from "./mapping";
+import { MAX_GENOME, copyPhenotype } from "./mapping";
 import { classifyEnergyDeath, deathFromOrganism } from "./deaths";
 import { applyPolicyMoves, type BrainRuntime } from "./brains";
 import { parentChildEdges, sampleMetrics } from "./metrics";
@@ -262,6 +262,8 @@ export class World {
           kind: genome.length === parent.genome.length ? "point" : Math.abs(genome.length - parent.genome.length) <= 3 ? "indel" : "duplication",
           changes,
           env: this.fields.sample(x, y),
+          parentGenome: parent.genome.length > MAX_GENOME ? parent.genome.slice(0, MAX_GENOME) : parent.genome,
+          genome: org.genome.length > MAX_GENOME ? org.genome.slice(0, MAX_GENOME) : org.genome,
         });
         if (this.innovations.length > 900) this.pruneInnovations();
       }

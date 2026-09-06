@@ -182,6 +182,15 @@ try {
   await page.screenshot({ path: 'scratch/interface/desktop-3d.png' });
   await page.locator('#view-2d').click();
   await page.locator('#fm-0').click();
+  await page.locator('#tab-organisms').click();
+  await page.locator('#kit-phototroph strong').click();
+  await clickWorld(0.32, 0.22);
+  await page.evaluate(() => window.__openavidaMutate?.(90));
+  await page.locator('#tab-species').click();
+  await page.waitForSelector('button[data-act="mutation"]', { timeout: 8000 });
+  await page.locator('button[data-act="mutation"]').first().click();
+  await visible('#panel-organisms');
+  assert.ok(await page.locator('#dna-strip .nt-diff').count() >= 1, 'Voir la mutation outlines changed bases');
   await page.locator('#tool-inspect').click();
   await page.mouse.move(0, 0);
   await page.waitForTimeout(200);

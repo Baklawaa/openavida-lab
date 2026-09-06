@@ -24,9 +24,11 @@ import {
 
   type GroupStats,
   type Strategy,
+  type Innovation,
   type TraitChange,
   type TraitName,
 } from "../sim/index";
+import { CONTROL_HELP } from "./help";
 import type { DeathRecord } from "../sim/types";
 import { DEATH_LABEL, TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
@@ -41,6 +43,7 @@ export interface SpeciesPanelOptions {
   loadGenome(seq: string, label: string): void;
   inject(seq: string, count: number): void;
   onColorByStrain(on: boolean): void;
+  openMutation(innovation: Innovation): void;
 }
 
 const TRAIT_ABBR: Record<TraitName, string> = {
@@ -227,7 +230,12 @@ export class SpeciesPanel {
       const inns = keyInnovations(w.innovations, spread ?? new Map(), strain.id, 4).filter((i) => i.living > 0);
       if (inns.length) {
         innov = `<div class="group-innov"><span class="eyebrow">CHANGEMENTS CLÉS</span><ul>${inns
-          .map((i) => `<li><b class="mono">pas ${i.tick}</b> ${i.changes.map(changeText).join(" · ")}<div class="tiny">${i.living} descendant${i.living > 1 ? "s" : ""} vivant${i.living > 1 ? "s" : ""} · né à T ${fmt(i.env.temperature)}, nutr ${fmt(i.env.nutrient)}, lum ${fmt(i.env.light)}</div></li>`)
+          .map((i) => {
+            const see = i.genome && i.parentGenome
+              ? `<button type="button" class="quiet btn-see-mutation" data-act="mutation" data-inn="${i.id}" title="${CONTROL_HELP["btn-see-mutation"]}" data-help="${CONTROL_HELP["btn-see-mutation"]}">Voir la mutation</button>`
+              : "";
+            return `<li><b class="mono">pas ${i.tick}</b> ${i.changes.map(changeText).join(" · ")}${see}<div class="tiny">${i.living} descendant${i.living > 1 ? "s" : ""} vivant${i.living > 1 ? "s" : ""} · né à T ${fmt(i.env.temperature)}, nutr ${fmt(i.env.nutrient)}, lum ${fmt(i.env.light)}</div></li>`;
+          })
           .join("")}</ul></div>`;
       } else innov = `<div class="group-innov muted">Aucune mutation à effet notable n’a encore de descendants vivants.</div>`;
     }
@@ -269,6 +277,11 @@ export class SpeciesPanel {
     list.addEventListener("click", (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLElement>("button[data-act]");
       if (!btn) return;
+      if (btn.dataset.act === "mutation") {
+        const inn = this.opts.world().innovations.find((x) => x.id === Number(btn.dataset.inn));
+        if (inn) this.opts.openMutation(inn);
+        return;
+      }
       const strain = this.opts.world().strains.get(Number(btn.dataset.strain));
       if (!strain) return;
       if (btn.dataset.act === "place") this.opts.loadGenome(strain.genome, strain.name);
