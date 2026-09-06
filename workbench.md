@@ -218,6 +218,13 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Decision: skip `type: "step"` inside a scheduled op (would recurse). Identify scale vs params in the UI; paint blobs land at the plate centre.
 - GATES: tsc ok; vitest 132/132 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/schedule-panel.png`.
 
+## Task 7 — Fitness landscape probe (2026-09-07)
+
+- `src/sim/landscape.ts`: 61 sense codons × coding cells, skip identity and duplicate phenotypes, score with `fitness(..., zeroNeighbors)`. Returns top/bottom N with position, codon, trait deltas. No RNG.
+- DNA editor `#dna-landscape`: env from the selected organism’s cell or the plate centre; click a hit → `replaceRange` + history.
+- Tests: 61 sense, GAT→TAT on the phototroph raises photo, lists sorted, every hit is a coding cell.
+- GATES: tsc ok; vitest 133/133 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/landscape-desktop.png`.
+
 ## Metrics (gating)
 
 | Check | Result |

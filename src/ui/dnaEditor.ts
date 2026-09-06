@@ -28,6 +28,7 @@ import {
   moveGene,
   pointMutate,
   removeGene,
+  probeLandscape,
   replaceRange,
   sanitizeSequence,
   sequenceDiff,
@@ -35,6 +36,8 @@ import {
   validateSequence,
   type CodonCell,
   type DnaAnnotation,
+  type EnvSample,
+  type LandscapeHit,
   type SeqHunk,
   type TraitName,
 } from "../sim/index";
@@ -49,6 +52,9 @@ export interface DnaEditorOptions {
   onPlace(): void;
   /** Genome of the organism currently inspected, if any. */
   selectedGenome(): { id: number; genome: string } | null;
+  /** Local environment for the landscape probe. */
+  env(): EnvSample;
+  envLabel(): string;
 }
 
 interface Sel {
@@ -100,6 +106,14 @@ function template(): string {
         <div id="dna-palette-codons" class="codon-chips"></div>
       </div>
       <div id="dna-warnings" class="dna-warnings" aria-live="polite"></div>
+    </details>
+    <details id="dna-landscape">
+      <summary>Paysage</summary>
+      <p class="micro" id="dna-landscape-env"></p>
+      <div class="tiny">Meilleures substitutions</div>
+      <div id="dna-landscape-best" class="landscape-list"></div>
+      <div class="tiny">Pires substitutions</div>
+      <div id="dna-landscape-worst" class="landscape-list"></div>
     </details>
     <div class="dna-pheno-head"><span class="eyebrow">PHÉNOTYPE</span><span class="tiny" id="dna-pheno-note">comparé au génome chargé</span></div>
     <div id="builder-pheno"></div>
@@ -240,6 +254,7 @@ export class DnaEditor {
     this.renderPalette();
     this.renderIssues();
     this.renderPheno();
+    this.renderLandscape();
     this.syncTextarea();
     this.opts.onChange?.(this.sequence);
   }
@@ -423,6 +438,37 @@ export class DnaEditor {
   private renderPheno(): void {
     const ref = annotateSequence(this.reference).decoded.phenotype;
     this.q("#builder-pheno").innerHTML = phenotypeDiffHtml(this.ann.decoded.phenotype, ref);
+  }
+
+  private renderLandscape(): void {
+    const box = this.q<HTMLDetailsElement>("#dna-landscape");
+    const envEl = this.q("#dna-landscape-env");
+    if (!box.open) {
+      envEl.textContent = "Ouvrez pour évaluer les substitutions d’un codon dans les gènes, à l’environnement local.";
+      this.q("#dna-landscape-best").innerHTML = "";
+      this.q("#dna-landscape-worst").innerHTML = "";
+      return;
+    }
+    const env = this.opts.env();
+    const probe = probeLandscape(this.sequence, env, 10);
+    envEl.textContent = `${this.opts.envLabel()} · fitness de référence ${probe.baseline.toFixed(3)}.`;
+    const maxAbs = Math.max(0.001, ...probe.best.map((h) => Math.abs(h.deltaFitness)), ...probe.worst.map((h) => Math.abs(h.deltaFitness)));
+    const row = (h: LandscapeHit, kind: "best" | "worst") => {
+      const traits = Object.entries(h.traits)
+        .filter(([, d]) => d)
+        .map(([t, d]) => `${TRAIT_LABEL[t as TraitName] ?? t} ${fmtDelta(d!)}`)
+        .join(" · ");
+      const w = Math.max(4, (Math.abs(h.deltaFitness) / maxAbs) * 100);
+      return `<button type="button" class="landscape-hit ${kind}" data-pos="${h.position}" data-codon="${h.codon}" title="Remplacer ${h.from} par ${h.codon} à la base ${h.position}">
+        <i style="width:${w.toFixed(0)}%"></i>
+        <span class="mono">${h.from}→${h.codon}</span>
+        <span class="pos">@${h.position}</span>
+        <span class="fit">${fmtDelta(h.deltaFitness)}</span>
+        <span class="tiny">${traits}</span>
+      </button>`;
+    };
+    this.q("#dna-landscape-best").innerHTML = probe.best.map((h) => row(h, "best")).join("") || `<p class="muted">Aucune substitution n’améliore la fitness.</p>`;
+    this.q("#dna-landscape-worst").innerHTML = probe.worst.map((h) => row(h, "worst")).join("") || `<p class="muted">Aucune substitution n’abaisse la fitness.</p>`;
   }
 
   private syncTextarea(): void {
@@ -677,6 +723,16 @@ export class DnaEditor {
     this.q("#dna-palette-trait").addEventListener("change", (ev) => {
       this.paletteTrait = (ev.target as HTMLSelectElement).value;
       this.renderPalette();
+    });
+    this.q("#dna-landscape").addEventListener("toggle", () => this.renderLandscape());
+    this.q("#dna-landscape").addEventListener("click", (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-pos]");
+      if (!btn) return;
+      const pos = Number(btn.dataset.pos);
+      const codon = btn.dataset.codon ?? "";
+      if (!Number.isInteger(pos) || codon.length !== 3) return;
+      const next = replaceRange(this.sequence, pos, pos + 3, codon);
+      this.commit(next, { a: pos, b: pos + 3 }, `Substitution ${this.sequence.slice(pos, pos + 3)} → ${codon} à la base ${pos}.`);
     });
     this.q("#dna-palette-codons").addEventListener("click", (ev) => {
       const chip = (ev.target as HTMLElement).closest<HTMLElement>("[data-codon]");

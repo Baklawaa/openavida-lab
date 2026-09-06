@@ -424,6 +424,18 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .replay-row { margin-top: 10px; }
 .replay-info { margin-top: 10px; padding: 9px 11px; font-size: 10px; line-height: 1.6; color: var(--muted); background: #13211b; border: 1px solid #2f4a3b; border-radius: 6px; }
 
+#dna-landscape { margin: 10px 0 8px; }
+#dna-landscape summary { cursor: pointer; font-size: 12px; }
+.landscape-list { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 8px; max-height: 160px; overflow: auto; scrollbar-width: thin; }
+.landscape-hit { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; text-align: left; padding: 4px 7px; min-height: 22px; font-size: 10px; line-height: 1.3; background: #18241e; border: 1px solid #24352c; overflow: hidden; }
+.landscape-hit i { position: absolute; left: 0; top: 0; bottom: 0; background: #3eb48928; pointer-events: none; }
+.landscape-hit.worst i { background: #c45c6a28; }
+.landscape-hit .mono { position: relative; font-size: 10px; }
+.landscape-hit .pos { position: relative; color: var(--muted); }
+.landscape-hit .fit { position: relative; font-family: var(--mono); color: var(--teal); margin-left: auto; }
+.landscape-hit.worst .fit { color: var(--rose); }
+.landscape-hit .tiny { position: relative; width: 100%; color: var(--muted); }
+
 #schedule-block .goal-row { flex-wrap: wrap; }
 #sched-at { width: 72px; flex: 0 0 auto; }
 #sched-action { flex: 1 1 160px; min-width: 160px; }

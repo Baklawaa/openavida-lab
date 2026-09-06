@@ -96,7 +96,7 @@ export {
   shannonFromCounts,
 } from "./metrics";
 export { DEFAULT_PARAMS, World } from "./world";
-export { DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type SimParams, type WorldSnapshot } from "./types";
+export { DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type EnvSample, type NeighborEffects, type SimParams, type WorldSnapshot } from "./types";
 export {
   CAUSE_COLOR,
   CAUSE_LABEL,
@@ -143,6 +143,14 @@ export {
   type DnaIssue,
   type SeqHunk,
 } from "./dnaEdit";
+export {
+  SENSE_CODONS,
+  ZERO_NEIGHBORS,
+  probeLandscape,
+  senseCodons,
+  type LandscapeHit,
+  type LandscapeProbe,
+} from "./landscape";
 export {
   INNOVATION_THRESHOLD,
   STRAIN_COLORS,

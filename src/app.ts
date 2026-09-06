@@ -331,6 +331,19 @@ export function mount(root: HTMLElement): void {
       setTool("place");
       status("Cliquez dans le monde pour placer un organisme avec ce génome.");
     },
+    env: () => {
+      const w = current();
+      const org = w.organisms.find((o) => o.id === state.selectedId);
+      if (org) return w.fields.sample(org.x, org.y);
+      return w.fields.sample(Math.floor(w.w / 2), Math.floor(w.h / 2));
+    },
+    envLabel: () => {
+      const w = current();
+      const org = w.organisms.find((o) => o.id === state.selectedId);
+      return org
+        ? `Environnement de la cellule (${org.x}, ${org.y})`
+        : `Environnement du centre (${Math.floor(w.w / 2)}, ${Math.floor(w.h / 2)})`;
+    },
   });
   const editorGenome = (): string => dna.sequence || genomeForKit(state.kit);
   const goals = new GoalPanel(root.querySelector<HTMLElement>("#panel-goals")!, {
