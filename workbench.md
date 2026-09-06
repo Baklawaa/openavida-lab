@@ -210,6 +210,14 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Decision: identify contestants by founding genome (`foundingShare`), not by name, so a mutant still counts for its strain.
 - GATES: tsc ok; vitest 129/129 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/tournament-block.png`.
 
+## Task 6 — Environment scripts (2026-09-07)
+
+- `ScheduledOp = { at, op }` where `op` is a `RecipeOp`, `{ type: "scale"; field; k }` or `{ type: "params"; params }`. Applied in `World.step` after `applyDisturbances` and before organisms act. Empty list returns immediately: perf hash stays **c2c03a81**.
+- Snapshots (optional `schedule`), recipes, frames, `SimOp.schedule`, `TrialConfig.schedule`. `applyRecipe` installs the programme before replaying ops so recorded steps fire it.
+- UI Milieu « Programme »: pas / action / paramètre, add/remove through the host. Fitness chart: dashed vertical marks at scheduled ticks.
+- Decision: skip `type: "step"` inside a scheduled op (would recurse). Identify scale vs params in the UI; paint blobs land at the plate centre.
+- GATES: tsc ok; vitest 132/132 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/schedule-panel.png`.
+
 ## Metrics (gating)
 
 | Check | Result |

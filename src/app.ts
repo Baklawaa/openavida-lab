@@ -48,8 +48,10 @@ import {
   type Recipe,
   type DeathCause,
   type FeatureFlags,
+  type FieldName,
   type PeerRole,
   type RoomOp,
+  type ScheduledOp,
   type Side,
   type SimHost,
   type SimParams,
@@ -589,7 +591,7 @@ export function mount(root: HTMLElement): void {
     const w = viewWorld();
     const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
     const size = (c: HTMLCanvasElement) => [c.parentElement!.clientWidth - 28, Math.max(75, c.parentElement!.clientHeight - 42)] as const;
-    drawFitness(cFit, ...size(cFit), hist);
+    drawFitness(cFit, ...size(cFit), hist, w.schedule.map((s) => s.at));
     drawShannon(cShan, ...size(cShan), hist);
     phyHits = drawPhylogeny(cPhy, ...size(cPhy), w.lineages.values(), w.tick, renderer.highlightLineage);
   }
@@ -682,6 +684,7 @@ export function mount(root: HTMLElement): void {
       }
     }
     refreshTimeline();
+    refreshScheduleList();
     const now = performance.now();
     if (now - state.lastUi > 250) {
       drawCharts();
@@ -1037,6 +1040,75 @@ export function mount(root: HTMLElement): void {
     host.apply({ kind: "disturbances", on: disturbBox.checked });
     status(disturbBox.checked ? "Perturbations aléatoires activées." : "Perturbations aléatoires désactivées.");
   });
+  const schedAt = root.querySelector<HTMLInputElement>("#sched-at")!;
+  const schedAction = root.querySelector<HTMLSelectElement>("#sched-action")!;
+  const schedArg = root.querySelector<HTMLInputElement>("#sched-arg")!;
+  const schedList = root.querySelector<HTMLElement>("#sched-list")!;
+  const SCHED_FIELD: Record<string, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
+  const SCHED_PARAM: Record<string, string> = { mutationRate: "taux de mutation", maxPopulation: "population max", reproduceEnergy: "seuil de reproduction" };
+  function describeSched(item: ScheduledOp): string {
+    const op = item.op;
+    if (op.type === "scale") return `× ${op.k} sur ${SCHED_FIELD[op.field] ?? op.field}`;
+    if (op.type === "params") {
+      const e = Object.entries(op.params)[0];
+      return e ? `${SCHED_PARAM[e[0]] ?? e[0]} → ${e[1]}` : "paramètres";
+    }
+    if (op.type === "paint") return `touche ${op.brush} r=${op.radius}`;
+    if (op.type === "inject") return `injecter ${op.count}`;
+    if (op.type === "place") return `placer (${op.x},${op.y})`;
+    if (op.type === "strain") return `souche ${op.name}`;
+    return op.type;
+  }
+  let schedListKey = "";
+  function refreshScheduleList(): void {
+    const list = current().schedule;
+    const key = list.map((s) => `${s.at}:${s.op.type}`).join("|");
+    if (key === schedListKey) return;
+    schedListKey = key;
+    if (!list.length) {
+      schedList.innerHTML = `<p class="muted">Aucune entrée.</p>`;
+      return;
+    }
+    schedList.innerHTML = list
+      .map((s, i) => `<div class="sched-row"><span class="mono">pas ${s.at}</span><span>${describeSched(s)}</span><button type="button" class="quiet" data-sched-i="${i}" aria-label="Retirer">×</button></div>`)
+      .join("");
+  }
+  root.querySelector("#btn-sched-add")!.addEventListener("click", () => {
+    const at = Math.max(0, Math.round(Number(schedAt.value) || 0));
+    const [kind, key] = schedAction.value.split(":");
+    const arg = Number(schedArg.value);
+    if (!kind || !key || !Number.isFinite(arg)) {
+      status("Programme incomplet.");
+      return;
+    }
+    const w = current();
+    let op: ScheduledOp["op"];
+    if (kind === "scale") op = { type: "scale", field: key as FieldName, k: arg };
+    else if (kind === "params") {
+      if (key === "mutationRate") op = { type: "params", params: { mutationRate: Math.max(0, Math.min(1, arg)) } };
+      else if (key === "maxPopulation") op = { type: "params", params: { maxPopulation: Math.max(16, Math.round(arg)) } };
+      else op = { type: "params", params: { reproduceEnergy: Math.max(0.05, arg) } };
+    } else {
+      op = { type: "paint", x: Math.floor(w.w / 2), y: Math.floor(w.h / 2), radius: 4, brush: key as BrushKind, amount: arg };
+    }
+    host.apply({ kind: "schedule", which: sideOf(w), schedule: [...w.schedule, { at, op }] });
+    schedListKey = "";
+    refreshScheduleList();
+    drawCharts();
+    status(`Programme : ${describeSched({ at, op })} au pas ${at}.`);
+  });
+  schedList.addEventListener("click", (ev) => {
+    const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-sched-i]");
+    if (!btn) return;
+    const i = Number(btn.dataset.schedI);
+    const w = current();
+    const next = w.schedule.filter((_, k) => k !== i);
+    host.apply({ kind: "schedule", which: sideOf(w), schedule: next });
+    schedListKey = "";
+    refreshScheduleList();
+    drawCharts();
+  });
+  refreshScheduleList();
   const box3d = root.querySelector("#opt-view3d input") as HTMLInputElement;
   const boxBrains = root.querySelector("#opt-brains input") as HTMLInputElement;
   const boxLlm = root.querySelector("#opt-llm input") as HTMLInputElement;

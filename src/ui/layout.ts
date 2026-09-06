@@ -139,6 +139,27 @@ export function createLabLayout(root: HTMLElement) {
         <div id="panel-environment" role="tabpanel" aria-labelledby="tab-environment" hidden>
           <section class="block"><div class="section-heading"><h2>Champs et terrain</h2><span class="tag">PINCEAU</span></div><p class="muted">Cliquez ou glissez dans le monde. En 3D, un clic par touche.</p><div class="brush-grid" id="brushes"></div><div class="range-label"><label for="radius">Rayon du pinceau</label><span><b id="rad-lab">3</b> cellules</span></div><input id="radius" type="range" min="0" max="12" value="3"></section>
           <section class="block"><h2>Dynamique du milieu</h2><label class="toggle-row" id="opt-terrain"><span>Relief aléatoire<small>Sources, obstacles et zones d’ombre</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-disturb"><span>Événements aléatoires<small>Perturbations au cours de l’expérience</small></span><input type="checkbox"></label></section>
+          <section class="block" id="schedule-block">
+            <div class="section-heading"><h2>Programme</h2><span class="tag">PAS</span></div>
+            <p class="muted">Changement appliqué au pas indiqué, après les perturbations, avant le métabolisme. Liste vide : le monde est inchangé.</p>
+            <div class="goal-row">
+              <input id="sched-at" type="number" min="1" step="1" value="50" aria-label="Pas d’application">
+              <select id="sched-action" aria-label="Action">
+                <option value="scale:nutrient">Échelle nutriments</option>
+                <option value="scale:toxin">Échelle toxines</option>
+                <option value="scale:temperature">Échelle température</option>
+                <option value="scale:light">Échelle lumière</option>
+                <option value="params:mutationRate">Taux de mutation</option>
+                <option value="params:maxPopulation">Population max</option>
+                <option value="params:reproduceEnergy">Seuil de reproduction</option>
+                <option value="paint:toxinBlob">Touche de toxines</option>
+                <option value="paint:nutrientBlob">Touche de nutriments</option>
+              </select>
+              <input id="sched-arg" type="number" step="0.05" value="0.5" aria-label="Paramètre">
+              <button type="button" id="btn-sched-add">Ajouter</button>
+            </div>
+            <div id="sched-list"></div>
+          </section>
           <section class="block info-note">${icon("sun")}<p>Diffusion à 4 voisins à chaque pas, bloquée par les obstacles. Une source émet en continu ; une touche de pinceau est ponctuelle.</p></section>
         </div>
         <div id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>

@@ -424,6 +424,18 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .replay-row { margin-top: 10px; }
 .replay-info { margin-top: 10px; padding: 9px 11px; font-size: 10px; line-height: 1.6; color: var(--muted); background: #13211b; border: 1px solid #2f4a3b; border-radius: 6px; }
 
+#schedule-block .goal-row { flex-wrap: wrap; }
+#sched-at { width: 72px; flex: 0 0 auto; }
+#sched-action { flex: 1 1 160px; min-width: 160px; }
+#sched-arg { width: 72px; flex: 0 0 auto; }
+#btn-sched-add { flex: 0 0 auto; }
+#sched-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+#sched-list:empty { display: none; }
+.sched-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: #18241e; border-radius: 5px; font-size: 11px; }
+.sched-row span { flex: 1; min-width: 0; }
+.sched-row .mono { flex: 0 0 auto; color: var(--teal); font-size: 10px; }
+.sched-row button { min-height: 22px; padding: 0 7px; }
+
 #tournament-block { margin-top: 8px; }
 .tournament-picks { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
 .tournament-pick-row { display: flex; flex-wrap: wrap; gap: 6px; }

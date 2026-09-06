@@ -8,6 +8,7 @@ import type { FieldName } from "./fields";
 import { TRAIT_NAMES, type TraitName } from "./mapping";
 import type { RecipeOp } from "./recipe";
 import { applyRecipeOp } from "./recipe";
+import { copySchedule, type ScheduledOp } from "./schedule";
 import { Rng } from "./rng";
 import type { SimParams, WorldSnapshot } from "./types";
 import { World, worldFromSnapshot } from "./world";
@@ -73,6 +74,8 @@ export interface TrialConfig {
   /** Tournament pair (contestant indices) and founding genomes, for share scoring. */
   pair?: [number, number];
   pairGenomes?: [string, string];
+  /** Replaces the start snapshot's programme when set. */
+  schedule?: ScheduledOp[];
 }
 
 export interface TrialResult {
@@ -197,6 +200,7 @@ export function worldForTrial(snapshot: WorldSnapshot, config: TrialConfig): Wor
   Object.assign(w.params, { seed });
   w.rng = new Rng(seed);
   if (config.ops) for (const op of config.ops) applyRecipeOp(w, op);
+  if (config.schedule) w.schedule = copySchedule(config.schedule);
   return w;
 }
 

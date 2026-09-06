@@ -17,7 +17,7 @@ Open http://127.0.0.1:5174
 The French interface keeps playback, field layers, world selection, and the 2D/3D view beside the simulation. The toolbox has four spaces:
 
 - **Organismes**: starter kits, placement, population injection, and the visual DNA editor.
-- **Milieu**: brushes, radius, terrain sources, and random disturbances.
+- **Milieu**: brushes, radius, terrain sources, random disturbances, and a timed programme (scale a field, change a parameter, or paint at a given step).
 - **Analyse**: organism inspection, traits, genome, metabolism, rankings, the death log, and an event log (lineage dominance/collapse, first predation, innovation sweep, strain extinction, population crash/boom) that opens the explorer and the nearest timeline snapshot.
 - **Espèces**: per-group analysis. Strains (founding genome, inherited by all descendants) or strategies (phenotype class). Population per group over time, mean traits, centroid and local environment, drift from the founder, key innovations (mutations whose lineage spread, with the environment they appeared in), deaths by cause. In strain mode, Trajectoires plots each strain's centroid path on a world-aspect map (vents as markers) and mean local temperature over time; each card reports displacement of the centre from the founder. Define named strains from the editor to compare 2–3 genomes in one environment; optionally color the plate (2D and 3D) by strain. Each strain card can overlay a 200-step occupancy heat map; the selected organism draws a 120-step trail.
 - **Expérience**: local presets, goal-directed multi-replicate runs, restore points, independent A/B steps, reset, data import/export, and experimental features.
@@ -41,6 +41,8 @@ Every replicate appears in a sortable table (successes fastest or slowest first,
 A **recette** is a tiny replayable setup: `SimParams` plus an op list (paint, place, inject, named strain, step). Consecutive steps collapse to one `{n}`. Recording is on by default for a fresh world (`World.recording`). Export JSON, re-run into world B, or share `?recipe=` (base64url JSON). If that payload exceeds 6000 characters, the copied link falls back to parameters only. Opening a recipe URL applies it to world A at startup (`src/sim/recipe.ts`).
 
 **Timeline.** The playback bar records a snapshot every 25 steps (150 Mo budget, oldest after the origin dropped first). The scrubber previews a recorded tick on the plate, charts, Espèces and Explorateur without writing the live world; « Reprendre ici » restores that snapshot and forgets later recordings.
+
+**Programme.** In Milieu, a list of `{pas, action}` applied inside `World.step` after disturbances and before metabolism (`src/sim/schedule.ts`). Scale multiplies a field; params writes mutation rate, population cap or reproduction threshold; paint drops a blob at the plate centre. An empty list leaves the seeded core unchanged (perf hash `c2c03a81`). The fitness chart marks each scheduled tick. Snapshots, recipes (`schedule` array) and goal-run start states carry the list; `TrialConfig.schedule` can replace it.
 
 The 2D plate is letterboxed to the world aspect; charts collapse (Réduire) or move beside the plate on wide, short windows. The plate starts empty. Choose a kit and click the world, or add 24 organisms. Space toggles playback; I/O/P select inspect/place/paint; 1–5 select field layers; S saves a restore point. The expand button gives the world more space. In split view, indicators and edits follow the last clicked world. Switching to 3D shows that world individually.
 

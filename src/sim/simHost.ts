@@ -15,6 +15,7 @@
 import { BrainRuntime, baselinePolicy, llmPolicy, type BrainTrace } from "./brains";
 import { copyPhenotype } from "./mapping";
 import type { RecipeOp } from "./recipe";
+import { copySchedule, type ScheduledOp } from "./schedule";
 import { DualWorld } from "./sandbox";
 import { Timeline } from "./timeline";
 import type { TimelineMeta } from "./timeline";
@@ -54,7 +55,8 @@ export type SimOp =
   | { kind: "recording"; which: Side; on: boolean }
   | { kind: "setParams"; which: Side; params: Partial<SimParams> }
   | { kind: "timeline"; which: Side; every?: number; trimAfter?: number }
-  | { kind: "heatStrain"; which: Side; strainId: number | null };
+  | { kind: "heatStrain"; which: Side; strainId: number | null }
+  | { kind: "schedule"; which: Side; schedule: ScheduledOp[] };
 
 export interface SimOpResult {
   child?: Organism | null;
@@ -168,6 +170,9 @@ function applySimOpCore(dual: DualWorld, op: SimOp): SimOpResult {
     case "heatStrain":
       worldOf(dual, op.which).heatStrainId = op.strainId;
       return {};
+    case "schedule":
+      worldOf(dual, op.which).schedule = copySchedule(op.schedule);
+      return {};
   }
 }
 
@@ -228,6 +233,7 @@ export interface WorldFrame {
   eventFlags?: EventFlags;
   heatStrainId?: number | null;
   heat?: Float32Array;
+  schedule?: ScheduledOp[];
 }
 
 export interface FrameOptions {
@@ -283,6 +289,7 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     nextEventId: w.nextEventId,
     eventFlags: { dominant: [...w.eventFlags.dominant], sweep: [...w.eventFlags.sweep], firstPredation: w.eventFlags.firstPredation },
     heatStrainId: w.heatStrainId,
+    schedule: copySchedule(w.schedule),
   };
   const transfer: ArrayBuffer[] = [nutrient.buffer, toxin.buffer, temperature.buffer, light.buffer, solar.buffer, terrain.buffer];
   if (w.heatStrainId !== null) {
@@ -363,6 +370,7 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
     if (w.heat.width !== w.w || w.heat.height !== w.h) w.heat = new OccupancyHeat(w.w, w.h);
     if (f.heatStrainId != null) w.heat.maps.set(f.heatStrainId, f.heat);
   }
+  if (f.schedule) w.schedule = copySchedule(f.schedule);
   return true;
 }
 

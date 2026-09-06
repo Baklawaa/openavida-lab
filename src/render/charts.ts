@@ -85,12 +85,32 @@ function curve(ctx: CanvasRenderingContext2D, w: number, h: number, hist: Metric
   ctx.fillStyle = color; ctx.beginPath(); ctx.arc(last.x, last.y, 2.4, 0, Math.PI * 2); ctx.fill();
 }
 
-export function drawFitness(canvas: HTMLCanvasElement, w: number, h: number, hist: MetricsSample[]): void {
+export function drawFitness(canvas: HTMLCanvasElement, w: number, h: number, hist: MetricsSample[], marks: readonly number[] = []): void {
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
   if (!hist.length) { empty(ctx, w, h, "La fitness apparaîtra ici"); return; }
   const [floor, ceiling] = chartDomain(hist.flatMap(m => [m.maxFitness, m.meanFitness]));
-  axes(ctx, w, h, floor, ceiling, hist[0]!.tick, hist[hist.length - 1]!.tick);
+  const start = hist[0]!.tick;
+  const end = hist[hist.length - 1]!.tick;
+  axes(ctx, w, h, floor, ceiling, start, end);
+  const duration = Math.max(1, end - start);
+  const plotW = w - PAD.left - PAD.right;
+  const plotH = h - PAD.top - PAD.bottom;
+  if (marks.length) {
+    ctx.save();
+    ctx.strokeStyle = "#c45c6a88";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    for (const t of marks) {
+      if (t < start || t > end) continue;
+      const x = PAD.left + (t - start) / duration * plotW;
+      ctx.beginPath();
+      ctx.moveTo(x, PAD.top);
+      ctx.lineTo(x, PAD.top + plotH);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   curve(ctx, w, h, hist, "maxFitness", floor, ceiling, "#eac789");
   curve(ctx, w, h, hist, "meanFitness", floor, ceiling, "#a2dfbd", true);
 }

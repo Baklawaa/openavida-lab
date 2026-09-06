@@ -62,6 +62,14 @@ export {
   type RecipeOp,
 } from "./recipe";
 export {
+  applyScheduledOp,
+  copySchedule,
+  isScheduledOp,
+  type ScheduleAction,
+  type ScheduleParams,
+  type ScheduledOp,
+} from "./schedule";
+export {
   DualWorld,
   applyBottleneck,
   buildShareURL,

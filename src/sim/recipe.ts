@@ -6,6 +6,7 @@
  * then falls back to the params-only link.
  */
 import { buildShareURL } from "./serialize";
+import { copySchedule, isScheduledOp, type ScheduledOp } from "./schedule";
 import { normalizeParams, type BrushKind, type SimParams } from "./types";
 import { World } from "./world";
 
@@ -23,6 +24,7 @@ export interface Recipe {
   version: 1;
   params: SimParams;
   ops: RecipeOp[];
+  schedule?: ScheduledOp[];
 }
 
 const BRUSHES: readonly BrushKind[] = [
@@ -105,7 +107,10 @@ export function parseRecipe(data: unknown): Recipe | null {
   const o = data as { version?: unknown; params?: unknown; ops?: unknown };
   if (o.version !== RECIPE_VERSION || !o.params || typeof o.params !== "object" || !Array.isArray(o.ops)) return null;
   const ops = o.ops.filter(isRecipeOp);
-  return { version: 1, params: normalizeParams(o.params as Partial<SimParams>), ops };
+  const schedule = Array.isArray((o as { schedule?: unknown }).schedule)
+    ? ((o as { schedule: unknown[] }).schedule.filter(isScheduledOp))
+    : undefined;
+  return { version: 1, params: normalizeParams(o.params as Partial<SimParams>), ops, ...(schedule?.length ? { schedule } : {}) };
 }
 
 export function recipeFromWorld(world: World): Recipe {
@@ -113,6 +118,7 @@ export function recipeFromWorld(world: World): Recipe {
     version: 1,
     params: { ...world.params, randomTerrain: world.randomTerrain, disturbances: world.disturbances },
     ops: world.recording ? world.recording.map((op) => ({ ...op })) : [],
+    ...(world.schedule.length ? { schedule: copySchedule(world.schedule) } : {}),
   };
 }
 
@@ -142,6 +148,7 @@ export function applyRecipeOp(world: World, op: RecipeOp): void {
 export function applyRecipe(recipe: Recipe): World {
   const w = new World(recipe.params);
   w.recording = null;
+  if (recipe.schedule?.length) w.schedule = copySchedule(recipe.schedule);
   for (const op of recipe.ops) applyRecipeOp(w, op);
   w.recording = recipe.ops.map((op) => ({ ...op }));
   return w;

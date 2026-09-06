@@ -30,6 +30,7 @@ import { parentChildEdges, sampleMetrics } from "./metrics";
 import type { DeathRecord } from "./types";
 import { mixSeed, Rng } from "./rng";
 import type { RecipeOp } from "./recipe";
+import { applyScheduledOp, copySchedule, type ScheduledOp } from "./schedule";
 import { EMPTY_EVENT_FLAGS, EVENT_LOG_MAX, detectEvents, type EventFlags, type WorldEvent } from "./events";
 import { OccupancyHeat, pushTrail } from "./heat";
 import { phenotypeChanges, strainColor, strategyOf, type Innovation, type Strain } from "./species";
@@ -96,6 +97,8 @@ export class World {
   eventFlags: EventFlags = { dominant: [], sweep: [], firstPredation: false };
   heat: OccupancyHeat;
   heatStrainId: number | null = null;
+  /** Future environment changes. Empty = identical to a world with no programme. */
+  schedule: ScheduledOp[] = [];
   private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {
@@ -433,6 +436,7 @@ export class World {
     this.fields.advance(this.terrain, this.params, seasonLight(this.tick));
     shadeOccupied(this.fields.light, this.organisms, this.occupancy, this.w, this.h);
     this.applyDisturbances();
+    this.applySchedule();
     const orgs = this.organisms;
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
@@ -502,6 +506,16 @@ export class World {
       typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     this.lastStepMs = t1 - t0;
     return m;
+  }
+
+  private applySchedule(): void {
+    const n = this.schedule.length;
+    if (n === 0) return;
+    const tick = this.tick;
+    for (let i = 0; i < n; i++) {
+      const item = this.schedule[i]!;
+      if (item.at === tick) applyScheduledOp(this, item);
+    }
   }
 
   private applyDisturbances(): void {
@@ -785,6 +799,7 @@ export class World {
       events: this.events.map((e) => ({ ...e })),
       nextEventId: this.nextEventId,
       eventFlags: { dominant: [...this.eventFlags.dominant], sweep: [...this.eventFlags.sweep], firstPredation: this.eventFlags.firstPredation },
+      ...(this.schedule.length ? { schedule: copySchedule(this.schedule) } : {}),
     };
   }
 
@@ -825,6 +840,7 @@ export class World {
     this.eventFlags = snap.eventFlags
       ? { dominant: [...snap.eventFlags.dominant], sweep: [...snap.eventFlags.sweep], firstPredation: snap.eventFlags.firstPredation }
       : { ...EMPTY_EVENT_FLAGS, dominant: [], sweep: [] };
+    this.schedule = snap.schedule?.length ? copySchedule(snap.schedule) : [];
     this.rebuildOccupancy();
   }
 
