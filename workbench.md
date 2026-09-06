@@ -193,6 +193,15 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - LabRenderer draws that map as an R8 texture under organisms. Espèces card « Carte de présence ». Selected organism: 120-cell trail polyline on `#gl-trail`.
 - Trails omitted from snapshots (`delete copy.trail`). Heat rebuilt after restore.
 
+## Task 4 — Multi-goal experiments (2026-09-07)
+
+- `runTrial` accepts `Goal | Goal[]` (single-goal signature unchanged). `TrialResult.reachedTicks` is one entry per goal; `reachedTick` is the last of them when all hit, else the single-goal tick, else null. Stop when all are reached, the world is empty, or every remaining goal is unreachable.
+- `summarizeTrials.perGoal` reports successes and median ticks per objective. Workers and `runReplicates` take the same union.
+- UI: step 2 « + Ajouter un objectif » (max 4 = builder + extras). Table and CSV add one « Pas » column per goal; chart still traces goal 1. Last-run records store optional `goals`.
+- Decision: extras are additional to the builder, not a replacement list, so a single-goal run still needs no click on Ajouter.
+- Tests: two population goals at ticks 0 and 4; first reached then second strain-share unreachable stops at 3 steps of 200.
+- GATES: tsc ok; vitest 127/127 `lastHash":"c2c03a81"`; build ok (goalWorker + simWorker); verify-interface inline and `?worker=1`; verify-worker hash `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/multi-goal.png`.
+
 ## Metrics (gating)
 
 | Check | Result |

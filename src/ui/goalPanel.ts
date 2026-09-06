@@ -18,6 +18,7 @@ import {
   summarizeTrials,
   sweepConfigs,
   sweepValues,
+  trialGoalTicks,
   worldForTrial,
   type FieldName,
   type Goal,
@@ -200,7 +201,7 @@ function template(): string {
     </section>
     <section class="block" id="goal-block">
       <div class="section-heading"><h2>Expérience ciblée</h2><span class="tag">MULTI-SIMULATION</span></div>
-      <p class="muted">Depuis un état de départ, n réplicats à graines différentes courent en arrière-plan. Chacun s’arrête au pas où l’objectif est atteint, à l’extinction, ou au bout du budget.</p>
+      <p class="muted">Depuis un état de départ, n réplicats à graines différentes courent en arrière-plan. Chacun s’arrête lorsque tous les objectifs sont atteints, à l’extinction, lorsque les objectifs restants sont impossibles, ou au bout du budget.</p>
 
       <div class="goal-step">
         <span class="eyebrow">1 · ÉTAT DE DÉPART</span>
@@ -223,6 +224,9 @@ function template(): string {
           <span class="tiny">maintenu</span><input id="goal-sustain" type="number" min="1" max="500" step="1" value="10" aria-label="Pas consécutifs"><span class="tiny">pas</span>
         </div>
         <div id="goal-text" class="micro"></div>
+        <div class="row goal-row-ops"><button type="button" id="btn-goal-add">+ Ajouter un objectif</button></div>
+        <div id="goal-extra"></div>
+        <p class="micro">Jusqu’à 4 objectifs. La course s’arrête lorsque tous sont atteints, que le monde est vide, ou que les objectifs restants sont impossibles. Le graphique trace le premier.</p>
       </div>
 
       <div class="goal-step">
@@ -281,6 +285,9 @@ export class GoalPanel {
   private results: TrialResult[] = [];
   private progress: number[] = [];
   private lastGoal: Goal | null = null;
+  private lastGoals: Goal[] = [];
+  private extraGoals: Goal[] = [];
+  private static readonly MAX_GOALS = 4;
   /** Start state and configs of the last run or sweep, for exact replays. */
   private lastRun: { snapshot: WorldSnapshot; label: string; configs: TrialConfig[] } | null = null;
   private lastStrains: Strain[] = [];
@@ -316,6 +323,7 @@ export class GoalPanel {
         label: this.lastRun.label,
         snapshot: this.lastRun.snapshot,
         goal: this.lastGoal,
+        goals: this.lastGoals.length ? this.lastGoals : [this.lastGoal],
         configs: this.lastRun.configs,
         results: slim,
         maxTicks,
@@ -331,6 +339,7 @@ export class GoalPanel {
     if (!rec || !rec.results.length) return;
     this.lastRun = { snapshot: rec.snapshot, label: rec.label, configs: rec.configs };
     this.lastGoal = rec.goal;
+    this.lastGoals = rec.goals?.length ? rec.goals : [rec.goal];
     this.results = rec.results.slice();
     this.progress = rec.results.map((r) => r.ticks);
     this.renderProgress(rec.maxTicks);
@@ -378,6 +387,7 @@ export class GoalPanel {
     if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
     else if (!prev) sel.value = "share:toxin";
     this.toggleFieldMin();
+    if (this.extraGoals.length) this.renderExtraGoals();
   }
 
   private toggleFieldMin(): void {
@@ -398,9 +408,49 @@ export class GoalPanel {
     };
   }
 
+  /** Builder goal plus the extra list, capped at 4. */
+  currentGoals(): Goal[] | null {
+    const g = this.currentGoal();
+    if (!g) return null;
+    return [g, ...this.extraGoals].slice(0, GoalPanel.MAX_GOALS);
+  }
+
+  private addExtraGoal(): void {
+    const g = this.currentGoal();
+    if (!g) {
+      this.opts.status("Objectif incomplet : choisissez une mesure et une valeur cible.");
+      return;
+    }
+    if (this.extraGoals.length >= GoalPanel.MAX_GOALS - 1) {
+      this.opts.status("Quatre objectifs au plus.");
+      return;
+    }
+    this.extraGoals.push(g);
+    this.renderExtraGoals();
+    this.updateGoalText();
+  }
+
+  private renderExtraGoals(): void {
+    const host = this.q("#goal-extra");
+    const add = this.q<HTMLButtonElement>("#btn-goal-add");
+    add.disabled = this.extraGoals.length >= GoalPanel.MAX_GOALS - 1;
+    if (!this.extraGoals.length) {
+      host.innerHTML = "";
+      return;
+    }
+    host.innerHTML = this.extraGoals
+      .map((g, i) => `<div class="goal-extra-row" data-i="${i}"><b>OBJECTIF ${i + 2}</b><span>${describeGoal(g, this.lastStrains)}</span><button type="button" class="quiet" data-remove-goal="${i}" aria-label="Retirer l’objectif ${i + 2}">×</button></div>`)
+      .join("");
+  }
+
   private updateGoalText(): void {
     const g = this.currentGoal();
-    this.q("#goal-text").textContent = g ? `Objectif : ${describeGoal(g, this.lastStrains)}.` : "Objectif incomplet.";
+    const n = 1 + this.extraGoals.length;
+    this.q("#goal-text").textContent = g
+      ? n > 1
+        ? `Objectif 1 : ${describeGoal(g, this.lastStrains)} · ${this.extraGoals.length} autre${this.extraGoals.length > 1 ? "s" : ""}.`
+        : `Objectif : ${describeGoal(g, this.lastStrains)}.`
+      : "Objectif incomplet.";
   }
 
   private applyTemplate(id: string): void {
@@ -463,8 +513,9 @@ export class GoalPanel {
 
   private async run(): Promise<void> {
     if (this.handle) return;
-    const goal = this.currentGoal();
-    if (!goal) {
+    const goals = this.currentGoals();
+    const goal = goals?.[0] ?? null;
+    if (!goal || !goals) {
       this.opts.status("Objectif incomplet : choisissez une mesure et une valeur cible.");
       return;
     }
@@ -494,6 +545,7 @@ export class GoalPanel {
       keepSnapshot: i < 8,
     }));
     this.lastGoal = goal;
+    this.lastGoals = goals;
     this.lastRun = { snapshot: start.snapshot, label: start.label, configs };
     this.results = new Array(reps);
     this.progress = new Array(reps).fill(0);
@@ -504,9 +556,9 @@ export class GoalPanel {
     this.q("#goal-summary").innerHTML = "";
     this.q("#goal-results").innerHTML = "";
     this.renderProgress(maxTicks);
-    this.opts.status(`${reps} réplicats lancés depuis ${start.label} : ${describeGoal(goal, this.lastStrains)}.`);
+    this.opts.status(`${reps} réplicats lancés depuis ${start.label} : ${goals.map((g, i) => `${goals.length > 1 ? `${i + 1}. ` : ""}${describeGoal(g, this.lastStrains)}`).join(" · ")}.`);
     const t0 = performance.now();
-    this.handle = runReplicates(start.snapshot, goal, configs, {
+    this.handle = runReplicates(start.snapshot, goals.length === 1 ? goal : goals, configs, {
       onProgress: (i, tick) => {
         this.progress[i] = tick - start.snapshot.tick;
         this.scheduleRender(maxTicks, false);
@@ -529,13 +581,14 @@ export class GoalPanel {
     this.renderResults();
     void this.persistRun(all, maxTicks);
     const s = summarizeTrials(all);
-    this.opts.status(`Réplicats terminés en ${((performance.now() - t0) / 1000).toFixed(1)} s : ${s.successes}/${s.n} atteignent l’objectif${s.medianTicks !== null ? ` (médiane ${s.medianTicks} pas)` : ""}.`);
+    this.opts.status(`Réplicats terminés en ${((performance.now() - t0) / 1000).toFixed(1)} s : ${s.successes}/${s.n} atteignent ${goals.length > 1 ? "tous les objectifs" : "l’objectif"}${s.medianTicks !== null ? ` (médiane ${s.medianTicks} pas)` : ""}.`);
   }
 
   private async runSweep(): Promise<void> {
     if (this.handle) return;
-    const goal = this.currentGoal();
-    if (!goal) {
+    const goals = this.currentGoals();
+    const goal = goals?.[0] ?? null;
+    if (!goal || !goals) {
       this.opts.status("Objectif incomplet : choisissez une mesure et une valeur cible.");
       return;
     }
@@ -570,6 +623,7 @@ export class GoalPanel {
     );
     this.sweepVar = variable;
     this.lastGoal = goal;
+    this.lastGoals = goals;
     this.lastRun = { snapshot: start.snapshot, label: start.label, configs };
     this.results = new Array(configs.length);
     this.progress = new Array(configs.length).fill(0);
@@ -582,7 +636,7 @@ export class GoalPanel {
     this.renderProgress(maxTicks);
     this.opts.status(`Balayage ${SWEEP_LABEL[variable]} : ${values.length} valeurs × ${perValue} réplicats.`);
     const t0 = performance.now();
-    this.handle = runReplicates(start.snapshot, goal, configs, {
+    this.handle = runReplicates(start.snapshot, goals.length === 1 ? goal : goals, configs, {
       onProgress: (i, tick) => {
         this.progress[i] = tick - start.snapshot.tick;
         this.scheduleRender(maxTicks, false);
@@ -727,6 +781,9 @@ export class GoalPanel {
     if (!goal) return;
     const s = summarizeTrials(done);
     const fmtT = (v: number | null) => (v === null ? "—" : `${Math.round(v)} pas`);
+    const perGoalHtml = s.perGoal.length > 1
+      ? s.perGoal.map((g, i) => `<span>Objectif ${i + 1}<b>${g.successes}/${s.n}${g.medianTicks !== null ? ` · méd. ${Math.round(g.medianTicks)}` : ""}</b></span>`).join("")
+      : "";
     this.q("#goal-summary").innerHTML = done.length
       ? `<div class="goal-stats">
           <span>Réussite<b>${s.successes}/${s.n}</b></span>
@@ -735,6 +792,7 @@ export class GoalPanel {
           <span>Min – max<b>${s.minTicks === null ? "—" : `${s.minTicks} – ${s.maxTicks}`}</b></span>
           <span>Extinctions<b>${s.extinctions}</b></span>
           <span>Impossibles<b>${s.unreachable}</b></span>
+          ${perGoalHtml}
         </div>${this.successSeedsHtml()}`
       : "";
     const now = performance.now();
@@ -758,17 +816,28 @@ export class GoalPanel {
       return;
     }
     pairs.sort(compareResults(this.sort));
+    const nGoals = Math.max(1, this.lastGoals.length);
+    const pasHeads = nGoals > 1
+      ? this.lastGoals.map((_, gi) => `<th class="num">Pas ${gi + 1}</th>`).join("")
+      : `<th class="num">Pas</th>`;
     const cells = pairs.map(([i, r]) => {
+      const ticks = trialGoalTicks(r);
       const steps = r.reachedTick !== null ? r.reachedTick - r.startTick : r.ticks;
       const outcome = r.reachedTick !== null
         ? `<span class="hit">atteint</span>`
         : r.extinct ? `<span class="dead">extinction</span>`
           : r.unreachable ? `<span class="dead">impossible</span>`
             : `<span class="miss">non atteint</span>`;
+      const pasCells = nGoals > 1
+        ? Array.from({ length: nGoals }, (_, gi) => {
+            const t = ticks[gi];
+            return `<td class="mono num">${t === null || t === undefined ? "—" : t - r.startTick}</td>`;
+          }).join("")
+        : `<td class="mono num">${steps}</td>`;
       const open = r.snapshot ? `<button type="button" class="quiet" data-open="${i}" title="État final dans B">fin</button>` : "";
-      return `<tr><td class="mono">${i + 1}</td><td class="mono seed" data-replay-seed="${r.seed}" title="Rejouer cette graine dans B">${r.seed}</td><td>${outcome}</td><td class="mono num">${steps}</td><td class="mono num">${r.finalValue.toFixed(3)}</td><td class="mono num">${r.finalPopulation}</td><td class="ops"><button type="button" data-replay="${i}" title="Rejouer dans B">${icon("play")}</button><button type="button" data-catalog="${i}" title="Catalogue des organismes à la fin de ce réplicat">${icon("inspect")}</button>${open}</td></tr>`;
+      return `<tr><td class="mono">${i + 1}</td><td class="mono seed" data-replay-seed="${r.seed}" title="Rejouer cette graine dans B">${r.seed}</td><td>${outcome}</td>${pasCells}<td class="mono num">${r.finalValue.toFixed(3)}</td><td class="mono num">${r.finalPopulation}</td><td class="ops"><button type="button" data-replay="${i}" title="Rejouer dans B">${icon("play")}</button><button type="button" data-catalog="${i}" title="Catalogue des organismes à la fin de ce réplicat">${icon("inspect")}</button>${open}</td></tr>`;
     });
-    host.innerHTML = `<div class="goal-table-wrap"><table class="goal-table"><thead><tr><th>#</th><th>Graine</th><th>Issue</th><th class="num">Pas</th><th class="num">Valeur</th><th class="num">Pop.</th><th></th></tr></thead><tbody>${cells.join("")}</tbody></table></div>`;
+    host.innerHTML = `<div class="goal-table-wrap"><table class="goal-table"><thead><tr><th>#</th><th>Graine</th><th>Issue</th>${pasHeads}<th class="num">Valeur</th><th class="num">Pop.</th><th></th></tr></thead><tbody>${cells.join("")}</tbody></table></div>`;
     this.q("#goal-table-note").textContent = `${pairs.length} réplicat${pairs.length > 1 ? "s" : ""}`;
   }
 
@@ -787,9 +856,29 @@ export class GoalPanel {
   }
 
   private exportCsv(): void {
-    const rows = [["replicate", "seed", "reached_tick", "ticks_run", "final_value", "final_population", "extinct", "unreachable"]];
+    const nGoals = Math.max(1, this.lastGoals.length);
+    const extra = nGoals > 1 ? this.lastGoals.map((_, gi) => `reached_tick_${gi + 1}`) : [];
+    const rows = [["replicate", "seed", "reached_tick", ...extra, "ticks_run", "final_value", "final_population", "extinct", "unreachable"]];
     this.results.forEach((r, i) => {
-      if (r) rows.push([String(i + 1), String(r.seed), r.reachedTick === null ? "" : String(r.reachedTick - r.startTick), String(r.ticks), r.finalValue.toFixed(4), String(r.finalPopulation), r.extinct ? "1" : "0", r.unreachable ? "1" : "0"]);
+      if (!r) return;
+      const ticks = trialGoalTicks(r);
+      const extraVals = nGoals > 1
+        ? this.lastGoals.map((_, gi) => {
+            const t = ticks[gi];
+            return t === null || t === undefined ? "" : String(t - r.startTick);
+          })
+        : [];
+      rows.push([
+        String(i + 1),
+        String(r.seed),
+        r.reachedTick === null ? "" : String(r.reachedTick - r.startTick),
+        ...extraVals,
+        String(r.ticks),
+        r.finalValue.toFixed(4),
+        String(r.finalPopulation),
+        r.extinct ? "1" : "0",
+        r.unreachable ? "1" : "0",
+      ]);
     });
     const text = rows.map((r) => r.join(",")).join("\n");
     const blob = new Blob([text], { type: "text/csv" });
@@ -897,6 +986,16 @@ export class GoalPanel {
       this.updateGoalText();
     });
     for (const id of ["#goal-field-min", "#goal-op", "#goal-target", "#goal-sustain"]) this.q(id).addEventListener("input", () => this.updateGoalText());
+    this.q("#btn-goal-add").addEventListener("click", () => this.addExtraGoal());
+    this.q("#goal-extra").addEventListener("click", (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-remove-goal]");
+      if (!btn) return;
+      const i = Number(btn.dataset.removeGoal);
+      if (!Number.isInteger(i)) return;
+      this.extraGoals.splice(i, 1);
+      this.renderExtraGoals();
+      this.updateGoalText();
+    });
     this.q("#btn-goal-run").addEventListener("click", () => void this.run());
     this.q("#btn-sweep-run").addEventListener("click", () => void this.runSweep());
     this.q("#btn-goal-stop").addEventListener("click", () => {

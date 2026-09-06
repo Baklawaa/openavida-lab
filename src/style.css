@@ -389,6 +389,12 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .goal-row-ops { margin-top: 6px; gap: 5px; }
 .goal-row-ops button { min-height: 24px; font-size: 10px; padding: 2px 8px; }
 .goal-row-ops button .icon { width: 12px; height: 12px; }
+#goal-extra { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+#goal-extra:empty { display: none; }
+.goal-extra-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #18241e; border-radius: 5px; font-size: 11px; line-height: 1.4; }
+.goal-extra-row b { font-size: 9px; color: var(--muted); letter-spacing: 0.08em; flex: 0 0 auto; }
+.goal-extra-row span { flex: 1; min-width: 0; }
+.goal-extra-row button { min-height: 22px; padding: 0 7px; }
 
 .goal-table-head { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .goal-table-head label { margin: 0; }

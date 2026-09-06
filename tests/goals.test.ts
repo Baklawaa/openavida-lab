@@ -115,7 +115,9 @@ describe("goal metrics", () => {
   });
 
   it("summarizes replicates", () => {
-    const mk = (reached: number | null, extinct = false) => ({ seed: 1, startTick: 10, ticks: 50, reachedTick: reached, finalValue: 1, finalPopulation: extinct ? 0 : 5, extinct, unreachable: false, series: [] as Array<[number, number]> });
+    const mk = (reached: number | null, extinct = false): TrialResult => ({
+      seed: 1, startTick: 10, ticks: 50, reachedTick: reached, reachedTicks: [reached], finalValue: 1, finalPopulation: extinct ? 0 : 5, extinct, unreachable: false, series: [],
+    });
     const s = summarizeTrials([mk(30), mk(50), mk(null), mk(null, true)]);
     expect(s.n).toBe(4);
     expect(s.successes).toBe(2);
@@ -127,8 +129,22 @@ describe("goal metrics", () => {
     expect(s.p25Ticks).toBe(25);
     expect(s.p75Ticks).toBe(35);
     expect(s.unreachable).toBe(0);
+    expect(s.perGoal).toHaveLength(1);
+    expect(s.perGoal[0]!.successes).toBe(2);
     expect(summarizeTrials([]).medianTicks).toBe(null);
+    expect(summarizeTrials([]).perGoal).toEqual([{ successes: 0, successRate: 0, medianTicks: null, meanTicks: null, minTicks: null, maxTicks: null }]);
     expect(replicateSeeds(0xfffffffe, 3)).toEqual([0xfffffffe, 0xffffffff, 1]);
+    const s2 = summarizeTrials([
+      { ...mk(30), reachedTicks: [20, 30] },
+      { ...mk(50), reachedTicks: [10, 50] },
+      { ...mk(null), reachedTicks: [5, null] },
+    ]);
+    expect(s2.successes).toBe(2);
+    expect(s2.perGoal).toHaveLength(2);
+    expect(s2.perGoal[0]!.successes).toBe(3);
+    expect(s2.perGoal[1]!.successes).toBe(2);
+    expect(s2.perGoal[0]!.medianTicks).toBe(0);
+    expect(s2.perGoal[1]!.medianTicks).toBe(30);
   });
 
   it("fieldScale multiplies the trial world fields and leaves the snapshot untouched", () => {
@@ -167,7 +183,7 @@ describe("goal metrics", () => {
 
   it("summarizeSweep reports one summary per value", () => {
     const mk = (reached: number | null, extinct = false): TrialResult => ({
-      seed: 1, startTick: 0, ticks: 40, reachedTick: reached, finalValue: 1, finalPopulation: extinct ? 0 : 4, extinct, unreachable: false, series: [],
+      seed: 1, startTick: 0, ticks: 40, reachedTick: reached, reachedTicks: [reached], finalValue: 1, finalPopulation: extinct ? 0 : 4, extinct, unreachable: false, series: [],
     });
     const points = summarizeSweep([0.5, 1.5], [[mk(10), mk(20)], [mk(null), mk(null, true)]]);
     expect(points).toHaveLength(2);
@@ -176,5 +192,35 @@ describe("goal metrics", () => {
     expect(points[0]!.summary.medianTicks).toBe(15);
     expect(points[1]!.summary.successes).toBe(0);
     expect(points[1]!.summary.extinctions).toBe(1);
+  });
+
+  it("records two goals at different ticks and stops when the rest are unreachable", () => {
+    const snap = takeSnapshot(toxinWorld());
+    const gNow: Goal = { metric: { kind: "population" }, op: ">=", target: 1, sustain: 1 };
+    const gLater: Goal = { metric: { kind: "population" }, op: ">=", target: 1, sustain: 5 };
+    const both = runTrial(snap, [gNow, gLater], { seed: 1, maxTicks: 50, sampleEvery: 5 });
+    expect(both.reachedTicks).toEqual([0, 4]);
+    expect(both.reachedTick).toBe(4);
+    expect(both.ticks).toBe(4);
+    const one = runTrial(snap, gNow, { seed: 1, maxTicks: 10, sampleEvery: 5 });
+    expect(one.reachedTicks).toEqual([0]);
+    expect(one.reachedTick).toBe(0);
+
+    const w2 = new World({ width: 16, height: 16, seed: 4 });
+    w2.fields.nutrient.fill(1);
+    w2.injectStrain(founderHeterotroph(), 6, 4, 4);
+    expect(w2.injectStrain(founderResistant(), 3, 12, 12)).toBe(3);
+    for (const o of w2.organisms) if (o.strainId === 2) o.energy = 0;
+    w2.step();
+    const gPop: Goal = { metric: { kind: "population" }, op: ">=", target: 1, sustain: 4 };
+    const gGone: Goal = { metric: { kind: "strain-share", strainId: 2 }, op: ">=", target: 0.5, sustain: 1 };
+    const stop = runTrial(takeSnapshot(w2), [gPop, gGone], { seed: 1, maxTicks: 200, sampleEvery: 5 });
+    expect(stop.startTick).toBe(1);
+    expect(stop.reachedTicks[0]).toBe(4);
+    expect(stop.reachedTicks[1]).toBe(null);
+    expect(stop.reachedTick).toBe(null);
+    expect(stop.unreachable).toBe(true);
+    expect(stop.ticks).toBe(3);
+    expect(stop.extinct).toBe(false);
   });
 });

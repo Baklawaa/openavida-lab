@@ -20,7 +20,7 @@ export function workerCount(n: number): number {
   return Math.max(1, Math.min(n, cores - 1, 16));
 }
 
-export function runReplicates(snapshot: WorldSnapshot, goal: Goal, configs: TrialConfig[], hooks: RunHooks = {}): RunHandle {
+export function runReplicates(snapshot: WorldSnapshot, goal: Goal | Goal[], configs: TrialConfig[], hooks: RunHooks = {}): RunHandle {
   const results: TrialResult[] = new Array(configs.length);
   let cancelled = false;
   let done = 0;

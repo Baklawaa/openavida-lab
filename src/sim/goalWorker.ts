@@ -3,13 +3,13 @@ import { runTrial, type Goal, type TrialConfig } from "./goals";
 import type { WorldSnapshot } from "./types";
 
 export type TrialRequest =
-  | { type: "init"; snapshot: WorldSnapshot; goal: Goal }
+  | { type: "init"; snapshot: WorldSnapshot; goal: Goal | Goal[] }
   | { type: "run"; id: number; config: TrialConfig };
 
 const port = self as unknown as { postMessage(message: unknown): void; onmessage: ((ev: MessageEvent<TrialRequest>) => void) | null };
 
 let snapshot: WorldSnapshot | null = null;
-let goal: Goal | null = null;
+let goal: Goal | Goal[] | null = null;
 
 port.onmessage = (ev: MessageEvent<TrialRequest>) => {
   const msg = ev.data;

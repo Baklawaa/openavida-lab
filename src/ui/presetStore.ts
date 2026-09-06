@@ -26,6 +26,8 @@ export interface LastRunRecord {
   label: string;
   snapshot: WorldSnapshot;
   goal: Goal;
+  /** Full goal list when the run used more than one objective. Absent on older records. */
+  goals?: Goal[];
   configs: TrialConfig[];
   results: TrialResult[];
   maxTicks: number;
