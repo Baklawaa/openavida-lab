@@ -49,6 +49,19 @@ export {
 export { FIELD_NAMES, Fields, type FieldName } from "./fields";
 export { shadeOccupied } from "./ecology";
 export {
+  RECIPE_QUERY_MAX,
+  RECIPE_VERSION,
+  applyRecipe,
+  applyRecipeOp,
+  buildRecipeShareURL,
+  parseRecipe,
+  recipeFromQuery,
+  recipeFromWorld,
+  recipeToQuery,
+  type Recipe,
+  type RecipeOp,
+} from "./recipe";
+export {
   DualWorld,
   applyBottleneck,
   buildShareURL,

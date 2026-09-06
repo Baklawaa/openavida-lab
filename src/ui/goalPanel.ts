@@ -10,6 +10,9 @@ import {
   SWEEP_VARIABLES,
   TRAIT_NAMES,
   World,
+  buildRecipeShareURL,
+  parseRecipe,
+  recipeFromWorld,
   replicateSeeds,
   summarizeSweep,
   summarizeTrials,
@@ -18,6 +21,7 @@ import {
   type FieldName,
   type Goal,
   type GoalMetric,
+  type Recipe,
   type Strain,
   type SweepPoint,
   type SweepVariable,
@@ -37,6 +41,8 @@ export interface GoalPanelOptions {
   activeWorld(): "A" | "B";
   /** Restore a snapshot into the active world or into world B (and show it). */
   restoreInto(target: "active" | "B", snapshot: WorldSnapshot): void;
+  setRecording(on: boolean): void;
+  applyRecipe(recipe: Recipe, target: "active" | "B"): void;
 }
 
 const FIELD_LABEL: Record<FieldName, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
@@ -126,6 +132,18 @@ function template(): string {
       <div class="row"><input id="preset-name" type="text" placeholder="Nom du préréglage" maxlength="40"><button type="button" id="btn-preset-save" class="primary">${icon("save")}Enregistrer l’état actuel</button></div>
       <div id="preset-list" class="feed preset-list"></div>
     </section>
+    <section class="block" id="recipe-block">
+      <div class="section-heading"><h2>Recette</h2><span class="tag" id="recipe-ops">0 ACTIONS</span></div>
+      <p class="muted">Séquence rejouable : paramètres plus peindre, placer, injecter, définir une souche, avancer. Encodée en <span class="mono">?recipe=</span> (base64url). Au-delà de 6000 caractères, le lien ne conserve que les paramètres.</p>
+      <label class="toggle-inline" id="opt-recipe-record"><input type="checkbox" checked> Enregistrer les actions</label>
+      <div class="row recipe-ops">
+        <button type="button" id="btn-recipe-copy">${icon("share")}Copier le lien de la recette</button>
+        <button type="button" id="btn-recipe-export">${icon("save")}Exporter .json</button>
+        <button type="button" id="btn-recipe-import">Importer .json</button>
+        <button type="button" id="btn-recipe-replay">Rejouer dans B</button>
+      </div>
+      <input id="recipe-file" type="file" accept="application/json,.json" hidden>
+    </section>
     <section class="block" id="goal-block">
       <div class="section-heading"><h2>Expérience ciblée</h2><span class="tag">MULTI-SIMULATION</span></div>
       <p class="muted">Depuis un état de départ, lance n réplicats en arrière-plan avec des graines différentes et mesure le pas auquel l’objectif est atteint.</p>
@@ -196,6 +214,7 @@ export class GoalPanel {
     this.bind();
     this.refreshMetricOptions(true);
     this.syncDefaults();
+    this.refreshRecipe();
     void this.refreshPresets();
   }
 
@@ -206,6 +225,7 @@ export class GoalPanel {
     const src = this.q<HTMLSelectElement>("#goal-source");
     const w = this.opts.world();
     src.options[0]!.textContent = `Monde ${this.opts.activeWorld()} actuel · pas ${w.tick} · ${w.organisms.length} organismes`;
+    this.refreshRecipe();
   }
 
   layout(): void {
@@ -567,8 +587,76 @@ export class GoalPanel {
     URL.revokeObjectURL(a.href);
   }
 
+  private refreshRecipe(): void {
+    const w = this.opts.world();
+    const n = w.recording?.length ?? 0;
+    this.q("#recipe-ops").textContent = `${n} ACTION${n > 1 ? "S" : ""}`;
+    const box = this.q<HTMLInputElement>("#opt-recipe-record input");
+    if (document.activeElement !== box) box.checked = w.recording !== null;
+  }
+
+  private recipe(): Recipe {
+    return recipeFromWorld(this.opts.world());
+  }
+
+  private async copyRecipeLink(): Promise<void> {
+    const { url, truncated } = buildRecipeShareURL(this.recipe());
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      this.opts.status(url);
+      return;
+    }
+    if (truncated) {
+      this.opts.status("Recette trop longue pour l’URL (> 6000 caractères). Lien des paramètres uniquement.");
+    } else {
+      this.opts.status("Lien de la recette copié.");
+      try { history.replaceState(null, "", "?" + url.split("?")[1]); } catch { /* ignore */ }
+    }
+  }
+
+  private exportRecipe(): void {
+    const text = JSON.stringify(this.recipe());
+    const blob = new Blob([text], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `openavida-recipe-t${this.opts.world().tick}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.opts.status("Recette exportée en JSON.");
+  }
+
+  private importRecipeFile(file: File): void {
+    void file.text().then((text) => {
+      const recipe = parseRecipe(JSON.parse(text) as unknown);
+      if (!recipe) {
+        this.opts.status("Fichier de recette invalide.");
+        return;
+      }
+      this.opts.applyRecipe(recipe, "active");
+      this.opts.status(`Recette importée : ${recipe.ops.length} action${recipe.ops.length > 1 ? "s" : ""}.`);
+    }).catch(() => this.opts.status("Import impossible : JSON de recette illisible."));
+  }
+
   private bind(): void {
     this.q("#btn-preset-save").addEventListener("click", () => void this.savePreset());
+    this.q<HTMLInputElement>("#opt-recipe-record input").addEventListener("change", (ev) => {
+      this.opts.setRecording((ev.target as HTMLInputElement).checked);
+      this.refreshRecipe();
+    });
+    this.q("#btn-recipe-copy").addEventListener("click", () => void this.copyRecipeLink());
+    this.q("#btn-recipe-export").addEventListener("click", () => this.exportRecipe());
+    this.q("#btn-recipe-import").addEventListener("click", () => this.q("#recipe-file").click());
+    this.q<HTMLInputElement>("#recipe-file").addEventListener("change", (ev) => {
+      const file = (ev.target as HTMLInputElement).files?.[0];
+      (ev.target as HTMLInputElement).value = "";
+      if (file) this.importRecipeFile(file);
+    });
+    this.q("#btn-recipe-replay").addEventListener("click", () => {
+      const recipe = this.recipe();
+      this.opts.applyRecipe(recipe, "B");
+      this.opts.status(`Recette rejouée dans B : ${recipe.ops.length} action${recipe.ops.length > 1 ? "s" : ""}.`);
+    });
     this.q("#preset-list").addEventListener("click", (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLElement>("button[data-act]");
       if (!btn) return;

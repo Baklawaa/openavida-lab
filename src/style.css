@@ -318,7 +318,10 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 /* ---------- presets & goal runs ---------- */
 #preset-name, #goal-source, #goal-example { width: 100%; }
 #goal-source, #goal-example, #goal-metric { margin-bottom: 8px; }
-#preset-block .row { margin-top: 10px; }
+#preset-block .row, #recipe-block .row { margin-top: 10px; }
+#recipe-block .toggle-inline { margin-top: 8px; }
+#recipe-block .mono { white-space: nowrap; }
+.recipe-ops button { min-height: 28px; font-size: 11px; padding: 4px 8px; }
 .preset-row .preset-ops { margin-top: 8px; gap: 5px; }
 .preset-row .preset-ops button { min-height: 26px; font-size: 10px; padding: 3px 8px; }
 #goal-block label.tiny { display: block; margin: 10px 0 5px; }

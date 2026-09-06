@@ -103,6 +103,13 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - Espèces (Souches): Trajectoires card — world-aspect centroid map (fade old→new, current disc, vent diamonds) + mean local T° (`drawTrackSeries`). Cards: « Déplacement du centre depuis le fondateur : n cellules ».
 - Decision: letterbox the square world inside the 140 px-tall map so the path is not stretched on a wide card. Hidden in Stratégies mode.
 
+## Task 4 — Scenario recipes (2026-09-06)
+
+- `Recipe` v1: `params` + ops (`paint`, `place`, `inject`, `strain`, `step`). Consecutive `step` collapse. `World.recording` on (`[]`) after construct; `null` = off. Founder `birth`, `paint`, manual `defineStrain`, `injectStrain` (not the inner places), `step` append. `seedRandomTerrain` and inject internals muted so vents from the param are not double-recorded.
+- `applyRecipe` builds a fresh world and replays; same seed → same `hashState()`. `?recipe=` base64url JSON; payload > 6000 → params-only URL (`truncated`).
+- Expérience → Recette: toggle, op count, copy link / export / import / replay in B. `parseShareURL` path applies `?recipe=` to world A at startup.
+- Decision: `worldFromSnapshot` clears recording so goal trials do not accumulate a step op. Toggle off drops the list; on again starts empty.
+
 ## Metrics (gating)
 
 | Check | Result |

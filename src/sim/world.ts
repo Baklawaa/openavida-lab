@@ -28,6 +28,7 @@ import { applyPolicyMoves, type BrainRuntime } from "./brains";
 import { parentChildEdges, sampleMetrics } from "./metrics";
 import type { DeathRecord } from "./types";
 import { mixSeed, Rng } from "./rng";
+import type { RecipeOp } from "./recipe";
 import { phenotypeChanges, strainColor, strategyOf, type Innovation, type Strain } from "./species";
 import {
   DEFAULT_PARAMS,
@@ -80,6 +81,9 @@ export class World {
   /** Off by default — phase-1 step path. */
   brainsEnabled = false;
   brain: BrainRuntime | null = null;
+  /** Recorded sandbox ops. `null` = not recording; `[]` = recording, empty. */
+  recording: RecipeOp[] | null = null;
+  private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {
     this.params = normalizeParams(partial);
@@ -95,6 +99,19 @@ export class World {
     if (this.randomTerrain) this.seedRandomTerrain();
     this.seedPopulation();
     this.recordMetrics();
+    this.recording = [];
+  }
+
+  private pushRecipe(op: RecipeOp): void {
+    if (!this.recording || this.muteRecipe) return;
+    if (op.type === "step") {
+      const last = this.recording[this.recording.length - 1];
+      if (last?.type === "step") {
+        last.n += op.n;
+        return;
+      }
+    }
+    this.recording.push(op);
   }
 
   get w(): number {
@@ -130,6 +147,8 @@ export class World {
 
   /** Optional preset: random vents, toxin, heat, walls, shade. Off by default. */
   seedRandomTerrain(): void {
+    this.muteRecipe = true;
+    try {
     const { w, h, rng, fields, terrain } = this;
     this.randomTerrain = true;
     const vents = 6 + rng.int(5);
@@ -168,6 +187,9 @@ export class World {
     const shadeN = 2 + rng.int(3);
     for (let k = 0; k < shadeN; k++) {
       this.paint(rng.int(w), rng.int(h), 3 + rng.int(4), "shade");
+    }
+    } finally {
+      this.muteRecipe = false;
     }
   }
 
@@ -278,6 +300,7 @@ export class World {
     this.organisms.push(org);
     this.occupancy[i] = this.organisms.length - 1;
     this.refreshFitness(org);
+    if (!parent) this.pushRecipe({ type: "place", x, y, genome: org.genome });
     return org;
   }
 
@@ -296,6 +319,7 @@ export class World {
       if (s.signature === signature && s.genome === seq) {
         if (opts.name && (opts.manual || !s.manual)) s.name = opts.name;
         if (opts.manual) s.manual = true;
+        if (opts.manual) this.pushRecipe({ type: "strain", name: s.name, genome: seq });
         return s;
       }
     }
@@ -311,6 +335,7 @@ export class World {
       founderPhenotype: copyPhenotype(opts.phenotype ?? decodeGenome(seq).phenotype),
     };
     this.strains.set(id, strain);
+    if (opts.manual) this.pushRecipe({ type: "strain", name: strain.name, genome: seq });
     return strain;
   }
 
@@ -442,6 +467,7 @@ export class World {
     this.lastDisplacements = mv.displacements;
     this.reproduceAll();
     this.reap();
+    this.pushRecipe({ type: "step", n: 1 });
     const m = this.recordMetrics();
     const t1 =
       typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
@@ -609,12 +635,15 @@ export class World {
       }
     }
     if (brush === "wipeOrgs" || brush === "barrier") this.reap();
+    this.pushRecipe({ type: "paint", x: cx, y: cy, radius, brush, amount });
   }
 
   injectStrain(genome: string, count: number, cx?: number, cy?: number): number {
     const decoded = decodeGenome(genome);
+    this.muteRecipe = true;
     let placed = 0;
     let founder: Organism | null = null;
+    try {
     const r = Math.max(2, Math.ceil(Math.sqrt(count)));
     for (let k = 0; k < count * 8 && placed < count; k++) {
       let x: number;
@@ -633,6 +662,17 @@ export class World {
       }
     }
     this.rebuildOccupancy();
+    } finally {
+      this.muteRecipe = false;
+    }
+    if (placed > 0) {
+      const op: RecipeOp = { type: "inject", genome: decoded.sequence, count };
+      if (cx !== undefined && cy !== undefined) {
+        op.x = cx;
+        op.y = cy;
+      }
+      this.pushRecipe(op);
+    }
     return placed;
   }
 
@@ -789,6 +829,7 @@ export class World {
 export function worldFromSnapshot(snap: WorldSnapshot): World {
   const w = new World({ ...snap.params, startPopulation: 0, seed: snap.params.seed });
   w.restore(snap);
+  w.recording = null;
   return w;
 }
 

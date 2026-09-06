@@ -11,6 +11,7 @@ import {
   BrainRuntime,
   applyBottleneck,
   baselinePolicy,
+  applyRecipe,
   buildShareURL,
   canDriveClock,
   canMutateWorld,
@@ -40,11 +41,13 @@ import {
   tallyDeaths,
   tracesHtml,
   parseShareURL,
+  recipeFromQuery,
   peerColor,
   restoreSnapshot,
   takeSnapshot,
   toGenomeTrack,
   type BrushKind,
+  type Recipe,
   type DeathCause,
   type FeatureFlags,
   type PeerRole,
@@ -101,8 +104,10 @@ function download(filename: string, text: string, mime: string): void {
 
 export function mount(root: HTMLElement): void {
   const q = typeof location !== "undefined" ? location.search : "";
-  const initial = parseShareURL(q);
+  const sharedRecipe = recipeFromQuery(q);
+  const initial = sharedRecipe ? sharedRecipe.params : parseShareURL(q);
   const dual = new DualWorld(initial);
+  if (sharedRecipe) dual.a = applyRecipe(sharedRecipe);
   const state = {
     view: "A" as ViewMode,
     paused: false,
@@ -321,7 +326,29 @@ export function mount(root: HTMLElement): void {
       paintFeeds();
       refreshMetrics();
     },
+    setRecording: (on) => {
+      const w = current();
+      w.recording = on ? (w.recording ?? []) : null;
+    },
+    applyRecipe: (recipe: Recipe, target) => {
+      const next = applyRecipe(recipe);
+      if (target === "B") {
+        dual.b = next;
+        setView("B");
+      } else if (dual.active === "B") {
+        dual.b = next;
+        selectOrganism(current(), -1);
+      } else {
+        dual.a = next;
+        selectOrganism(current(), -1);
+      }
+      paintFeeds();
+      refreshMetrics();
+    },
   });
+  if (sharedRecipe) {
+    status(`Recette chargée : ${sharedRecipe.ops.length} action${sharedRecipe.ops.length > 1 ? "s" : ""}.`);
+  }
   /** Name the strain after its kit when the genome is an unmodified kit genome. */
   function tagStrain(world: World, seq: string): void {
     const kit = DNA_KITS.find((k) => genomeForKit(k.id) === seq);
