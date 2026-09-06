@@ -261,7 +261,49 @@ export class GoalPanel {
     this.refreshMetricOptions(true);
     this.syncDefaults();
     this.refreshRecipe();
-    void this.refreshPresets();
+    void this.refreshPresets().then(() => this.restoreLastRun());
+  }
+
+  /* ---------- persistence of the last run (survives a reload) ---------- */
+
+  private async persistRun(results: TrialResult[], maxTicks: number): Promise<void> {
+    if (!this.lastRun || !this.lastGoal) return;
+    // Keep the table and replays, not the per-replicate final worlds; keep curves for an even sample only.
+    const stride = Math.max(1, Math.ceil(results.length / MAX_CHART_SERIES));
+    const slim = results.map((r, i) => {
+      const { snapshot: _s, ...rest } = r;
+      return i % stride === 0 ? rest : { ...rest, series: [] };
+    });
+    try {
+      await this.store.saveLastRun({
+        savedAt: Date.now(),
+        label: this.lastRun.label,
+        snapshot: this.lastRun.snapshot,
+        goal: this.lastGoal,
+        configs: this.lastRun.configs,
+        results: slim,
+        maxTicks,
+      });
+    } catch {
+      /* storage unavailable: the run simply is not restored after a reload */
+    }
+  }
+
+  private async restoreLastRun(): Promise<void> {
+    if (this.handle || this.results.some(Boolean)) return;
+    const rec = await this.store.loadLastRun();
+    if (!rec || !rec.results.length) return;
+    this.lastRun = { snapshot: rec.snapshot, label: rec.label, configs: rec.configs };
+    this.lastGoal = rec.goal;
+    this.results = rec.results.slice();
+    this.progress = rec.results.map((r) => r.ticks);
+    this.renderProgress(rec.maxTicks);
+    this.lastTableRender = 0;
+    this.renderResults();
+    this.q<HTMLButtonElement>("#btn-goal-csv").disabled = false;
+    const when = new Date(rec.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    this.q("#goal-table-note").textContent = `${rec.results.length} réplicats · course du ${when} restaurée · depuis ${rec.label}`;
+    this.opts.status(`Dernière course restaurée (${rec.results.length} réplicats depuis ${rec.label}, ${when}) : tableau, tri et rejeu disponibles.`);
   }
 
   /** Called on the UI refresh cadence: keep strain-based options and defaults fresh. */
@@ -444,6 +486,7 @@ export class GoalPanel {
     this.renderProgress(maxTicks);
     this.lastTableRender = 0;
     this.renderResults();
+    void this.persistRun(all, maxTicks);
     const s = summarizeTrials(all);
     this.opts.status(`Réplicats terminés en ${((performance.now() - t0) / 1000).toFixed(1)} s : ${s.successes}/${s.n} atteignent l’objectif${s.medianTicks !== null ? ` (médiane ${s.medianTicks} pas)` : ""}.`);
   }

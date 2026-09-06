@@ -232,6 +232,15 @@ try {
   await page.locator('#btn-goal-csv').click();
   const csv = await csvEvent;
   assert.match(csv.suggestedFilename(), /\.csv$/);
+  // The last run survives a reload: table, sort and replay come back from IndexedDB.
+  await page.reload();
+  await page.waitForFunction(() => window.__openavida);
+  await page.locator('#tab-experiment').click();
+  await page.waitForFunction(() => document.querySelectorAll('#goal-results tbody tr').length >= 2, null, { timeout: 15000 });
+  assert.match(await page.locator('#goal-table-note').textContent(), /restaurée/, 'Restored run is labelled');
+  await page.locator('#goal-results [data-replay="0"]').click();
+  await page.waitForFunction(() => window.__openavida.world === 'B');
+  assert.equal((await probe()).seed, replaySeed, 'Replay works after a reload');
   await page.locator('#view-A').click();
 
   // Focus view and keyboard navigation, including the native help dialog.
@@ -254,6 +263,7 @@ try {
   await page.locator('#fm-0').click();
   await page.locator('#tab-organisms').click();
   await page.locator('#kit-phototroph strong').click();
+  await page.locator('#btn-inject').click(); // world A is empty again after the reload above
   await clickWorld(0.32, 0.22);
   await page.evaluate(() => window.__openavidaMutate?.(90));
   await page.locator('#tab-species').click();

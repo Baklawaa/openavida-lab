@@ -3,7 +3,7 @@
  * in-memory fallback when IndexedDB is unavailable). Snapshots are stored as
  * structured clones, so a 128×128 world costs no JSON round trip.
  */
-import type { WorldSnapshot } from "../sim/index";
+import type { Goal, TrialConfig, TrialResult, WorldSnapshot } from "../sim/index";
 
 export interface PresetMeta {
   id: string;
@@ -19,6 +19,20 @@ export interface PresetMeta {
 export interface PresetRecord extends PresetMeta {
   snapshot: WorldSnapshot;
 }
+
+/** The last goal run: enough to rebuild the table and replay any seed after a reload. */
+export interface LastRunRecord {
+  savedAt: number;
+  label: string;
+  snapshot: WorldSnapshot;
+  goal: Goal;
+  configs: TrialConfig[];
+  results: TrialResult[];
+  maxTicks: number;
+}
+
+/** Reserved ids (never listed as presets). */
+const LAST_RUN_ID = "__last-run__";
 
 const DB_NAME = "openavida-lab";
 const STORE = "presets";
@@ -75,7 +89,34 @@ export class PresetStore {
         records = [...this.memory.values()];
       }
     }
-    return records.map(presetMeta).sort((a, b) => b.createdAt - a.createdAt);
+    return records.filter((r) => !r.id.startsWith("__")).map(presetMeta).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async saveLastRun(run: LastRunRecord): Promise<void> {
+    const rec = { id: LAST_RUN_ID, ...run };
+    const db = await this.open();
+    if (db) {
+      try {
+        await request(db.transaction(STORE, "readwrite").objectStore(STORE).put(rec));
+        return;
+      } catch {
+        /* fall through to memory */
+      }
+    }
+    this.memory.set(LAST_RUN_ID, rec as unknown as PresetRecord);
+  }
+
+  async loadLastRun(): Promise<LastRunRecord | null> {
+    const db = await this.open();
+    if (db) {
+      try {
+        const rec = (await request(db.transaction(STORE, "readonly").objectStore(STORE).get(LAST_RUN_ID) as IDBRequest<(LastRunRecord & { id: string }) | undefined>)) ?? null;
+        if (rec) return rec;
+      } catch {
+        /* fall through */
+      }
+    }
+    return (this.memory.get(LAST_RUN_ID) as unknown as LastRunRecord | undefined) ?? null;
   }
 
   async save(name: string, snapshot: WorldSnapshot, world: "A" | "B"): Promise<PresetMeta> {

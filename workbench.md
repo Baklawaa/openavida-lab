@@ -156,6 +156,10 @@ User: after 1000 replicates with 6 successes, where do I put a seed to watch it?
 - Table: `renderTable` builds all rows in one HTML string (rebuilt at most once per second during a run, once at the end); `compareResults` presets in `RESULT_SORTS`. Limits raised: 5000 replicates, 500 per sweep value.
 - Checks: verify-interface asserts the replay fills the seed field, opens B paused with the replicate seed, and that sorting keeps every row. Browser replay check (phototrophs, population ≥ 40): the replayed seed reaches the goal at the same step as the trial. Load: 2000 × 200 steps → 16 s, table sort 19 ms, rAF ≤ 17 ms.
 
+## Round: last run survives a reload (2026-09-06)
+
+User reloaded after a 1000-replicate run, kept the CSV and a seed, and had no way to replay it. `PresetStore.saveLastRun` / `loadLastRun` store the run (start snapshot, goal, configs, results without final-state snapshots, curves for an even sample of 100) under a reserved id in the presets store (filtered out of `list()`). `GoalPanel.restoreLastRun` rebuilds table, sort, summary and replays on construction and labels the table note "course du … restaurée". verify-interface reloads mid-script and replays seed #1 from the restored run.
+
 ## Metrics (gating)
 
 | Check | Result |
