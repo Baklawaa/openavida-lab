@@ -23,6 +23,7 @@ import {
   exportPhylogenyCSV,
   CAUSE_COLOR,
   CAUSE_LABEL,
+  EVENT_COLOR,
   DNA_KITS,
   dnaSnippet,
   flagsFromQuery,
@@ -454,7 +455,7 @@ export function mount(root: HTMLElement): void {
   }
 
   function paintFeeds(): void {
-    const w = current();
+    const w = viewWorld();
     const board = root.querySelector("#leaderboard")!;
     const top = strongestLiving(w.organisms, 8);
     if (top.length === 0) {
@@ -468,6 +469,22 @@ export function mount(root: HTMLElement): void {
             <div class="muted">Lignée ${o.lineageId} · Lumière ${ph.photo.toFixed(2)} · Nutrition ${ph.uptake.toFixed(2)}</div>
             <div class="dna">${dnaSnippet(o.genome)}</div>
             <span class="use-dna" data-use="${o.id}">Modifier cet ADN</span>
+          </button>`;
+        })
+        .join("");
+    }
+    const eventLog = root.querySelector("#event-log")!;
+    const recentEvents = w.events.slice(-40).reverse();
+    root.querySelector("#event-count")!.textContent = String(w.events.length);
+    if (recentEvents.length === 0) {
+      eventLog.innerHTML = `<p class="muted">Aucun événement pour le moment.</p>`;
+    } else {
+      eventLog.innerHTML = recentEvents
+        .map((e) => {
+          const color = EVENT_COLOR[e.kind];
+          return `<button type="button" class="feed-row event-row" data-tick="${e.tick}" data-kind="${e.kind}" data-lineage="${e.lineageId ?? ""}" data-strain="${e.strainId ?? ""}">
+            <div class="feed-head" style="color:${color}">${e.text}</div>
+            <div class="muted">Pas ${e.tick}</div>
           </button>`;
         })
         .join("");
@@ -1211,6 +1228,16 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-ancestry")!.addEventListener("click", () => {
     if (state.selectedId >= 0) explorer.open({ organismId: state.selectedId });
     else status("Sélectionnez d’abord un organisme.");
+  });
+  root.querySelector("#event-log")!.addEventListener("click", (ev) => {
+    const row = (ev.target as HTMLElement).closest<HTMLElement>(".event-row");
+    if (!row) return;
+    const tick = Number(row.dataset.tick);
+    const lineageId = Number(row.dataset.lineage);
+    const strainId = Number(row.dataset.strain);
+    if (Number.isFinite(tick)) void previewTick(tick);
+    if (Number.isFinite(lineageId) && lineageId > 0) explorer.open({ lineageId });
+    else if (Number.isFinite(strainId) && strainId > 0) explorer.open({ filter: { strainId }, tab: "organisms" });
   });
   root.querySelector("#leaderboard")!.addEventListener("click", (ev) => {
     const t = ev.target as HTMLElement;

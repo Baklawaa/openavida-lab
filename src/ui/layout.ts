@@ -144,6 +144,10 @@ export function createLabLayout(root: HTMLElement) {
         <div id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
           <section class="block"><div class="section-heading"><h2>Organisme sélectionné</h2><span class="tag" id="selection-tag">AUCUN</span></div><div id="inspect-meta" class="muted">Outil Inspecter, puis clic sur un organisme.</div><div id="inspect-phenotype"></div><div class="row inspect-actions" id="inspect-actions" hidden><button id="btn-edit-selected">${icon("dna")}<span>Modifier cet ADN</span></button><button id="btn-ancestry">${icon("chart")}<span>Évolution</span></button></div><details class="inspect-detail"><summary>Génome et gènes</summary><div id="inspect-genome"></div><div id="browser-wrap"><canvas id="gbrowser"></canvas></div><div id="inspect-genes"></div></details><details class="inspect-detail"><summary>Métabolisme et comportement</summary><div id="inspect-pathways"></div><div id="inspect-brain"></div></details></section>
           <section class="block"><div class="section-heading"><h2>Explorateur</h2><span class="tag">TOUS LES ORGANISMES</span></div><p class="muted">Vivants et morts, groupés par espèce, filtres et tris précis, branche d’évolution, enregistrement local.</p><button id="btn-explorer" class="primary full">${icon("inspect")}Ouvrir l’explorateur</button></section>
+          <section class="block">
+            <div class="section-heading"><h2>Événements</h2><span class="tag" id="event-count">0</span></div>
+            <div id="event-log" class="feed"></div>
+          </section>
           <section class="block"><h2>Classement par fitness</h2><div id="leaderboard" class="feed"></div></section>
           <section class="block"><h2>Journal des décès</h2><div id="death-tally" class="death-tally"></div><div id="death-log" class="feed"></div></section>
           <section class="block"><details><summary>Table codon → trait</summary><p class="muted">ORF = ATG … TAA/TAG/TGA, lecture dans tous les cadres. phénotype[trait] = squash(basal + Σ deltas). La couleur n’entre pas dans la fitness.</p><div class="mapping-legend" id="legend"></div></details></section>

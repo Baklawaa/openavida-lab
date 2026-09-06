@@ -181,6 +181,12 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - UI `#timeline-row` under playback. Scrub pauses and previews a temp World; « Reprendre ici » restores + trims. Plate, charts, Espèces, Explorateur read `viewWorld()`.
 - Decision: tick-0 snapshot is updated in place when the user places/injects before the first step, so rewind to origin is not an empty plate.
 
+## Task 2 — Event log (2026-09-07)
+
+- `src/sim/events.ts`: `detectEvents` is pure (flags carry the “once” memory). Kinds: lineage-dominant / collapse, first-predation, innovation-sweep, strain-extinct, population-crash/boom (±20 pas). Log bounded at 500, optional on snapshots, copied in frames.
+- Analyse `#event-log`: last 40, newest first; click scrubs the timeline and opens the explorer on the lineage or strain.
+- Tests: each kind fires exactly once on a synthetic world.
+
 ## Metrics (gating)
 
 | Check | Result |

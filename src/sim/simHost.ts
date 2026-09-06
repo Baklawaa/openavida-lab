@@ -18,6 +18,7 @@ import type { RecipeOp } from "./recipe";
 import { DualWorld } from "./sandbox";
 import { Timeline } from "./timeline";
 import type { TimelineMeta } from "./timeline";
+import type { EventFlags, WorldEvent } from "./events";
 import type { Innovation, Strain } from "./species";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX } from "./types";
 import type {
@@ -216,6 +217,10 @@ export interface WorldFrame {
   brainTraces?: BrainTrace[];
   recording: RecipeOp[] | null;
   timelineMeta?: TimelineMeta | null;
+  events?: WorldEvent[];
+  eventsFull?: boolean;
+  nextEventId?: number;
+  eventFlags?: EventFlags;
 }
 
 export interface FrameOptions {
@@ -266,6 +271,10 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     brainsEnabled: w.brainsEnabled,
     recording: w.recording ? w.recording.map((op) => ({ ...op })) : null,
     timelineMeta: w.timelineMeta ? { ...w.timelineMeta, entries: w.timelineMeta.entries.map((e) => ({ ...e })) } : w.timelineMeta,
+    events: w.events.map((e) => ({ ...e })),
+    eventsFull: true,
+    nextEventId: w.nextEventId,
+    eventFlags: { dominant: [...w.eventFlags.dominant], sweep: [...w.eventFlags.sweep], firstPredation: w.eventFlags.firstPredation },
   };
   if (opts.innovations) frame.innovations = w.innovations.map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } }));
   if (opts.lineages) frame.lineages = [...w.lineages.values()].map((l) => ({ ...l }));
@@ -323,6 +332,16 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
   }
   w.recording = f.recording;
   if (f.timelineMeta !== undefined) w.timelineMeta = f.timelineMeta;
+  if (f.events) {
+    if (f.eventsFull || !w.events.length) w.events = f.events;
+    else {
+      const seen = new Set(w.events.map((e) => e.id));
+      for (const e of f.events) if (!seen.has(e.id)) w.events.push(e);
+      if (w.events.length > 500) w.events.splice(0, w.events.length - 500);
+    }
+  }
+  if (f.nextEventId !== undefined) w.nextEventId = f.nextEventId;
+  if (f.eventFlags) w.eventFlags = { dominant: [...f.eventFlags.dominant], sweep: [...f.eventFlags.sweep], firstPredation: f.eventFlags.firstPredation };
   return true;
 }
 

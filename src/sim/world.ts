@@ -30,6 +30,7 @@ import { parentChildEdges, sampleMetrics } from "./metrics";
 import type { DeathRecord } from "./types";
 import { mixSeed, Rng } from "./rng";
 import type { RecipeOp } from "./recipe";
+import { EMPTY_EVENT_FLAGS, EVENT_LOG_MAX, detectEvents, type EventFlags, type WorldEvent } from "./events";
 import { phenotypeChanges, strainColor, strategyOf, type Innovation, type Strain } from "./species";
 import {
   DEATH_LOG_KEEP,
@@ -89,6 +90,9 @@ export class World {
   recording: RecipeOp[] | null = null;
   /** Cadence snapshots available for rewind (metadata only on the worker mirror). */
   timelineMeta: { every: number; used: number; budget: number; entries: Array<{ tick: number; population: number; bytes: number }> } | null = null;
+  events: WorldEvent[] = [];
+  nextEventId = 1;
+  eventFlags: EventFlags = { dominant: [], sweep: [], firstPredation: false };
   private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {
@@ -481,6 +485,13 @@ export class World {
     this.reap();
     this.pushRecipe({ type: "step", n: 1 });
     const m = this.recordMetrics();
+    const prev = this.history.length >= 2 ? this.history[this.history.length - 2] : null;
+    if (prev) {
+      const detected = detectEvents(prev, this, this.eventFlags);
+      this.eventFlags = detected.flags;
+      for (const e of detected.events) this.events.push({ ...e, id: this.nextEventId++ });
+      if (this.events.length > EVENT_LOG_MAX) this.events.splice(0, this.events.length - EVENT_LOG_MAX);
+    }
     const t1 =
       typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     this.lastStepMs = t1 - t0;
@@ -764,6 +775,9 @@ export class World {
       nextStrainId: this.nextStrainId,
       innovations: this.innovations.map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } })),
       nextInnovationId: this.nextInnovationId,
+      events: this.events.map((e) => ({ ...e })),
+      nextEventId: this.nextEventId,
+      eventFlags: { dominant: [...this.eventFlags.dominant], sweep: [...this.eventFlags.sweep], firstPredation: this.eventFlags.firstPredation },
     };
   }
 
@@ -798,6 +812,11 @@ export class World {
     this.nextDeathSeq = snap.nextDeathSeq ?? (Math.max(0, ...this.deaths.map((d) => d.seq ?? 0)) + 1);
     this.randomTerrain = Boolean(snap.params.randomTerrain);
     this.disturbances = Boolean(snap.params.disturbances);
+    this.events = (snap.events ?? []).map((e) => ({ ...e }));
+    this.nextEventId = snap.nextEventId ?? (Math.max(0, ...this.events.map((e) => e.id)) + 1);
+    this.eventFlags = snap.eventFlags
+      ? { dominant: [...snap.eventFlags.dominant], sweep: [...snap.eventFlags.sweep], firstPredation: snap.eventFlags.firstPredation }
+      : { ...EMPTY_EVENT_FLAGS, dominant: [], sweep: [] };
     this.rebuildOccupancy();
   }
 

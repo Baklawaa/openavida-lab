@@ -224,6 +224,15 @@ export {
   type Liveness,
 } from "./catalog";
 export {
+  EMPTY_EVENT_FLAGS,
+  EVENT_COLOR,
+  EVENT_LOG_MAX,
+  detectEvents,
+  type EventFlags,
+  type WorldEvent,
+  type WorldEventKind,
+} from "./events";
+export {
   DEFAULT_TIMELINE_BUDGET,
   DEFAULT_TIMELINE_EVERY,
   Timeline,

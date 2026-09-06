@@ -281,6 +281,7 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .world-panel { grid-template-columns: minmax(0, 1fr); }
 .world-toolbar, .playback { min-width: 0; max-width: 100%; }
 .feed-row { flex-shrink: 0; }
+#event-log .event-row { margin-bottom: 4px; }
 
 /* ---------- Espèces tab ---------- */
 .toggle-inline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); cursor: pointer; }

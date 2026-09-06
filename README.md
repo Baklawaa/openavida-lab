@@ -18,7 +18,7 @@ The French interface keeps playback, field layers, world selection, and the 2D/3
 
 - **Organismes**: starter kits, placement, population injection, and the visual DNA editor.
 - **Milieu**: brushes, radius, terrain sources, and random disturbances.
-- **Analyse**: organism inspection, traits, genome, metabolism, rankings, and the death log.
+- **Analyse**: organism inspection, traits, genome, metabolism, rankings, the death log, and an event log (lineage dominance/collapse, first predation, innovation sweep, strain extinction, population crash/boom) that opens the explorer and the nearest timeline snapshot.
 - **Espèces**: per-group analysis. Strains (founding genome, inherited by all descendants) or strategies (phenotype class). Population per group over time, mean traits, centroid and local environment, drift from the founder, key innovations (mutations whose lineage spread, with the environment they appeared in), deaths by cause. In strain mode, Trajectoires plots each strain's centroid path on a world-aspect map (vents as markers) and mean local temperature over time; each card reports displacement of the centre from the founder. Define named strains from the editor to compare 2–3 genomes in one environment; optionally color the plate (2D and 3D) by strain.
 - **Expérience**: local presets, goal-directed multi-replicate runs, restore points, independent A/B steps, reset, data import/export, and experimental features.
 

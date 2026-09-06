@@ -1,4 +1,5 @@
 import type { Phenotype } from "./mapping";
+import type { EventFlags, WorldEvent } from "./events";
 import type { Innovation, Strain } from "./species";
 
 export type DeathCause =
@@ -217,6 +218,9 @@ export interface WorldSnapshot {
   nextStrainId?: number;
   innovations?: Innovation[];
   nextInnovationId?: number;
+  events?: WorldEvent[];
+  nextEventId?: number;
+  eventFlags?: EventFlags;
 }
 
 export function normalizeParams(partial: Partial<SimParams> = {}): SimParams {

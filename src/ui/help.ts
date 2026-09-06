@@ -58,6 +58,8 @@ export const CONTROL_HELP: Record<string, string> = {
   "gene-add-size": "Ajoute un gène de taille, qui affecte aussi l’entretien énergétique.",
   "btn-from-inspect": "Copie le génome de l’organisme sélectionné dans l’éditeur. Il devient le génome de référence du phénotype.",
   "btn-clear-genes": "Vide la séquence. Le phénotype devient basal jusqu’à l’ajout d’un gène ou au choix d’un kit. Annulable.",
+  "event-log": "Événements dérivés des mesures : dominance ou extinction d’une lignée, première prédation, essor d’une innovation, extinction de souche, chute ou essor de population. Un clic ouvre l’explorateur et l’instantané le plus proche.",
+  "event-count": "Nombre d’événements conservés (plafond 500).",
   "leaderboard": "Organismes vivants classés par fitness. Cliquez sur une ligne pour l’inspecter, ou sur Modifier cet ADN pour le réutiliser.",
   "death-log": "Décès récents et leurs causes. Cliquez sur une ligne pour charger le génome de l’organisme dans l’éditeur.",
   "death-tally": "Nombre de décès par cause dans le journal de ce monde.",
