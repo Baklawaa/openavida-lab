@@ -19,6 +19,7 @@ import { DualWorld } from "./sandbox";
 import { Timeline } from "./timeline";
 import type { TimelineMeta } from "./timeline";
 import type { EventFlags, WorldEvent } from "./events";
+import { OccupancyHeat } from "./heat";
 import type { Innovation, Strain } from "./species";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX } from "./types";
 import type {
@@ -52,7 +53,8 @@ export type SimOp =
   | { kind: "brains"; on: boolean; llm: boolean }
   | { kind: "recording"; which: Side; on: boolean }
   | { kind: "setParams"; which: Side; params: Partial<SimParams> }
-  | { kind: "timeline"; which: Side; every?: number; trimAfter?: number };
+  | { kind: "timeline"; which: Side; every?: number; trimAfter?: number }
+  | { kind: "heatStrain"; which: Side; strainId: number | null };
 
 export interface SimOpResult {
   child?: Organism | null;
@@ -163,6 +165,9 @@ function applySimOpCore(dual: DualWorld, op: SimOp): SimOpResult {
       if (op.trimAfter !== undefined) tl.trimAfter(op.trimAfter);
       return {};
     }
+    case "heatStrain":
+      worldOf(dual, op.which).heatStrainId = op.strainId;
+      return {};
   }
 }
 
@@ -221,6 +226,8 @@ export interface WorldFrame {
   eventsFull?: boolean;
   nextEventId?: number;
   eventFlags?: EventFlags;
+  heatStrainId?: number | null;
+  heat?: Float32Array;
 }
 
 export interface FrameOptions {
@@ -275,11 +282,20 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     eventsFull: true,
     nextEventId: w.nextEventId,
     eventFlags: { dominant: [...w.eventFlags.dominant], sweep: [...w.eventFlags.sweep], firstPredation: w.eventFlags.firstPredation },
+    heatStrainId: w.heatStrainId,
   };
+  const transfer: ArrayBuffer[] = [nutrient.buffer, toxin.buffer, temperature.buffer, light.buffer, solar.buffer, terrain.buffer];
+  if (w.heatStrainId !== null) {
+    const heat = w.heat.normalized(w.heatStrainId);
+    if (heat) {
+      frame.heat = heat;
+      transfer.push(heat.buffer);
+    }
+  }
   if (opts.innovations) frame.innovations = w.innovations.map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } }));
   if (opts.lineages) frame.lineages = [...w.lineages.values()].map((l) => ({ ...l }));
   if (w.brain) frame.brainTraces = w.brain.traces.slice(-200).map((t) => ({ ...t }));
-  return { frame, transfer: [nutrient.buffer, toxin.buffer, temperature.buffer, light.buffer, solar.buffer, terrain.buffer] };
+  return { frame, transfer };
 }
 
 /** Overwrite a mirror world with a frame. Returns false when the grid size differs (caller must recreate the world). */
@@ -342,6 +358,11 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
   }
   if (f.nextEventId !== undefined) w.nextEventId = f.nextEventId;
   if (f.eventFlags) w.eventFlags = { dominant: [...f.eventFlags.dominant], sweep: [...f.eventFlags.sweep], firstPredation: f.eventFlags.firstPredation };
+  if (f.heatStrainId !== undefined) w.heatStrainId = f.heatStrainId;
+  if (f.heat) {
+    if (w.heat.width !== w.w || w.heat.height !== w.h) w.heat = new OccupancyHeat(w.w, w.h);
+    if (f.heatStrainId != null) w.heat.maps.set(f.heatStrainId, f.heat);
+  }
   return true;
 }
 

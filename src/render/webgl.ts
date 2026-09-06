@@ -91,6 +91,22 @@ void main() {
 }
 `;
 
+const FS_HEAT = `#version 300 es
+precision highp float;
+uniform sampler2D uHeat;
+uniform vec2 uRes;
+uniform vec4 uCrop;
+uniform vec3 uColor;
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 local = vec2(uv.x, 1.0 - uv.y);
+  vec2 tuv = vec2(mix(uCrop.x, uCrop.z, local.x), mix(uCrop.y, uCrop.w, local.y));
+  float h = texture(uHeat, tuv).r;
+  fragColor = vec4(uColor, h * 0.42);
+}
+`;
+
 const VS_ORGANISM = `#version 300 es
 precision highp float;
 layout(location=0) in vec2 aPosition;
@@ -196,7 +212,10 @@ export class LabRenderer {
   readonly canvas: HTMLCanvasElement;
   readonly gl: WebGL2RenderingContext;
   private fieldProg: WebGLProgram;
+  private heatProg: WebGLProgram;
   private organismProg: WebGLProgram;
+  private heatTex: WebGLTexture;
+  private heatBytes = new Uint8Array(1);
   private organismBuffer: WebGLBuffer;
   private organismVao: WebGLVertexArrayObject;
   private texA: WebGLTexture;
@@ -216,6 +235,10 @@ export class LabRenderer {
   zoom = 1;
   /** Color organisms by founding strain instead of guild + lineage. */
   colorByStrain = false;
+  /** Normalised occupancy 0–1 for the selected strain, or null when off. */
+  heatStrain: Float32Array | null = null;
+  heatSize: [number, number] = [0, 0];
+  heatColor: [number, number, number] = [0.2, 0.85, 0.7];
   private cropA: [number, number, number, number] = [0, 0, 1, 1];
   private cropB: [number, number, number, number] = [0, 0, 1, 1];
 
@@ -231,7 +254,9 @@ export class LabRenderer {
     if (!gl) throw new Error("WebGL2 required");
     this.gl = gl;
     this.fieldProg = program(gl, VS_FIELD, FS_FIELD);
+    this.heatProg = program(gl, VS_FIELD, FS_HEAT);
     this.organismProg = program(gl, VS_ORGANISM, FS_ORGANISM);
+    this.heatTex = this.makeTex(true);
     this.organismBuffer = gl.createBuffer()!;
     this.organismVao = gl.createVertexArray()!;
     gl.bindVertexArray(this.organismVao);
@@ -377,7 +402,30 @@ export class LabRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.plateB);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uPlateB"), 3);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.drawHeat(primary);
     this.drawOrganisms(split ? [worldA, worldB] : [primary]);
+  }
+
+  private drawHeat(world: World): void {
+    const map = this.heatStrain;
+    if (!map || this.heatSize[0] !== world.w || this.heatSize[1] !== world.h) return;
+    const gl = this.gl;
+    const n = world.w * world.h;
+    if (this.heatBytes.length !== n) this.heatBytes = new Uint8Array(n);
+    for (let i = 0; i < n; i++) this.heatBytes[i] = Math.max(0, Math.min(255, Math.round(map[i]! * 255)));
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.heatTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, world.w, world.h, 0, gl.RED, gl.UNSIGNED_BYTE, this.heatBytes);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(this.heatProg);
+    gl.uniform2f(gl.getUniformLocation(this.heatProg, "uRes"), this.canvas.width, this.canvas.height);
+    gl.uniform4f(gl.getUniformLocation(this.heatProg, "uCrop"), ...this.cropA);
+    gl.uniform3f(gl.getUniformLocation(this.heatProg, "uColor"), ...this.heatColor);
+    gl.uniform1i(gl.getUniformLocation(this.heatProg, "uHeat"), 4);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disable(gl.BLEND);
   }
 
   private drawOrganisms(worlds: World[]): void {

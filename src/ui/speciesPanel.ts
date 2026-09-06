@@ -49,6 +49,7 @@ export interface SpeciesPanelOptions {
   defineStrain(genome: string, name: string): Strain;
   renameStrain(id: number, name: string): boolean;
   onColorByStrain(on: boolean): void;
+  onHeatStrain(strainId: number | null): void;
   openMutation(innovation: Innovation): void;
 }
 
@@ -209,7 +210,7 @@ export class SpeciesPanel {
     const list = this.q("#species-list");
     if (list.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement) return;
     const spread = this.mode === "strains" ? innovationSpread(w.lineages, w.innovations) : null;
-    const key = `${this.mode}|${w.tick}|${stats.map((s) => `${s.key}:${s.count}`).join(",")}|${w.innovations.length}`;
+    const key = `${this.mode}|${w.tick}|${stats.map((s) => `${s.key}:${s.count}`).join(",")}|${w.innovations.length}|${w.heatStrainId}`;
     if (!force && key === this.lastListKey) return;
     this.lastListKey = key;
     if (stats.length === 0) {
@@ -228,7 +229,7 @@ export class SpeciesPanel {
       ? `<input class="group-name" value="${strain.name.replace(/"/g, "&quot;")}" data-strain="${strain.id}" aria-label="Nom de la souche" maxlength="32">`
       : `<b class="group-label">${s.label}</b>`;
     const ops = strain
-      ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="Charger ce génome dans l’éditeur et activer Placer">Placer</button><button type="button" data-act="inject" data-strain="${strain.id}" title="Injecter 24 organismes de cette souche">+24</button></span>`
+      ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="Charger ce génome dans l’éditeur et activer Placer">Placer</button><button type="button" data-act="inject" data-strain="${strain.id}" title="Injecter 24 organismes de cette souche">+24</button><button type="button" data-act="heat" data-strain="${strain.id}" class="${w.heatStrainId === strain.id ? "active" : ""}" title="${CONTROL_HELP["btn-heat-strain"]}">Carte de présence</button></span>`
       : "";
     const state = extinct ? `<span class="tiny group-state">${everLived ? "éteinte" : "non placée"}</span>` : `<span class="tiny">${(s.share * 100).toFixed(0)} %</span>`;
     const path = strainTrack(w.history, s.key, Math.max(1, w.history.length - 1));
@@ -311,6 +312,12 @@ export class SpeciesPanel {
       if (!strain) return;
       if (btn.dataset.act === "place") this.opts.loadGenome(strain.genome, strain.name);
       else if (btn.dataset.act === "inject") this.opts.inject(strain.genome, 24);
+      else if (btn.dataset.act === "heat") {
+        const on = this.opts.world().heatStrainId !== strain.id;
+        this.opts.onHeatStrain(on ? strain.id : null);
+        this.lastListKey = "";
+        this.refresh(true);
+      }
     });
     list.addEventListener("change", (ev) => {
       const input = ev.target as HTMLInputElement;

@@ -31,6 +31,7 @@ import type { DeathRecord } from "./types";
 import { mixSeed, Rng } from "./rng";
 import type { RecipeOp } from "./recipe";
 import { EMPTY_EVENT_FLAGS, EVENT_LOG_MAX, detectEvents, type EventFlags, type WorldEvent } from "./events";
+import { OccupancyHeat, pushTrail } from "./heat";
 import { phenotypeChanges, strainColor, strategyOf, type Innovation, type Strain } from "./species";
 import {
   DEATH_LOG_KEEP,
@@ -93,6 +94,8 @@ export class World {
   events: WorldEvent[] = [];
   nextEventId = 1;
   eventFlags: EventFlags = { dominant: [], sweep: [], firstPredation: false };
+  heat: OccupancyHeat;
+  heatStrainId: number | null = null;
   private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {
@@ -100,6 +103,7 @@ export class World {
     this.rng = new Rng(this.params.seed);
     const { width: w, height: h } = this.params;
     this.fields = new Fields(w, h);
+    this.heat = new OccupancyHeat(w, h);
     this.terrain = new Uint8Array(w * h);
     this.occupancy = new Int32Array(w * h);
     this.occupancy.fill(-1);
@@ -484,6 +488,8 @@ export class World {
     this.reproduceAll();
     this.reap();
     this.pushRecipe({ type: "step", n: 1 });
+    for (const o of this.organisms) pushTrail(o);
+    this.heat.step(this);
     const m = this.recordMetrics();
     const prev = this.history.length >= 2 ? this.history[this.history.length - 2] : null;
     if (prev) {
@@ -760,10 +766,11 @@ export class World {
       tick: this.tick,
       ...this.fields.toArrays(),
       terrain: Array.from(this.terrain),
-      organisms: this.organisms.map((o) => ({
-        ...o,
-        ph: copyPhenotype(o.ph),
-      })),
+      organisms: this.organisms.map((o) => {
+        const copy = { ...o, ph: copyPhenotype(o.ph) };
+        delete copy.trail;
+        return copy;
+      }),
       nextOrgId: this.nextOrgId,
       nextLineageId: this.nextLineageId,
       lineages: Array.from(this.lineages.values()).map((l) => ({ ...l })),
@@ -811,6 +818,7 @@ export class World {
     this.deaths = (snap.deaths ?? []).map((d) => ({ ...d }));
     this.nextDeathSeq = snap.nextDeathSeq ?? (Math.max(0, ...this.deaths.map((d) => d.seq ?? 0)) + 1);
     this.randomTerrain = Boolean(snap.params.randomTerrain);
+    this.heat = new OccupancyHeat(this.w, this.h);
     this.disturbances = Boolean(snap.params.disturbances);
     this.events = (snap.events ?? []).map((e) => ({ ...e }));
     this.nextEventId = snap.nextEventId ?? (Math.max(0, ...this.events.map((e) => e.id)) + 1);

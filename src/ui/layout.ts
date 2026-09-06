@@ -77,7 +77,7 @@ export function createLabLayout(root: HTMLElement) {
           <button id="btn-focus" class="icon-button" aria-label="Agrandir la visualisation" aria-pressed="false">${icon("expand")}</button>
         </div>
         <div class="stage">
-          <div class="viz"><canvas id="gl" aria-label="Monde en deux dimensions : cliquez pour utiliser l’outil sélectionné"></canvas><canvas id="gl3d" aria-label="Monde en trois dimensions : glissez pour tourner, molette pour zoomer"></canvas><div id="mp-cursors"></div></div>
+          <div class="viz"><canvas id="gl" aria-label="Monde en deux dimensions : cliquez pour utiliser l’outil sélectionné"></canvas><canvas id="gl-trail" aria-hidden="true"></canvas><canvas id="gl3d" aria-label="Monde en trois dimensions : glissez pour tourner, molette pour zoomer"></canvas><div id="mp-cursors"></div></div>
           <div class="stage-label" id="stage-label">MONDE A</div><div class="stage-label stage-label-b" id="stage-label-b" hidden>MONDE B</div>
           <div class="empty-world" id="empty-world"><span class="empty-icon">${icon("life")}</span><div><h2>Monde vide</h2><p>Kit sélectionné + clic sur une cellule libre, ou injection aléatoire.</p></div><button id="btn-start" class="primary">${icon("plus")}Injecter 24 organismes</button></div>
           <div class="viz-hud" role="group" aria-label="Outils du monde">

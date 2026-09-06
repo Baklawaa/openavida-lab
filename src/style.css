@@ -76,7 +76,9 @@ kbd { display: inline-flex; justify-content: center; min-width: 18px; padding: 2
 .stage { position: relative; min-height: 0; display: flex; justify-content: center; align-items: center; background-color: #090f13; background-image: radial-gradient(#40504744 .7px, transparent .7px); background-size: 18px 18px; overflow: hidden; }
 .viz { position: relative; flex-shrink: 0; min-height: 0; overflow: hidden; box-shadow: 0 0 0 1px #536a604d, 0 12px 45px #0004; border-radius: 2px; }
 .viz canvas#gl { display: block; width: 100%; height: 100%; touch-action: none; }
+.viz canvas#gl-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .viz canvas#gl.off { display: none; }
+.viz canvas#gl.off ~ #gl-trail { display: none; }
 .viz canvas#gl3d { display: none; position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .viz canvas#gl3d.on { display: block; }
 .stage-label { position: absolute; left: 12px; top: 10px; font: 9px var(--mono); color: #82968b; letter-spacing: .12em; pointer-events: none; }

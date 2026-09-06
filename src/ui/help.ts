@@ -67,6 +67,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "species-strains": "Regroupe les organismes par génome fondateur. Les descendants gardent l’étiquette de leur souche, même après mutation.",
   "species-strategies": "Regroupe les organismes par stratégie actuelle, déduite du phénotype : prédateur, mutualiste, phototrophe, hétérotrophe ou mixotrophe.",
   "opt-color-strain": "Colore chaque organisme, en 2D et en 3D, avec la couleur de sa souche, pour suivre les groupes sur la plaque.",
+  "btn-heat-strain": "Superpose la carte de présence de cette souche (occupation décroissante sur 200 pas) sous les organismes.",
   "chart-groups": "Effectif vivant de chaque groupe au fil des pas. Une courbe qui monte pendant qu’une autre chute signale un remplacement.",
   "chart-strain-map": "Carte du monde : trajet du centre de masse de chaque souche, du plus ancien (fade) au plus récent. Le disque est la position actuelle ; les losanges sont les sources (nutriment, toxine, chaleur).",
   "chart-strain-temp": "Température locale moyenne au centre de chaque souche au fil des pas. Une baisse indique un éloignement des sources thermiques.",

@@ -187,6 +187,12 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Analyse `#event-log`: last 40, newest first; click scrubs the timeline and opens the explorer on the lineage or strain.
 - Tests: each kind fires exactly once on a synthetic world.
 
+## Task 3 — Spatial trails and heat maps (2026-09-07)
+
+- `OccupancyHeat`: per-strain Float32 occupancy, decay `exp(-1/200)`, no RNG, not in snapshots. Frames send the selected strain’s normalised map. `SimOp.heatStrain`.
+- LabRenderer draws that map as an R8 texture under organisms. Espèces card « Carte de présence ». Selected organism: 120-cell trail polyline on `#gl-trail`.
+- Trails omitted from snapshots (`delete copy.trail`). Heat rebuilt after restore.
+
 ## Metrics (gating)
 
 | Check | Result |

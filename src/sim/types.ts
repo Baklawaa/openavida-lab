@@ -132,6 +132,8 @@ export interface Organism {
   fitness: number;
   /** Founding-genome group; 0 when untagged (older snapshots). */
   strainId: number;
+  /** Last positions; not snapshotted. */
+  trail?: Array<[number, number]>;
   /** Body condition 0–1: rises with prey eaten, decays slowly. See src/sim/body.ts. */
   mass: number;
   /** Prey eaten by this organism. */

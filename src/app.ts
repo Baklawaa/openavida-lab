@@ -145,6 +145,7 @@ export function mount(root: HTMLElement): void {
   if (state.flags.view3d) state.surface = "3d";
 
   const { viz, stage, canvas, canvas3d, hud, cursors, side, cFit, cShan, cPhy } = createLabLayout(root);
+  const trailCanvas = root.querySelector<HTMLCanvasElement>("#gl-trail")!;
   type Panel = "organisms" | "environment" | "analysis" | "species" | "experiment";
   const PANELS: readonly Panel[] = ["organisms", "environment", "analysis", "species", "experiment"];
   const openTab = (panel: Panel) => {
@@ -406,6 +407,10 @@ export function mount(root: HTMLElement): void {
       renderer.colorByStrain = on;
       if (view3d) view3d.colorByStrain = on;
       status(on ? "Couleur des organismes : souche fondatrice." : "Couleur des organismes : guilde et lignée.");
+    },
+    onHeatStrain: (id) => {
+      host.apply({ kind: "heatStrain", which: sideOf(current()), strainId: id });
+      status(id === null ? "Carte de présence masquée." : `Carte de présence : souche ${id}.`);
     },
     openMutation: (inn) => {
       if (!inn.genome) {
@@ -1343,6 +1348,34 @@ export function mount(root: HTMLElement): void {
     return { x: p.x, y: p.y, id: o.id };
   };
 
+  function drawTrail(w: World): void {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cssW = viz.clientWidth;
+    const cssH = viz.clientHeight;
+    trailCanvas.width = Math.max(1, Math.round(cssW * dpr));
+    trailCanvas.height = Math.max(1, Math.round(cssH * dpr));
+    const ctx = trailCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const org = w.organisms.find((o) => o.id === state.selectedId);
+    const trail = org?.trail;
+    if (!trail || trail.length < 2) return;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (let i = 1; i < trail.length; i++) {
+      const p0 = renderer.gridToCanvas(trail[i - 1]![0], trail[i - 1]![1], w);
+      const p1 = renderer.gridToCanvas(trail[i]![0], trail[i]![1], w);
+      const a = 0.1 + 0.75 * (i / (trail.length - 1));
+      ctx.strokeStyle = `rgba(226,236,232,${a.toFixed(3)})`;
+      ctx.lineWidth = 1.7;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.stroke();
+    }
+  }
+
   let lastFrame = performance.now();
   let tickAccum = 0;
   const loop = (now: number) => {
@@ -1360,9 +1393,19 @@ export function mount(root: HTMLElement): void {
       ensure3d().draw(viewWorld());
     } else {
       const side = sideOf(current());
+      const shown = viewWorld();
       const a = state.preview && side === "A" ? state.preview : dual.a;
       const b = state.preview && side === "B" ? state.preview : dual.b;
+      const heatId = shown.heatStrainId;
+      renderer.heatStrain = heatId === null ? null : shown.heat.normalized(heatId);
+      renderer.heatSize = [shown.w, shown.h];
+      const strain = heatId !== null ? shown.strains.get(heatId) : undefined;
+      if (strain) {
+        const n = parseInt(strain.color.slice(1), 16);
+        renderer.heatColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+      }
       renderer.draw(a, b, now / 1000);
+      drawTrail(shown);
     }
     if (state.room?.isHost && !state.paused && state.speed > 0 && current().tick % 10 === 0) {
       state.roomPost?.({ kind: "snapshot", snap: current().snapshot() });

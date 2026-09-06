@@ -223,6 +223,7 @@ export {
   type GroupMode as CatalogGroupMode,
   type Liveness,
 } from "./catalog";
+export { HEAT_DECAY, HEAT_STEPS, OccupancyHeat, TRAIL_LENGTH, pushTrail } from "./heat";
 export {
   EMPTY_EVENT_FLAGS,
   EVENT_COLOR,
