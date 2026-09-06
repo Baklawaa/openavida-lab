@@ -164,6 +164,15 @@ User reloaded after a 1000-replicate run, kept the CSV and a seed, and had no wa
 
 User screenshot: cramped goal builder, a 13-digit seed silently truncated by a number input (seeds are uint32), world B "empty" after replaying with the wrong seed and mutation 1. Changes: the goal block is five numbered steps (état de départ, objectif, paramètres, résultats, rejeu) with full-width selects and the field threshold on its own labelled row; seed inputs are text fields validated by `parseSeed` (digits, 1…4294967295) with an explicit refusal message; after a replay `#replay-info` states the start state, seed, parameters, what the replicate did in the run (step reached, extinction, budget) and how to play. Browser check: invalid seed refused; typed valid seed replays; Reprendre advances world B from tick 0 with the 24 organisms; verify-interface OK; Vitest 108/108 (`tests/goalPanel.test.ts` adds parseSeed + sort presets).
 
+## Round: explorer, clickable lineage tree, saved organisms (2026-09-06)
+
+User: make the lineage tree clickable to understand what happened; per replicate a catalogue of all organisms by species with precise filters (died fastest/slowest, best stats, most kills…); show how an organism got there with a tree and the biggest changes; save organisms locally with their branch and optionally the whole simulation.
+
+- Sim: `Organism.kills` / `births` (set in `feed` and `birth`), `DeathRecord` gains `seq, age, kills, births, parentId, mass`; death log bounded at 4000/3000 (`DEATH_LOG_MAX/KEEP`) and mirrored incrementally in worker frames (`deathsSince`, `deathsFull`). `src/sim/lineageTree.ts` (chain, ancestry with innovations, subtree counts, descendants, biggest changes). `src/sim/catalog.ts` (entries for living + dead, filters, sort presets, grouping, records). Tests `tests/catalog.test.ts` (4).
+- Render: `drawPhylogeny` returns hit rows and highlights a lineage; `phylogenyHitAt`; `LabRenderer.highlightLineage` rings the lineage on the plate.
+- UI: `src/ui/explorer.ts` dialog (Organismes / Lignées / Enregistrés); `PresetStore` v2 with an `organisms` store (`SavedOrganism`: entry, ancestry, strain name, optional snapshot). Entry points: Analyse (Ouvrir l’explorateur, Évolution on the selected organism), click on `#chart-phy`, per-replicate catalogue buttons in Expérience (deterministic rebuild to the replicate's last step, chunked). Implemented with two Opus subagents (app/layout/CSS/help; goal panel) after the plan and the sim/explorer core were written here.
+- Perf hash unchanged: counters draw no RNG.
+
 ## Metrics (gating)
 
 | Check | Result |

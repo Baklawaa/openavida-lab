@@ -30,6 +30,7 @@ const port = self as unknown as {
 
 let dual: DualWorld | null = null;
 const sentTick: Record<Side, number> = { A: -1, B: -1 };
+const sentDeath: Record<Side, number> = { A: -1, B: -1 };
 const sentInnovations: Record<Side, number> = { A: -1, B: -1 };
 let frameCount = 0;
 
@@ -43,10 +44,12 @@ function sendFrames(seq: number, sides: Side[], stepped: boolean, full: boolean)
     const innovations = full || w.innovations.length !== sentInnovations[side] || frameCount % 30 === 0;
     const { frame, transfer: t } = frameFromWorld(w, side, {
       historySince: full ? -1 : sentTick[side],
+      deathsSince: full ? -1 : sentDeath[side],
       lineages: full || !stepped || frameCount % 6 === 0,
       innovations,
     });
     sentTick[side] = w.tick;
+    sentDeath[side] = w.nextDeathSeq - 1;
     if (innovations) sentInnovations[side] = w.innovations.length;
     frames.push(frame);
     transfer.push(...t);

@@ -22,7 +22,18 @@ export interface DeathRecord {
   x: number;
   y: number;
   strainId?: number;
+  /** Monotonic id (1-based) so a trimmed log can be mirrored incrementally. */
+  seq?: number;
+  age?: number;
+  kills?: number;
+  births?: number;
+  parentId?: number;
+  mass?: number;
 }
+
+/** Death log size: keep the last DEATH_LOG_KEEP once it exceeds DEATH_LOG_MAX. */
+export const DEATH_LOG_MAX = 4000;
+export const DEATH_LOG_KEEP = 3000;
 
 export const TERRAIN = {
   empty: 0,
@@ -122,6 +133,10 @@ export interface Organism {
   strainId: number;
   /** Body condition 0–1: rises with prey eaten, decays slowly. See src/sim/body.ts. */
   mass: number;
+  /** Prey eaten by this organism. */
+  kills: number;
+  /** Children born to this organism. */
+  births: number;
   pendingDeath?: DeathCause;
 }
 
@@ -197,6 +212,7 @@ export interface WorldSnapshot {
   extinctions: ExtinctionRecord[];
   history: MetricsSample[];
   deaths?: DeathRecord[];
+  nextDeathSeq?: number;
   strains?: Strain[];
   nextStrainId?: number;
   innovations?: Innovation[];

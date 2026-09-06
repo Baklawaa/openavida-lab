@@ -68,6 +68,11 @@ export function deathFromOrganism(o: Organism, tick: number, cause: DeathCause):
     x: o.x,
     y: o.y,
     strainId: o.strainId,
+    age: o.age,
+    kills: o.kills,
+    births: o.births,
+    parentId: o.parentId,
+    mass: o.mass,
   };
 }
 

@@ -44,6 +44,8 @@ export interface GoalPanelOptions {
   restoreInto(target: "active" | "B", snapshot: WorldSnapshot): void;
   /** Replace world B with a start state and start playing it, so a replicate is watched from its first step. */
   replayInto(snapshot: WorldSnapshot): void;
+  /** Replace world B with this end state and open the organism explorer on it. */
+  openCatalog(snapshot: WorldSnapshot): void;
   setRecording(on: boolean): void;
   applyRecipe(recipe: Recipe, target: "active" | "B"): void;
 }
@@ -55,6 +57,8 @@ const MAX_CHART_SERIES = 100;
 const RENDER_INTERVAL_MS = 200;
 /** The full result table is rebuilt at most this often while a run is in progress (always once at the end). */
 const TABLE_INTERVAL_MS = 1000;
+/** Steps replayed per animation frame when a replicate is rebuilt for its end-state catalogue, so the UI keeps breathing. */
+const CATALOG_CHUNK = 150;
 
 export type ResultSort = "launch" | "hit-fast" | "hit-slow" | "fail-fast" | "fail-slow" | "value-desc" | "pop-desc";
 export const RESULT_SORTS: Array<{ id: ResultSort; label: string }> = [
@@ -246,8 +250,8 @@ function template(): string {
 
       <div class="goal-step" id="replay-step">
         <span class="eyebrow">5 · REJOUER UN RÉPLICAT DANS LE MONDE B</span>
-        <p class="micro">Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, puis la lecture démarre : la simulation reproduit le réplicat pas pour pas. Un nouveau clic repart du début.</p>
-        <div class="row replay-row"><input id="replay-seed" type="text" inputmode="numeric" pattern="[0-9]*" spellcheck="false" placeholder="Graine du réplicat"><button type="button" id="btn-replay-seed" class="primary">${icon("play")}Rejouer dans B</button></div>
+        <p class="micro">Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, puis la lecture démarre : la simulation reproduit le réplicat pas pour pas. Un nouveau clic repart du début. « Catalogue à la fin » rejoue le réplicat sans l’afficher jusqu’à son dernier pas, puis ouvre l’explorateur des organismes sur cet état final.</p>
+        <div class="row replay-row"><input id="replay-seed" type="text" inputmode="numeric" pattern="[0-9]*" spellcheck="false" placeholder="Graine du réplicat"><button type="button" id="btn-replay-seed" class="primary">${icon("play")}Rejouer dans B</button><button type="button" id="btn-catalog-seed">${icon("inspect")}Catalogue à la fin</button></div>
         <div id="replay-info" class="replay-info" hidden></div>
       </div>
 
@@ -762,7 +766,7 @@ export class GoalPanel {
           : r.unreachable ? `<span class="dead">impossible</span>`
             : `<span class="miss">non atteint</span>`;
       const open = r.snapshot ? `<button type="button" class="quiet" data-open="${i}" title="État final dans B">fin</button>` : "";
-      return `<tr><td class="mono">${i + 1}</td><td class="mono seed" data-replay-seed="${r.seed}" title="Rejouer cette graine dans B">${r.seed}</td><td>${outcome}</td><td class="mono num">${steps}</td><td class="mono num">${r.finalValue.toFixed(3)}</td><td class="mono num">${r.finalPopulation}</td><td class="ops"><button type="button" data-replay="${i}" title="Rejouer dans B">${icon("play")}</button>${open}</td></tr>`;
+      return `<tr><td class="mono">${i + 1}</td><td class="mono seed" data-replay-seed="${r.seed}" title="Rejouer cette graine dans B">${r.seed}</td><td>${outcome}</td><td class="mono num">${steps}</td><td class="mono num">${r.finalValue.toFixed(3)}</td><td class="mono num">${r.finalPopulation}</td><td class="ops"><button type="button" data-replay="${i}" title="Rejouer dans B">${icon("play")}</button><button type="button" data-catalog="${i}" title="Catalogue des organismes à la fin de ce réplicat">${icon("inspect")}</button>${open}</td></tr>`;
     });
     host.innerHTML = `<div class="goal-table-wrap"><table class="goal-table"><thead><tr><th>#</th><th>Graine</th><th>Issue</th><th class="num">Pas</th><th class="num">Valeur</th><th class="num">Pop.</th><th></th></tr></thead><tbody>${cells.join("")}</tbody></table></div>`;
     this.q("#goal-table-note").textContent = `${pairs.length} réplicat${pairs.length > 1 ? "s" : ""}`;
@@ -912,6 +916,11 @@ export class GoalPanel {
         this.replayIndex(Number(replay.dataset.replay));
         return;
       }
+      const catalog = t.closest<HTMLElement>("[data-catalog]");
+      if (catalog) {
+        this.catalogIndex(Number(catalog.dataset.catalog));
+        return;
+      }
       const seedCell = t.closest<HTMLElement>("[data-replay-seed]");
       if (seedCell) {
         this.replaySeed(Number(seedCell.dataset.replaySeed));
@@ -949,6 +958,16 @@ export class GoalPanel {
         return;
       }
       this.replaySeed(seed);
+    });
+    this.q("#btn-catalog-seed").addEventListener("click", () => {
+      const seed = parseSeed(this.q<HTMLInputElement>("#replay-seed").value);
+      if (seed === null) {
+        this.opts.status(SEED_HINT);
+        this.showReplayInfo(`<span class="dead">${SEED_HINT}</span>`);
+        this.q("#replay-seed").focus();
+        return;
+      }
+      this.catalogSeed(seed);
     });
     this.q("#replay-seed").addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") this.q("#btn-replay-seed").click();
@@ -1010,6 +1029,88 @@ export class GoalPanel {
     const o = config.overrides ?? {};
     this.showReplayInfo(`<b>Monde B relancé, lecture en cours</b> · ${label} · départ ${this.lastRun.label}, pas ${w.tick}, ${w.organisms.length} organismes<br>Graine <span class="mono">${config.seed}</span> · mutation ${o.mutationRate ?? w.params.mutationRate} · pop. max ${o.maxPopulation ?? w.params.maxPopulation} · perturbations ${(o.disturbances ?? w.disturbances) ? "oui" : "non"}<br>${expected}<br>Le monde B rejoue ce réplicat pas pour pas ; Espace met en pause, un nouveau clic sur Rejouer repart du pas ${w.tick}.`);
     this.opts.status(`Monde B : ${label} rejoué (graine ${config.seed}), lecture en cours.`);
+  }
+
+  /* ---------- end-state catalogue ---------- */
+
+  /** Set while a replicate is being re-simulated: one reconstruction at a time, never two racing for world B. */
+  private rebuilding = false;
+
+  private catalogIndex(i: number): void {
+    const cfg = this.lastRun?.configs[i];
+    const r = this.results[i];
+    if (!cfg || !r) {
+      this.opts.status("Paramètres de ce réplicat inconnus : relancez la course avant d’ouvrir son catalogue de fin.");
+      return;
+    }
+    this.catalogFor(cfg, r.ticks, `réplicat ${i + 1}`);
+  }
+
+  /** Catalogue for a typed seed: the recorded length when the seed ran, otherwise the full budget of the course. */
+  private catalogSeed(seed: number): void {
+    if (!this.lastRun) {
+      this.opts.status("Aucune course en mémoire : lancez des réplicats (ou attendez la restauration de la dernière course) avant d’ouvrir un catalogue de fin.");
+      return;
+    }
+    const exact = this.lastRun.configs.find((c) => c.seed === seed);
+    const template = exact ?? this.lastRun.configs[0];
+    if (!template) {
+      this.opts.status("Aucun paramètre de course disponible : relancez des réplicats avant d’ouvrir un catalogue de fin.");
+      return;
+    }
+    const known = this.results.find((r) => r && r.seed === seed);
+    this.catalogFor({ ...template, seed }, known ? known.ticks : template.maxTicks, exact ? `graine ${seed}` : `graine ${seed} (hors de la dernière course)`);
+  }
+
+  /**
+   * Rebuild a replicate from the last run's start state, step it to its recorded end, and hand that
+   * end state to the explorer. Stepping is chunked with a zero timeout so the page stays responsive.
+   */
+  private catalogFor(config: TrialConfig, ticks: number, label: string): void {
+    const run = this.lastRun;
+    if (!run) {
+      this.opts.status("Aucune course en mémoire : lancez des réplicats (ou attendez la restauration de la dernière course) avant d’ouvrir un catalogue de fin.");
+      return;
+    }
+    if (this.rebuilding) {
+      this.opts.status("Une reconstitution est déjà en cours : attendez qu’elle se termine.");
+      return;
+    }
+    const total = Math.max(0, Math.round(ticks));
+    const w = worldForTrial(run.snapshot, config);
+    this.rebuilding = true;
+    this.q<HTMLInputElement>("#replay-seed").value = String(config.seed);
+    const o = config.overrides ?? {};
+    this.showReplayInfo(`<b>Reconstitution en cours</b> · ${label} · départ ${run.label}, pas ${w.tick}, ${w.organisms.length} organismes<br>Graine <span class="mono">${config.seed}</span> · mutation ${o.mutationRate ?? w.params.mutationRate} · pop. max ${o.maxPopulation ?? w.params.maxPopulation} · ${total} pas à rejouer, sans affichage.<br>Le monde B sera remplacé par cet état final, puis le catalogue des organismes s’ouvrira dessus.`);
+    this.opts.status(`Reconstitution de ${label} : pas 0/${total}`);
+    let done = 0;
+    const chunk = (): void => {
+      const end = Math.min(total, done + CATALOG_CHUNK);
+      try {
+        // An extinct world cannot change any more: stop there, the catalogue still reads (deaths log included).
+        while (done < end && w.organisms.length > 0) {
+          w.step();
+          done++;
+        }
+      } catch (err) {
+        this.rebuilding = false;
+        const msg = (err instanceof Error ? err.message : String(err)).replace(/</g, "&lt;");
+        this.showReplayInfo(`<span class="dead">Reconstitution de ${label} interrompue au pas ${done} : ${msg}</span>`);
+        this.opts.status(`Reconstitution de ${label} impossible au pas ${done} : ${msg}`);
+        return;
+      }
+      this.opts.status(`Reconstitution de ${label} : pas ${done}/${total}`);
+      if (done < total && w.organisms.length > 0) {
+        window.setTimeout(chunk, 0);
+        return;
+      }
+      this.rebuilding = false;
+      const note = w.organisms.length > 0 ? "" : done < total ? ` · extinction après ${done} des ${total} pas` : " · aucun survivant au dernier pas";
+      this.showReplayInfo(`<b>${label} reconstitué</b> · pas ${w.tick} · ${w.organisms.length} organismes${note}<br>Le monde B porte cet état final, à l’arrêt, et le catalogue des organismes est ouvert dessus.`);
+      this.opts.openCatalog(w.snapshot());
+      this.opts.status(`${label} reconstitué au pas ${w.tick} : catalogue ouvert sur le monde B.`);
+    };
+    chunk();
   }
 
   private showReplayInfo(html: string): void {

@@ -17,6 +17,7 @@ import { copyPhenotype } from "./mapping";
 import type { RecipeOp } from "./recipe";
 import { DualWorld } from "./sandbox";
 import type { Innovation, Strain } from "./species";
+import { DEATH_LOG_KEEP, DEATH_LOG_MAX } from "./types";
 import type {
   BrushKind,
   DeathRecord,
@@ -156,7 +157,10 @@ export interface WorldFrame {
   organisms: Organism[];
   strains: Strain[];
   innovations?: Innovation[];
+  /** Death records with seq > deathsSince (all when deathsFull). */
   deaths: DeathRecord[];
+  deathsFull: boolean;
+  nextDeathSeq: number;
   extinctions: ExtinctionRecord[];
   history: MetricsSample[];
   historyFull: boolean;
@@ -175,6 +179,8 @@ export interface WorldFrame {
 export interface FrameOptions {
   /** Send history rows with tick > historySince; -1 = everything. */
   historySince: number;
+  /** Send death records with seq > deathsSince; -1 = everything. */
+  deathsSince?: number;
   lineages: boolean;
   innovations: boolean;
 }
@@ -203,7 +209,9 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     terrain,
     organisms: w.organisms.map((o) => ({ ...o, ph: copyPhenotype(o.ph) })),
     strains: [...w.strains.values()].map((s) => ({ ...s, founderPhenotype: copyPhenotype(s.founderPhenotype) })),
-    deaths: w.deaths.map((d) => ({ ...d })),
+    deaths: (opts.deathsSince === undefined || opts.deathsSince < 0 ? w.deaths : w.deaths.filter((d) => (d.seq ?? 0) > opts.deathsSince!)).map((d) => ({ ...d })),
+    deathsFull: opts.deathsSince === undefined || opts.deathsSince < 0,
+    nextDeathSeq: w.nextDeathSeq,
     extinctions: w.extinctions.map((e) => ({ ...e })),
     history: opts.historySince < 0 ? w.history.map((h) => ({ ...h })) : w.history.filter((h) => h.tick > opts.historySince).map((h) => ({ ...h })),
     historyFull: opts.historySince < 0,
@@ -242,7 +250,12 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
   w.nextInnovationId = f.nextInnovationId;
   w.strains = new Map(f.strains.map((s) => [s.id, s]));
   if (f.innovations) w.innovations = f.innovations;
-  w.deaths = f.deaths;
+  if (f.deathsFull) w.deaths = f.deaths;
+  else if (f.deaths.length) {
+    w.deaths.push(...f.deaths);
+    if (w.deaths.length > DEATH_LOG_MAX) w.deaths.splice(0, w.deaths.length - DEATH_LOG_KEEP);
+  }
+  w.nextDeathSeq = f.nextDeathSeq;
   w.extinctions = f.extinctions;
   if (f.historyFull) w.history = f.history;
   else if (f.history.length) {

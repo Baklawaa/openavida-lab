@@ -1,6 +1,7 @@
-import { drawFitness, drawPhylogeny, drawShannon } from "./render/charts";
+import { drawFitness, drawPhylogeny, drawShannon, phylogenyHitAt, type PhylogenyHit } from "./render/charts";
 import { GenomeBrowser, genesHtml, phenotypeTableHtml } from "./render/genomeBrowser";
 import { DnaEditor } from "./ui/dnaEditor";
+import { Explorer } from "./ui/explorer";
 import { SpeciesPanel } from "./ui/speciesPanel";
 import { GoalPanel } from "./ui/goalPanel";
 import { WorkerHost } from "./ui/workerHost";
@@ -349,6 +350,16 @@ export function mount(root: HTMLElement): void {
       paintFeeds();
       refreshMetrics();
     },
+    // A catalog is read, not run: load the state into B, keep it stopped, and open the explorer on it.
+    openCatalog: (snap) => {
+      host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
+      state.paused = true;
+      updatePlayback();
+      setView("B");
+      paintFeeds();
+      refreshMetrics();
+      explorer.open({ tab: "organisms" });
+    },
     setRecording: (on) => host.apply({ kind: "recording", which: sideOf(current()), on }),
     applyRecipe: (recipe: Recipe, target) => {
       const next = applyRecipe(recipe);
@@ -401,6 +412,35 @@ export function mount(root: HTMLElement): void {
       root.querySelector("#dna-editor")?.scrollIntoView({ block: "nearest" });
       (root.querySelector("#dna-strip-section") as HTMLDetailsElement | null)?.setAttribute("open", "");
       status(`Mutation au pas ${inn.tick} · ${inn.kind} · génome comparé au parent.`);
+    },
+  });
+
+  const explorer = new Explorer(root.querySelector<HTMLDialogElement>("#explorer-dialog")!, {
+    status,
+    world: () => current(),
+    worldSide: () => sideOf(current()),
+    store: goals.store,
+    selectOrganism: (id) => {
+      setTool("inspect");
+      selectOrganism(current(), id, "select");
+      refreshMetrics();
+    },
+    highlightLineage: (id) => {
+      renderer.highlightLineage = id;
+      drawCharts();
+    },
+    loadGenome: (seq, label) => {
+      dna.load(seq);
+      setTool("place");
+      status(`Génome de ${label} chargé dans l’éditeur.`);
+    },
+    restoreInto: (_target, snap) => {
+      host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
+      state.paused = true;
+      updatePlayback();
+      setView("B");
+      paintFeeds();
+      refreshMetrics();
     },
   });
 
@@ -516,6 +556,8 @@ export function mount(root: HTMLElement): void {
     if (view3d) view3d.selectedId = id;
   }
 
+  /** Rows drawn by the last phylogeny pass, in CSS pixels: what a click or hover on #chart-phy resolves against. */
+  let phyHits: PhylogenyHit[] = [];
   function drawCharts(): void {
     if (root.classList.contains("charts-collapsed") && !root.classList.contains("wide-workspace")) return;
     const w = current();
@@ -523,8 +565,21 @@ export function mount(root: HTMLElement): void {
     const size = (c: HTMLCanvasElement) => [c.parentElement!.clientWidth - 28, Math.max(75, c.parentElement!.clientHeight - 42)] as const;
     drawFitness(cFit, ...size(cFit), hist);
     drawShannon(cShan, ...size(cShan), hist);
-    drawPhylogeny(cPhy, ...size(cPhy), w.lineages.values(), w.tick);
+    phyHits = drawPhylogeny(cPhy, ...size(cPhy), w.lineages.values(), w.tick, renderer.highlightLineage);
   }
+  cPhy.addEventListener("click", (ev) => {
+    const hit = phylogenyHitAt(phyHits, ev.offsetX, ev.offsetY);
+    if (hit) explorer.open({ lineageId: hit.id });
+  });
+  cPhy.addEventListener("mousemove", (ev) => {
+    const hit = phylogenyHitAt(phyHits, ev.offsetX, ev.offsetY);
+    const node = hit ? current().lineages.get(hit.id) : undefined;
+    cPhy.title = node ? `Lignée n° ${node.id} · née au pas ${node.bornTick} · ${node.count} vivants (max ${node.peakCount})` : "";
+    cPhy.style.cursor = hit ? "pointer" : "default";
+  });
+  cPhy.addEventListener("mouseleave", () => {
+    cPhy.title = "";
+  });
 
   const workspace = root.querySelector<HTMLElement>(".workspace")!;
   function layout(): void {
@@ -639,6 +694,7 @@ export function mount(root: HTMLElement): void {
       brainTraces: w.brain?.traces.length ?? 0,
       roomPeers: state.room?.metrics.peers ?? 0,
       host: host.kind,
+      explorerOpen: explorer.isOpen,
     };
   }
 
@@ -926,6 +982,8 @@ export function mount(root: HTMLElement): void {
     state.view = view;
     renderer.view = view;
     dual.active = view === "B" ? "B" : "A";
+    // The highlighted lineage belongs to the world we are leaving.
+    renderer.highlightLineage = -1;
     state.selectedId = -1;
     selectOrganism(current(), -1);
     if (view === "split" && state.surface === "3d") setSurface("2d");
@@ -989,6 +1047,7 @@ export function mount(root: HTMLElement): void {
     const seed = Number((root.querySelector("#seed") as HTMLInputElement).value) >>> 0 || 1;
     const p: SimParams = { ...current().params, seed };
     host.apply({ kind: "reseed", params: p, seedB: (seed ^ 0x9e3779b9) >>> 0 || 1 });
+    renderer.highlightLineage = -1;
     state.selectedId = -1;
     selectOrganism(current(), -1);
     status(`Mondes A et B réinitialisés avec la graine ${seed}.`);
@@ -1048,6 +1107,11 @@ export function mount(root: HTMLElement): void {
     root.querySelector("#dna-editor")!.scrollIntoView({ block: "start", behavior: "smooth" });
     status(`ADN de l’organisme ${org.id} ouvert dans l’éditeur. Modifiez-le, puis appliquez-le ou placez un nouvel organisme.`);
   });
+  root.querySelector("#btn-explorer")!.addEventListener("click", () => explorer.open({ tab: "organisms" }));
+  root.querySelector("#btn-ancestry")!.addEventListener("click", () => {
+    if (state.selectedId >= 0) explorer.open({ organismId: state.selectedId });
+    else status("Sélectionnez d’abord un organisme.");
+  });
   root.querySelector("#leaderboard")!.addEventListener("click", (ev) => {
     const t = ev.target as HTMLElement;
     const use = t.closest("[data-use]") as HTMLElement | null;
@@ -1087,7 +1151,7 @@ export function mount(root: HTMLElement): void {
   });
 
   window.addEventListener("keydown", (ev) => {
-    if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLSelectElement || (ev.target instanceof HTMLElement && (ev.target.isContentEditable || ev.target.closest("[data-own-keys]"))) || ev.metaKey || ev.ctrlKey || ev.altKey || helpDialog.open) return;
+    if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLSelectElement || (ev.target instanceof HTMLElement && (ev.target.isContentEditable || ev.target.closest("[data-own-keys]"))) || ev.metaKey || ev.ctrlKey || ev.altKey || helpDialog.open || explorer.isOpen) return;
     if (ev.code === "Space" && !(ev.target instanceof HTMLElement && ev.target.closest("button, summary, a"))) {
       ev.preventDefault();
       (root.querySelector("#btn-pause") as HTMLElement).click();

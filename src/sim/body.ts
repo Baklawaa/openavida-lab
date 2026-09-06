@@ -59,6 +59,7 @@ export function preyGap(pred: Body, other: Body, predationThreshold: number): nu
 export function feed(pred: Organism, prey: Organism): number {
   const meal = prey.energy * (0.35 + 0.4 * pred.ph.aggression) + MEAL_BODY_BONUS * bodySize(prey);
   pred.energy += meal;
+  pred.kills = (pred.kills ?? 0) + 1;
   pred.mass = Math.min(1, (pred.mass ?? 0) + MASS_PER_KILL + MASS_KILL_AGGRESSION * pred.ph.aggression);
   prey.energy = 0;
   prey.pendingDeath = "predation";

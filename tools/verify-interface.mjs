@@ -125,6 +125,50 @@ try {
   const popA = (await probe()).population;
   assert.ok(popA > 25, 'Injected strain increases population');
 
+  // Explorateur: catalogue with filters and sorts, organism record with its evolutionary branch, save / list / remove.
+  await page.evaluate(() => window.__openavidaMutate?.(40)); // a few generations so lineages and deaths exist
+  await page.locator('#tab-analysis').click();
+  await page.locator('#btn-explorer').click();
+  await page.waitForFunction(() => document.querySelector('#explorer-dialog')?.open === true);
+  await page.waitForFunction(() => document.querySelectorAll('#ex-groups .ex-row').length > 0);
+  const totalRows = await page.locator('#ex-groups .ex-row').count();
+  await page.locator('#ex-liveness').selectOption('dead');
+  await page.waitForFunction(() => document.querySelectorAll('#ex-groups .ex-row').length > 0 && [...document.querySelectorAll('#ex-groups .ex-row')].every(r => r.dataset.alive === '0'));
+  await page.locator('#ex-liveness').selectOption('all');
+  await page.locator('#ex-sort').selectOption('most-kills');
+  await page.locator('#ex-group').selectOption('strategy');
+  await page.waitForFunction(n => document.querySelectorAll('#ex-groups .ex-row').length === n, totalRows);
+  await page.locator('#ex-records .ex-record').first().click();
+  await page.waitForFunction(() => /Organisme n°/.test(document.querySelector('#ex-detail')?.textContent ?? ''));
+  assert.ok((await page.locator('#ex-detail .ex-step').count()) >= 1, 'Organism record shows its evolutionary branch');
+  await page.locator('#ex-detail [data-act="save"]').click();
+  await page.locator('#ex-save-name').fill('Sonde test');
+  await page.locator('#ex-save-world').uncheck();
+  await page.locator('#ex-detail [data-act="save-confirm"]').click();
+  await page.waitForFunction(() => document.querySelector('#status-line').textContent.includes('enregistré'));
+  await page.locator('[data-etab="saved"]').click();
+  await page.waitForFunction(() => document.querySelectorAll('#ex-saved .ex-row').length >= 1);
+  await page.locator('#ex-saved .ex-row').first().click();
+  await page.waitForFunction(() => /Sonde test/.test(document.querySelector('#ex-saved-detail')?.textContent ?? ''));
+  await page.locator('#ex-saved-detail [data-act="saved-remove"]').click();
+  await page.waitForFunction(() => document.querySelectorAll('#ex-saved .ex-row').length === 0);
+  await page.locator('#ex-close').click();
+  await page.waitForFunction(() => document.querySelector('#explorer-dialog')?.open === false);
+  // Lineage tree: hovering a drawn lineage shows its title; clicking opens the explorer on that lineage.
+  const phy = await page.locator('#chart-phy').boundingBox();
+  let hovered = '';
+  for (let k = 0.08; k < 0.95 && !hovered; k += 0.03) {
+    await page.mouse.move(phy.x + phy.width * 0.5, phy.y + phy.height * k);
+    hovered = await page.locator('#chart-phy').getAttribute('title') ?? '';
+  }
+  assert.match(hovered, /Lignée n°/, 'Hovering the lineage tree names the lineage');
+  await page.mouse.down(); await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('#explorer-dialog')?.open === true);
+  await page.waitForFunction(() => /Lignée n°/.test(document.querySelector('#ex-lin-detail')?.textContent ?? ''));
+  await page.locator('#ex-close').click();
+  await page.mouse.move(0, 0);
+  const popA2 = (await probe()).population; // world A advanced during the explorer checks
+
   // Painting a nutrient field updates real sampled values; shortcuts sync UI.
   await page.locator('#tab-environment').click();
   await active('#tool-paint');
@@ -166,7 +210,7 @@ try {
   await page.locator('#view-split').click();
   await active('#view-2d');
   await page.locator('#view-A').click();
-  assert.equal((await probe()).population, popA);
+  assert.equal((await probe()).population, popA2);
 
   // Snapshot / restore, exports, and invalid imports have visible outcomes.
   await page.locator('#tab-experiment').click();
@@ -176,10 +220,12 @@ try {
   assert.ok((await probe()).population < snapshotPopulation);
   await page.locator('#btn-restore').click();
   assert.equal((await probe()).population, snapshotPopulation);
+  const tickBefore = (await probe()).tick;
   await page.locator('#btn-step-once').click();
-  await page.waitForFunction(t => window.__openavida.tick === t + 1, tick, { timeout: 5000 }); // async in worker mode
+  await page.waitForFunction(t => window.__openavida.tick === t + 1, tickBefore, { timeout: 5000 }); // async in worker mode
   await page.waitForTimeout(600);
-  assert.equal((await probe()).tick, tick + 1, 'Single-step remains paused');
+  assert.equal((await probe()).tick, tickBefore + 1, 'Single-step remains paused');
+  const exportedPopulation = (await probe()).population; // one step after the restore point
   const downloadEvent = page.waitForEvent('download');
   await page.locator('#btn-json').click();
   const download = await downloadEvent;
@@ -187,10 +233,10 @@ try {
   await download.saveAs('scratch/interface/export.json');
   await page.locator('#btn-bottle').click();
   await page.locator('#import-file').setInputFiles('scratch/interface/export.json');
-  await page.waitForFunction(n => window.__openavida.population === n, snapshotPopulation);
+  await page.waitForFunction(n => window.__openavida.population === n, exportedPopulation);
   await page.locator('#import-file').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('invalid') });
   await page.waitForFunction(() => document.querySelector('#status-line').textContent.includes('Import impossible'));
-  assert.equal((await probe()).population, snapshotPopulation);
+  assert.equal((await probe()).population, exportedPopulation);
 
   // Presets: save, load into the active world, remove until the list is empty.
   while (await page.locator('.preset-row [data-act="remove"]').count()) {
@@ -198,10 +244,12 @@ try {
     await page.waitForTimeout(80);
   }
   await input('#preset-name', 'Vérif');
+  const presetPopulation = (await probe()).population;
   await page.locator('#btn-preset-save').click();
   await page.waitForSelector('.preset-row');
+  await page.locator('#btn-bottle').click();
   await page.locator('.preset-row [data-act="load"]').first().click();
-  await page.waitForFunction(n => window.__openavida.population === n, snapshotPopulation);
+  await page.waitForFunction(n => window.__openavida.population === n, presetPopulation);
   await page.locator('.preset-row [data-act="remove"]').first().click();
   await page.waitForFunction(() => document.querySelectorAll('.preset-row').length === 0);
 
@@ -217,6 +265,12 @@ try {
   // Sorting keeps every replicate and reorders by outcome and speed.
   await page.locator('#goal-sort').selectOption('fail-fast');
   assert.equal(await page.locator('#goal-results tbody tr').count(), 2, 'Sorted table keeps all replicates');
+  // Catalogue of a replicate: deterministic rebuild to its last step, explorer on world B.
+  await page.locator('#goal-results [data-catalog="0"]').click();
+  await page.waitForFunction(() => document.querySelector('#explorer-dialog')?.open === true, null, { timeout: 30000 });
+  assert.match(await page.locator('#ex-world').textContent(), /MONDE B/, 'Catalogue opens on world B');
+  await page.locator('#ex-close').click();
+  await page.locator('#tab-experiment').click();
   await page.locator('#goal-sort').selectOption('hit-fast');
   // Replaying a replicate rebuilds its start state in B, paused, with the replicate's seed.
   const replaySeed = Number((await page.locator('#goal-results td.seed').first().textContent()).trim());
@@ -298,7 +352,7 @@ try {
     }
   }
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, presets, goal runs, keyboard, and 5 responsive sizes.');
+  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, explorer (catalogue, branch, saved organisms, lineage tree click), presets, goal runs, replicate catalogue, keyboard, and 5 responsive sizes.');
 } finally {
   await browser.close();
 }

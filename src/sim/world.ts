@@ -32,6 +32,8 @@ import { mixSeed, Rng } from "./rng";
 import type { RecipeOp } from "./recipe";
 import { phenotypeChanges, strainColor, strategyOf, type Innovation, type Strain } from "./species";
 import {
+  DEATH_LOG_KEEP,
+  DEATH_LOG_MAX,
   DEFAULT_PARAMS,
   TERRAIN,
   normalizeParams,
@@ -73,6 +75,7 @@ export class World {
   nextInnovationId = 1;
   history: MetricsSample[] = [];
   deaths: DeathRecord[] = [];
+  nextDeathSeq = 1;
   lastPredation = 0;
   lastMutualism = 0;
   lastDisplacements = 0;
@@ -269,7 +272,10 @@ export class World {
       fitness: 0,
       strainId: parent ? parent.strainId : this.strainFor(decoded.sequence, decoded.phenotype).id,
       mass: 0,
+      kills: 0,
+      births: 0,
     };
+    if (parent) parent.births++;
     if (!parent) {
       org.lineageId = this.createLineage(-1, org);
     } else if (mutant) {
@@ -542,8 +548,10 @@ export class World {
       }
       const cause =
         o.age >= maxAge ? "old-age" : (o.pendingDeath ?? (o.energy <= 0 ? "starvation" : "old-age"));
-      this.deaths.push(deathFromOrganism(o, this.tick, cause));
-      if (this.deaths.length > 250) this.deaths.splice(0, this.deaths.length - 200);
+      const rec = deathFromOrganism(o, this.tick, cause);
+      rec.seq = this.nextDeathSeq++;
+      this.deaths.push(rec);
+      if (this.deaths.length > DEATH_LOG_MAX) this.deaths.splice(0, this.deaths.length - DEATH_LOG_KEEP);
     }
     for (const lin of this.lineages.values()) {
       const next = counts.get(lin.id) ?? 0;
@@ -749,6 +757,7 @@ export class World {
       extinctions: this.extinctions.map((e) => ({ ...e })),
       history: this.history.map((h) => ({ ...h })),
       deaths: this.deaths.map((d) => ({ ...d })),
+      nextDeathSeq: this.nextDeathSeq,
       strains: Array.from(this.strains.values()).map((s) => ({ ...s, founderPhenotype: copyPhenotype(s.founderPhenotype) })),
       nextStrainId: this.nextStrainId,
       innovations: this.innovations.map((i) => ({ ...i, changes: i.changes.map((c) => ({ ...c })), env: { ...i.env } })),
@@ -770,6 +779,8 @@ export class World {
       ph: copyPhenotype(o.ph),
       strainId: o.strainId ?? 0,
       mass: o.mass ?? 0,
+      kills: o.kills ?? 0,
+      births: o.births ?? 0,
     }));
     // Older snapshots carry no strain tags: rebuild them from founders' genomes where possible.
     for (const o of this.organisms) {
@@ -782,6 +793,7 @@ export class World {
     this.extinctions = snap.extinctions.map((e) => ({ ...e }));
     this.history = snap.history.map((h) => ({ ...h }));
     this.deaths = (snap.deaths ?? []).map((d) => ({ ...d }));
+    this.nextDeathSeq = snap.nextDeathSeq ?? (Math.max(0, ...this.deaths.map((d) => d.seq ?? 0)) + 1);
     this.randomTerrain = Boolean(snap.params.randomTerrain);
     this.disturbances = Boolean(snap.params.disturbances);
     this.rebuildOccupancy();

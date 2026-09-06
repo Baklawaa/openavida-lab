@@ -88,7 +88,7 @@ export {
   shannonFromCounts,
 } from "./metrics";
 export { DEFAULT_PARAMS, World } from "./world";
-export { TERRAIN, normalizeParams, type BrushKind, type DeathCause, type SimParams, type WorldSnapshot } from "./types";
+export { DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type SimParams, type WorldSnapshot } from "./types";
 export {
   CAUSE_COLOR,
   CAUSE_LABEL,
@@ -195,6 +195,34 @@ export {
   preyGap,
 } from "./body";
 export { chemotaxisDir, interactNeighbors, moveOrganisms, nearestPrey } from "./ecology";
+export {
+  ancestry,
+  biggestChanges,
+  descendantLineages,
+  innovationByLineage,
+  lineageChain,
+  lineageChildren,
+  organismsUnderLineage,
+  subtreeCount,
+  type AncestryStep,
+} from "./lineageTree";
+export {
+  CATALOG_SORTS,
+  DEFAULT_FILTER,
+  applyFilter,
+  buildCatalog,
+  catalogRecords,
+  entryFromDeath,
+  entryFromOrganism,
+  groupCatalog,
+  sortCatalog,
+  type CatalogEntry,
+  type CatalogFilter,
+  type CatalogGroup,
+  type CatalogSort,
+  type GroupMode as CatalogGroupMode,
+  type Liveness,
+} from "./catalog";
 export {
   InlineHost,
   applyFrame,

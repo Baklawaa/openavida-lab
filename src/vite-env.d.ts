@@ -26,6 +26,7 @@ interface OpenAvidaProbe {
   brainTraces: number;
   roomPeers: number;
   host: "inline" | "worker";
+  explorerOpen: boolean;
 }
 
 interface Window {

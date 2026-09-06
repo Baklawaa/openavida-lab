@@ -65,6 +65,17 @@ This checks placement, DNA editing, painting, 2D/3D, A/B, snapshots, Espèces (d
 
 ES modules will not load from `file://`. Use `npm run dev` or `npm run preview`.
 
+## Explorer: every organism, every lineage
+
+**Explorateur** (Analyse → Ouvrir l’explorateur, or click a lineage in the tree chart) is a full-size dialog over the active world.
+
+- **Organismes**: every organism, living and dead (the death log keeps the last 3000–4000 deaths with age, kills, offspring), grouped by strain, strategy or lineage. Filters: state, strain, strategy, lineage, cause of death, age range, kills ≥, offspring ≥, fitness ≥, any trait ≥ value, genome substring, free text. Sort presets: died fastest/slowest, longest-lived, best/worst fitness, most kills, most offspring, most body mass, newest/oldest, highest value of each trait. "Records du monde" lists the extreme organism of each preset. A row opens the organism's record: stats, phenotype, genome, and its **evolutionary branch**: the chain of lineages from the founder with the phenotype-changing mutation that opened each one, the three biggest changes highlighted, and the environment each mutant was born in. Actions: show in the world, highlight its lineage on the plate (rings), load its DNA into the editor, save it.
+- **Lignées**: the lineage table (born, extinct, living, peak, living descendants), each with its origin chain, sub-lineages and members. The tree chart in the workspace is clickable and shows lineage details on hover.
+- **Enregistrés**: organisms saved in the browser with their branch and, optionally, the entire world they lived in (map, fields, seed). Reload the DNA, export as JSON, or open the saved world in B to watch it again.
+- **Per replicate**: in Expérience, every result row has a catalogue button that rebuilds the replicate deterministically to its last step and opens the explorer on it; the same is available for a typed seed.
+
+Per-organism counters `kills` and `births` are simulation state (saved in snapshots).
+
 ## Predators: feeding, growth, hunting
 
 Predation is a real trophic link (`src/sim/body.ts`, `src/sim/ecology.ts`):

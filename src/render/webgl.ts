@@ -209,6 +209,8 @@ export class LabRenderer {
   fieldMode: FieldMode = 0;
   view: ViewMode = "A";
   selectedId = -1;
+  /** Ring every organism of this lineage (−1 = none). */
+  highlightLineage = -1;
   selectedWorld: "A" | "B" = "A";
   /** 1 = whole 128×128 plate. User-controlled; does not chase biomass. */
   zoom = 1;
@@ -391,7 +393,8 @@ export class LabRenderer {
         const strain = this.colorByStrain ? world.strains.get(org.strainId) : undefined;
         const color = strain ? hexRgb(strain.color) : organismRgb(org.ph, org.lineageId);
         const sizeFactor = Math.max(0.6, Math.min(2.2, 0.7 + 0.35 * bodySize(org)));
-        data.push((u + side) / worlds.length * 2 - 1, 1 - v * 2, ...color, org.id === this.selectedId && (worlds.length === 1 || (side === 0 ? "A" : "B") === this.selectedWorld) ? 1 : 0, sizeFactor);
+        const selected = (org.id === this.selectedId && (worlds.length === 1 || (side === 0 ? "A" : "B") === this.selectedWorld)) || (this.highlightLineage >= 0 && org.lineageId === this.highlightLineage);
+        data.push((u + side) / worlds.length * 2 - 1, 1 - v * 2, ...color, selected ? 1 : 0, sizeFactor);
       }
     }
     const dpr = Math.min(2, window.devicePixelRatio || 1);

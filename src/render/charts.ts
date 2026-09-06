@@ -104,14 +104,24 @@ export function drawShannon(canvas: HTMLCanvasElement, w: number, h: number, his
   curve(ctx, w, h, hist, "shannon", 0, ceiling, "#bcaaea", true);
 }
 
-export function drawPhylogeny(canvas: HTMLCanvasElement, w: number, h: number, lineages: Iterable<LineageNode>, tick: number): void {
+export interface PhylogenyHit {
+  id: number;
+  y: number;
+  x0: number;
+  x1: number;
+}
+
+/** Draws the lineage tree and returns one hit row per drawn lineage (CSS pixels) so the canvas can be clicked. */
+export function drawPhylogeny(canvas: HTMLCanvasElement, w: number, h: number, lineages: Iterable<LineageNode>, tick: number, highlightId = -1): PhylogenyHit[] {
   const ctx = prepare(canvas, w, h);
-  if (w <= 0) return;
+  if (w <= 0) return [];
   const all = Array.from(lineages);
   const live = all.filter(n => n.count > 0).sort((a, b) => b.count - a.count).slice(0, 80);
   const dead = all.filter(n => n.count === 0 && n.extinctTick !== null && tick - n.extinctTick < 180).sort((a, b) => b.peakCount - a.peakCount).slice(0, 24);
   const nodes = live.concat(dead);
-  if (!nodes.length) { empty(ctx, w, h, "Les lignées prendront racine ici"); return; }
+  const wanted = all.find(n => n.id === highlightId);
+  if (wanted && !nodes.includes(wanted)) nodes.push(wanted);
+  if (!nodes.length) { empty(ctx, w, h, "Les lignées prendront racine ici"); return []; }
   const ids = new Set(nodes.map(n => n.id));
   const children = new Map<number, LineageNode[]>();
   for (const n of nodes) children.set(n.parentId, [...(children.get(n.parentId) ?? []), n]);
@@ -122,16 +132,36 @@ export function drawPhylogeny(canvas: HTMLCanvasElement, w: number, h: number, l
   for (const n of nodes) visit(n);
   const rows = new Map(laid.map((n, i) => [n.id, 9 + (i + .5) / laid.length * (h - 34)]));
   const x = (t: number) => 7 + t / Math.max(1, tick) * (w - 18);
+  const hits: PhylogenyHit[] = [];
   for (const n of laid) {
     const y = rows.get(n.id)!;
     const parentY = rows.get(n.parentId);
-    if (parentY !== undefined) { ctx.strokeStyle = "#41534b"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x(n.bornTick), parentY); ctx.lineTo(x(n.bornTick), y); ctx.stroke(); }
-    ctx.strokeStyle = `hsla(${n.hue * 360}, ${n.count ? 48 : 20}%, 68%, ${n.count ? 1 : .4})`;
-    ctx.lineWidth = Math.min(3, 1 + Math.log2(1 + n.peakCount) / 3);
-    ctx.beginPath(); ctx.moveTo(x(n.bornTick), y); ctx.lineTo(Math.max(x(n.bornTick) + 2, x(n.extinctTick ?? tick)), y); ctx.stroke();
+    const hi = n.id === highlightId;
+    if (parentY !== undefined) { ctx.strokeStyle = hi ? "#a2dfbd" : "#41534b"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x(n.bornTick), parentY); ctx.lineTo(x(n.bornTick), y); ctx.stroke(); }
+    ctx.strokeStyle = hi ? "#e6f1e9" : `hsla(${n.hue * 360}, ${n.count ? 48 : 20}%, 68%, ${n.count ? 1 : .4})`;
+    ctx.lineWidth = hi ? 4 : Math.min(3, 1 + Math.log2(1 + n.peakCount) / 3);
+    const x0 = x(n.bornTick);
+    const x1 = Math.max(x0 + 2, x(n.extinctTick ?? tick));
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    if (hi) { ctx.fillStyle = "#e6f1e9"; ctx.beginPath(); ctx.arc(x0, y, 3, 0, Math.PI * 2); ctx.fill(); }
+    hits.push({ id: n.id, y, x0, x1 });
   }
   ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.fillText("0", 7, h - 6);
   ctx.textAlign = "right"; ctx.fillText(`${tick} pas`, w - 9, h - 6); ctx.textAlign = "left";
+  return hits;
+}
+
+/** Nearest drawn lineage to a point (CSS pixels), within `tolerance` px vertically. */
+export function phylogenyHitAt(hits: readonly PhylogenyHit[], px: number, py: number, tolerance = 6): PhylogenyHit | null {
+  let best: PhylogenyHit | null = null;
+  let bestD = tolerance + 0.01;
+  for (const h of hits) {
+    const dy = Math.abs(h.y - py);
+    const dx = px < h.x0 ? h.x0 - px : px > h.x1 ? px - h.x1 : 0;
+    const d = Math.max(dy, dx * 0.5);
+    if (d < bestD) { bestD = d; best = h; }
+  }
+  return best;
 }
 
 export interface GroupSeries {
