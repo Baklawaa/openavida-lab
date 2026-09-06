@@ -162,6 +162,7 @@ export {
   applySweepValue,
   asGoals,
   evaluateGoalMetric,
+  foundingShare,
   goalHolds,
   goalUnreachable,
   replicateSeeds,
@@ -182,6 +183,16 @@ export {
   type TrialResult,
   type TrialSummary,
 } from "./goals";
+export {
+  TOURNAMENT_DRAW,
+  TOURNAMENT_INJECT,
+  pairOutcome,
+  summarizeTournament,
+  tournamentConfigs,
+  type TournamentCell,
+  type TournamentContestant,
+  type TournamentSummary,
+} from "./tournament";
 export {
   MASS_DECAY,
   MASS_PER_KILL,

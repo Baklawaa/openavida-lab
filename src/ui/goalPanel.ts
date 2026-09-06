@@ -18,7 +18,9 @@ import {
   summarizeTrials,
   sweepConfigs,
   sweepValues,
+  tournamentConfigs,
   trialGoalTicks,
+  summarizeTournament,
   worldForTrial,
   type FieldName,
   type Goal,
@@ -28,6 +30,8 @@ import {
   type SweepPoint,
   type SweepVariable,
   type TraitName,
+  type TournamentContestant,
+  type TournamentSummary,
   type TrialConfig,
   type TrialResult,
   type WorldSnapshot,
@@ -272,6 +276,18 @@ function template(): string {
       <div class="row"><button type="button" id="btn-sweep-run">${icon("play")}Lancer le balayage</button><button type="button" id="btn-sweep-csv" class="quiet" disabled>${icon("save")}CSV du balayage</button></div>
       <div id="sweep-table"></div>
       <div class="chart-card goal-chart"><div class="chart-heading"><h3>Pas jusqu’à l’objectif vs valeur</h3><span id="sweep-chart-note"></span></div><canvas id="chart-sweep" role="img" aria-label="Médiane et étendue des pas jusqu’à l’objectif selon la variable"></canvas></div>
+    </section>
+    <section class="block" id="tournament-block">
+      <div class="section-heading"><h2>Tournoi</h2><span class="tag">SOUCHES</span></div>
+      <p class="muted">Chaque paire de 2 à 4 contestataires (souches du monde actif ou organismes enregistrés) est injectée à effectifs égaux dans l’état de départ. Après le budget de pas, la plus grande part l’emporte ; écart ≤ 10 % = nul. Les auto-appariements sont exclus.</p>
+      <div id="tournament-picks" class="tournament-picks"></div>
+      <div class="goal-config">
+        <label>Réplicats / paire<input id="tournament-reps" type="number" min="1" max="50" step="1" value="4"></label>
+        <label>Pas max<input id="tournament-max" type="number" min="10" max="5000" step="10" value="400"></label>
+      </div>
+      <div class="row"><button type="button" id="btn-tournament-run">${icon("play")}Lancer le tournoi</button><button type="button" id="btn-tournament-csv" class="quiet" disabled>${icon("save")}CSV</button></div>
+      <div id="tournament-progress" class="goal-progress"></div>
+      <div id="tournament-matrix"></div>
     </section>`;
 }
 
@@ -288,6 +304,10 @@ export class GoalPanel {
   private lastGoals: Goal[] = [];
   private extraGoals: Goal[] = [];
   private static readonly MAX_GOALS = 4;
+  private static readonly MAX_TOURNAMENT = 4;
+  private tournamentNames: string[] = [];
+  private tournamentSummary: TournamentSummary | null = null;
+  private tournamentPickKey = "";
   /** Start state and configs of the last run or sweep, for exact replays. */
   private lastRun: { snapshot: WorldSnapshot; label: string; configs: TrialConfig[] } | null = null;
   private lastStrains: Strain[] = [];
@@ -355,6 +375,7 @@ export class GoalPanel {
   refresh(): void {
     if (this.root.closest("[role=tabpanel]")?.hasAttribute("hidden")) return;
     this.refreshMetricOptions(false);
+    void this.refreshTournamentPicks();
     const src = this.q<HTMLSelectElement>("#goal-source");
     const w = this.opts.world();
     src.options[0]!.textContent = `Monde ${this.opts.activeWorld()} actuel · pas ${w.tick} · ${w.organisms.length} organismes`;
@@ -717,6 +738,168 @@ export class GoalPanel {
     URL.revokeObjectURL(a.href);
   }
 
+  /* ---------- tournaments ---------- */
+
+  private async refreshTournamentPicks(): Promise<void> {
+    const host = this.q("#tournament-picks");
+    const strains = [...this.opts.world().strains.values()];
+    const saved = await this.store.listOrganisms();
+    const key = strains.map((s) => `${s.id}:${s.name}`).join("|") + "#" + saved.map((o) => o.id).join("|");
+    const checked = new Set([...host.querySelectorAll<HTMLInputElement>("input[type=checkbox]:checked")].map((el) => el.value));
+    if (key === this.tournamentPickKey && host.childElementCount) return;
+    this.tournamentPickKey = key;
+    if (!strains.length && !saved.length) {
+      host.innerHTML = `<p class="muted">Aucune souche ni organisme enregistré. Définissez une souche dans Espèces ou enregistrez un organisme dans l’explorateur.</p>`;
+      return;
+    }
+    const strainItems = strains.map((s) => {
+      const v = `strain:${s.id}`;
+      return `<label class="tournament-pick"><input type="checkbox" value="${v}"${checked.has(v) ? " checked" : ""}><span class="swatch" style="background:${s.color}"></span>${s.name.replace(/</g, "&lt;")}</label>`;
+    }).join("");
+    const savedItems = saved.map((o) => {
+      const v = `org:${o.id}`;
+      return `<label class="tournament-pick"><input type="checkbox" value="${v}"${checked.has(v) ? " checked" : ""}>${o.name.replace(/</g, "&lt;")}<span class="tiny">enregistré</span></label>`;
+    }).join("");
+    host.innerHTML = (strainItems ? `<div class="tiny">Souches du monde actif</div><div class="tournament-pick-row">${strainItems}</div>` : "")
+      + (savedItems ? `<div class="tiny">Organismes enregistrés</div><div class="tournament-pick-row">${savedItems}</div>` : "");
+    this.limitTournamentPicks();
+  }
+
+  private limitTournamentPicks(): void {
+    const boxes = [...this.q("#tournament-picks").querySelectorAll<HTMLInputElement>("input[type=checkbox]")];
+    const n = boxes.filter((b) => b.checked).length;
+    for (const b of boxes) b.disabled = !b.checked && n >= GoalPanel.MAX_TOURNAMENT;
+  }
+
+  private async selectedContestants(): Promise<TournamentContestant[] | null> {
+    const values = [...this.q("#tournament-picks").querySelectorAll<HTMLInputElement>("input[type=checkbox]:checked")].map((el) => el.value);
+    if (values.length < 2) {
+      this.opts.status("Choisissez 2 à 4 souches ou organismes enregistrés.");
+      return null;
+    }
+    const out: TournamentContestant[] = [];
+    const strains = this.opts.world().strains;
+    for (const v of values) {
+      if (v.startsWith("strain:")) {
+        const s = strains.get(Number(v.slice(7)));
+        if (!s) continue;
+        out.push({ name: s.name, genome: s.genome });
+      } else if (v.startsWith("org:")) {
+        const rec = await this.store.loadOrganism(v.slice(4));
+        if (!rec) continue;
+        out.push({ name: rec.name, genome: rec.entry.genome });
+      }
+    }
+    if (out.length < 2) {
+      this.opts.status("Contestataires introuvables : actualisez la liste.");
+      return null;
+    }
+    return out.slice(0, GoalPanel.MAX_TOURNAMENT);
+  }
+
+  private async runTournament(): Promise<void> {
+    if (this.handle) return;
+    const contestants = await this.selectedContestants();
+    if (!contestants) return;
+    const start = await this.startSnapshot();
+    if (!start) return;
+    const perPair = Math.max(1, Math.min(50, Math.round(Number(this.q<HTMLInputElement>("#tournament-reps").value) || 1)));
+    const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#tournament-max").value) || 400));
+    const seed = parseSeed(this.q<HTMLInputElement>("#goal-seed").value) ?? (this.opts.world().params.seed >>> 0 || 1);
+    const configs = tournamentConfigs(start.snapshot, contestants, perPair, seed, { maxTicks, sampleEvery: Math.max(1, Math.round(maxTicks / 80)) });
+    if (!configs.length) {
+      this.opts.status("Aucune paire à jouer.");
+      return;
+    }
+    this.tournamentNames = contestants.map((c) => c.name);
+    this.tournamentSummary = null;
+    this.q("#tournament-matrix").innerHTML = "";
+    this.q<HTMLButtonElement>("#btn-tournament-csv").disabled = true;
+    this.q<HTMLButtonElement>("#btn-goal-run").disabled = true;
+    this.q<HTMLButtonElement>("#btn-sweep-run").disabled = true;
+    this.q<HTMLButtonElement>("#btn-tournament-run").disabled = true;
+    this.q<HTMLButtonElement>("#btn-goal-stop").disabled = false;
+    const dummy: Goal = { metric: { kind: "population" }, op: ">=", target: 1e9, sustain: 1 };
+    this.opts.status(`Tournoi : ${contestants.length} contestataires, ${configs.length} courses (${perPair} par paire).`);
+    const results: TrialResult[] = new Array(configs.length);
+    const render = () => {
+      const done = results.filter(Boolean).length;
+      this.q("#tournament-progress").innerHTML = `<div class="goal-total" role="progressbar" aria-valuemin="0" aria-valuemax="${configs.length}" aria-valuenow="${done}"><i style="width:${((done / configs.length) * 100).toFixed(1)}%"></i></div><div class="tiny">${done}/${configs.length} paires × réplicats</div>`;
+    };
+    render();
+    const t0 = performance.now();
+    this.handle = runReplicates(start.snapshot, dummy, configs, {
+      onResult: (i, r) => {
+        results[i] = r;
+        render();
+      },
+    });
+    const all = await this.handle.promise;
+    this.handle = null;
+    this.q<HTMLButtonElement>("#btn-goal-run").disabled = false;
+    this.q<HTMLButtonElement>("#btn-sweep-run").disabled = false;
+    this.q<HTMLButtonElement>("#btn-tournament-run").disabled = false;
+    this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
+    this.tournamentSummary = summarizeTournament(all);
+    this.renderTournamentMatrix();
+    this.q<HTMLButtonElement>("#btn-tournament-csv").disabled = this.tournamentSummary.cells.length === 0;
+    render();
+    this.opts.status(`Tournoi terminé en ${((performance.now() - t0) / 1000).toFixed(1)} s · ${this.tournamentSummary.cells.length} paires.`);
+  }
+
+  private renderTournamentMatrix(): void {
+    const host = this.q("#tournament-matrix");
+    const s = this.tournamentSummary;
+    const names = this.tournamentNames;
+    if (!s || !names.length) {
+      host.innerHTML = "";
+      return;
+    }
+    const cellAt = (i: number, j: number) => s.cells.find((c) => c.i === i && c.j === j) ?? s.cells.find((c) => c.i === j && c.j === i);
+    const heads = names.map((n) => `<th>${n.replace(/</g, "&lt;")}</th>`).join("");
+    const rows = names.map((name, i) => {
+      const tds = names.map((_, j) => {
+        if (i === j) return `<td class="diag">—</td>`;
+        const cell = cellAt(Math.min(i, j), Math.max(i, j));
+        if (!cell) return `<td class="miss">—</td>`;
+        const winsRow = i === cell.i ? cell.winsI : cell.winsJ;
+        const winsCol = i === cell.i ? cell.winsJ : cell.winsI;
+        const share = i === cell.i ? cell.meanShareI : cell.meanShareJ;
+        const rate = cell.n ? winsRow / cell.n : 0.5;
+        const alpha = Math.min(0.55, Math.abs(rate - 0.5) * 1.4 + (cell.draws === cell.n ? 0 : 0));
+        const color = rate > 0.5 ? `rgba(62, 180, 137, ${alpha})` : rate < 0.5 ? `rgba(196, 92, 106, ${alpha})` : `rgba(125, 146, 163, 0.18)`;
+        return `<td style="background:${color}" title="part moyenne ${share.toFixed(2)}">${winsRow}–${winsCol}${cell.draws ? `<span class="tiny"> nuls ${cell.draws}</span>` : ""}</td>`;
+      }).join("");
+      return `<tr><th>${name.replace(/</g, "&lt;")}</th>${tds}</tr>`;
+    }).join("");
+    host.innerHTML = `<table class="tournament-matrix"><thead><tr><th></th>${heads}</tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  private exportTournamentCsv(): void {
+    const s = this.tournamentSummary;
+    if (!s) return;
+    const names = this.tournamentNames;
+    const rows = [["row", "col", "wins_row", "wins_col", "draws", "mean_share_row", "mean_share_col"]];
+    for (const c of s.cells) {
+      rows.push([
+        names[c.i] ?? String(c.i),
+        names[c.j] ?? String(c.j),
+        String(c.winsI),
+        String(c.winsJ),
+        String(c.draws),
+        c.meanShareI.toFixed(4),
+        c.meanShareJ.toFixed(4),
+      ]);
+    }
+    const text = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([text], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `openavida-tournament-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   private renderTimer: number | null = null;
   private renderMax = 0;
   private resultsDirty = false;
@@ -1004,6 +1187,9 @@ export class GoalPanel {
     });
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
     this.q("#btn-sweep-csv").addEventListener("click", () => this.exportSweepCsv());
+    this.q("#tournament-picks").addEventListener("change", () => this.limitTournamentPicks());
+    this.q("#btn-tournament-run").addEventListener("click", () => void this.runTournament());
+    this.q("#btn-tournament-csv").addEventListener("click", () => this.exportTournamentCsv());
     this.q("#goal-sort").addEventListener("change", (ev) => {
       this.sort = (ev.target as HTMLSelectElement).value as ResultSort;
       this.renderTable();

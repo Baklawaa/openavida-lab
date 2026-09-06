@@ -202,6 +202,14 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Tests: two population goals at ticks 0 and 4; first reached then second strain-share unreachable stops at 3 steps of 200.
 - GATES: tsc ok; vitest 127/127 `lastHash":"c2c03a81"`; build ok (goalWorker + simWorker); verify-interface inline and `?worker=1`; verify-worker hash `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/multi-goal.png`.
 
+## Task 5 — Strain tournaments (2026-09-07)
+
+- `src/sim/tournament.ts`: `tournamentConfigs` emits one `TrialConfig` per unordered pair × replicates, with a recipe op list (`strain` + `inject` at left/right of the plate). Ops run inside `worldForTrial` after the replicate seed, so no RNG is drawn while building the list.
+- `summarizeTournament`: win = larger founding-strain share; `|Δshare| ≤ 0.10` is a draw. Matrix is n×n with zeros on the diagonal.
+- UI `#tournament-block` in Expérience: 2–4 contestants from live strains or saved organisms, replicates/pair, budget, colour matrix, CSV.
+- Decision: identify contestants by founding genome (`foundingShare`), not by name, so a mutant still counts for its strain.
+- GATES: tsc ok; vitest 129/129 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/tournament-block.png`.
+
 ## Metrics (gating)
 
 | Check | Result |

@@ -6,6 +6,8 @@
  */
 import type { FieldName } from "./fields";
 import { TRAIT_NAMES, type TraitName } from "./mapping";
+import type { RecipeOp } from "./recipe";
+import { applyRecipeOp } from "./recipe";
 import { Rng } from "./rng";
 import type { SimParams, WorldSnapshot } from "./types";
 import { World, worldFromSnapshot } from "./world";
@@ -66,6 +68,11 @@ export interface TrialConfig {
     fieldScale?: Partial<Record<FieldName, number>>;
   };
   keepSnapshot?: boolean;
+  /** Applied after the trial seed is set, so any RNG they use is the trial's. */
+  ops?: RecipeOp[];
+  /** Tournament pair (contestant indices) and founding genomes, for share scoring. */
+  pair?: [number, number];
+  pairGenomes?: [string, string];
 }
 
 export interface TrialResult {
@@ -82,6 +89,9 @@ export interface TrialResult {
   unreachable: boolean;
   series: Array<[number, number]>;
   snapshot?: WorldSnapshot;
+  pair?: [number, number];
+  /** Living shares of pairGenomes[0] and pairGenomes[1] at the end of the trial. */
+  shares?: [number, number];
 }
 
 export interface GoalHitSummary {
@@ -186,7 +196,25 @@ export function worldForTrial(snapshot: WorldSnapshot, config: TrialConfig): Wor
   const seed = config.seed >>> 0 || 1;
   Object.assign(w.params, { seed });
   w.rng = new Rng(seed);
+  if (config.ops) for (const op of config.ops) applyRecipeOp(w, op);
   return w;
+}
+
+/** Fraction of living organisms whose strain was founded by this genome. No RNG. */
+export function foundingShare(world: World, genome: string): number {
+  const n = world.organisms.length;
+  if (!n) return 0;
+  let id = -1;
+  for (const s of world.strains.values()) {
+    if (s.genome === genome) {
+      id = s.id;
+      break;
+    }
+  }
+  if (id < 0) return 0;
+  let k = 0;
+  for (const o of world.organisms) if (o.strainId === id) k++;
+  return k / n;
 }
 
 export function asGoals(goal: Goal | Goal[]): Goal[] {
@@ -210,7 +238,7 @@ export function runTrial(
   const every = Math.max(1, Math.round(config.sampleEvery));
   const series: Array<[number, number]> = [];
   if (goals.length === 0) {
-    return {
+    const empty: TrialResult = {
       seed: config.seed,
       startTick,
       ticks: 0,
@@ -222,6 +250,9 @@ export function runTrial(
       unreachable: false,
       series: [[w.tick, 0]],
     };
+    if (config.pair) empty.pair = config.pair;
+    if (config.pairGenomes) empty.shares = [foundingShare(w, config.pairGenomes[0]!), foundingShare(w, config.pairGenomes[1]!)];
+    return empty;
   }
   const primary = goals[0]!;
   const streaks = goals.map(() => 0);
@@ -274,6 +305,10 @@ export function runTrial(
     series,
   };
   if (config.keepSnapshot) result.snapshot = w.snapshot();
+  if (config.pair) result.pair = config.pair;
+  if (config.pairGenomes) {
+    result.shares = [foundingShare(w, config.pairGenomes[0]!), foundingShare(w, config.pairGenomes[1]!)];
+  }
   return result;
 }
 
