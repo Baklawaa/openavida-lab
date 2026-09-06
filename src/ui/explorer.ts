@@ -40,11 +40,13 @@ import {
   type WorldSnapshot,
 } from "../sim/index";
 import type { LineageNode } from "../sim/types";
+import { LineageTreeView } from "../render/lineageTreeCanvas";
+import { layoutLineageTree, lineageStrainMap, type TreeNode } from "../render/lineageTreeLayout";
 import { DEATH_LABEL, TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
 import type { PresetStore, SavedOrganism, SavedOrganismMeta } from "./presetStore";
 
-export type ExplorerTab = "organisms" | "lineages" | "saved";
+export type ExplorerTab = "organisms" | "lineages" | "tree" | "saved";
 
 export interface ExplorerOptions {
   status(msg: string): void;
@@ -89,6 +91,7 @@ function template(): string {
         <div class="segmented ex-tabs" role="tablist">
           <button type="button" data-etab="organisms" class="active" role="tab" aria-selected="true">Organismes</button>
           <button type="button" data-etab="lineages" role="tab" aria-selected="false">Lignées</button>
+          <button type="button" data-etab="tree" role="tab" aria-selected="false">Arbre</button>
           <button type="button" data-etab="saved" role="tab" aria-selected="false">Enregistrés</button>
         </div>
         <span class="spacer"></span>
@@ -133,6 +136,22 @@ function template(): string {
         <aside class="explorer-detail" id="ex-lin-detail"><p class="muted">Cliquez sur une lignée, ici ou dans l’arbre des lignées.</p></aside>
       </div>
 
+      <div class="explorer-body explorer-body-tree" id="ex-tab-tree" hidden>
+        <section class="explorer-tree">
+          <div class="ex-tree-bar">
+            <button type="button" id="ex-tree-fit" class="quiet">Ajuster</button>
+            <button type="button" id="ex-tree-zoom" class="quiet">Zoom sur le foyer</button>
+            <label class="ex-inline"><input id="ex-tree-siblings" type="checkbox" checked> lignées sœurs</label>
+            <label class="ex-inline">Éteintes <select id="ex-tree-extinct"><option value="all">toutes</option><option value="200">récentes (200 pas)</option><option value="0">masquées</option></select></label>
+            <label class="ex-inline">Descendance <select id="ex-tree-budget"><option value="150">150</option><option value="400" selected>400</option><option value="1500">1500</option></select></label>
+            <span id="ex-tree-note" class="tiny"></span>
+            <span class="ex-tree-legend"><i class="dot" style="background:#e6f1e9"></i>trajet fondateur → foyer <i class="dot" style="background:#eac789"></i>mutation à effet <i class="dot faded"></i>éteinte</span>
+          </div>
+          <div class="ex-tree-wrap"><canvas id="ex-tree-canvas" role="img" aria-label="Arbre des lignées autour de la lignée choisie"></canvas></div>
+        </section>
+        <aside class="explorer-detail" id="ex-tree-detail"><p class="muted">Cliquez sur une lignée de l’arbre. Double-clic : recentrer l’arbre sur elle.</p></aside>
+      </div>
+
       <div class="explorer-body explorer-body-2" id="ex-tab-saved" hidden>
         <section class="explorer-list">
           <div class="ex-count" id="ex-saved-count"></div>
@@ -154,6 +173,9 @@ export class Explorer {
   private expandedGroups = new Set<string>();
   private saved: SavedOrganismMeta[] = [];
   private savedSelected: SavedOrganism | null = null;
+  private tree: LineageTreeView | null = null;
+  private treeFocus = -1;
+  private treeObserver: ResizeObserver | null = null;
 
   constructor(dialog: HTMLDialogElement, opts: ExplorerOptions) {
     this.dialog = dialog;
@@ -173,7 +195,8 @@ export class Explorer {
     if (view.filter || view.sort) this.setFilterInputs(view.filter ?? {}, view.sort);
     if (view.tab) this.setTab(view.tab);
     else this.setTab(view.lineageId !== undefined ? "lineages" : "organisms");
-    if (view.lineageId !== undefined) this.showLineage(view.lineageId);
+    if (view.tab === "tree" && view.lineageId !== undefined) this.showTree(view.lineageId);
+    else if (view.lineageId !== undefined) this.showLineage(view.lineageId);
     if (view.organismId !== undefined) {
       const e = this.entries.find((x) => x.id === view.organismId);
       if (e) this.showOrganism(e);
@@ -321,6 +344,7 @@ export class Explorer {
       </div>
       <div class="row ex-actions">
         ${e.alive ? `<button type="button" data-act="select" data-id="${e.id}">${icon("inspect")}Voir dans le monde</button>` : ""}
+        <button type="button" data-act="tree" data-lineage="${e.lineageId}">${icon("chart")}Voir dans l’arbre</button>
         <button type="button" data-act="highlight" data-lineage="${e.lineageId}">Surligner la lignée</button>
         <button type="button" data-act="dna" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("dna")}Charger l’ADN</button>
         <button type="button" class="primary" data-act="save" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("save")}Enregistrer…</button>
@@ -356,21 +380,23 @@ export class Explorer {
   }
 
   showLineage(id: number): void {
-    const w = this.opts.world();
-    const node = w.lineages.get(id);
     this.selectedLineage = id;
     this.setTab("lineages");
     this.renderLineages();
-    if (!node) {
-      this.q("#ex-lin-detail").innerHTML = `<p class="muted">Lignée ${id} inconnue.</p>`;
-      return;
-    }
+    this.q("#ex-lin-detail").innerHTML = this.lineageDetailHtml(id);
+    if (this.opts.world().lineages.has(id)) this.opts.highlightLineage(id);
+  }
+
+  private lineageDetailHtml(id: number): string {
+    const w = this.opts.world();
+    const node = w.lineages.get(id);
+    if (!node) return `<p class="muted">Lignée ${id} inconnue.</p>`;
     const steps = ancestry(w.lineages, w.innovations, id);
     const kids = descendantLineages(w.lineages, id, 40);
     const members = organismsUnderLineage(w.organisms, w.lineages, id);
     const own = w.organisms.filter((o) => o.lineageId === id);
     const sample = own[0] ?? members[0];
-    this.q("#ex-lin-detail").innerHTML = `
+    return `
       <div class="ex-detail-head"><h3>Lignée n° ${id}</h3>${node.count > 0 ? `<span class="hit">${node.count} vivant${node.count > 1 ? "s" : ""}</span>` : `<span class="dead">éteinte au pas ${node.extinctTick ?? "?"}</span>`}</div>
       <div class="ex-facts">
         <span>Née au pas<b>${node.bornTick}</b></span>
@@ -381,13 +407,81 @@ export class Explorer {
         <span>Signature<b class="mono">${esc(node.signature)}</b></span>
       </div>
       <div class="row ex-actions">
+        <button type="button" data-act="tree" data-lineage="${id}">${icon("chart")}Voir dans l’arbre</button>
         <button type="button" data-act="highlight" data-lineage="${id}">Surligner sur la plaque</button>
         <button type="button" data-act="members" data-lineage="${id}">${icon("inspect")}Voir ses organismes</button>
         ${sample ? `<button type="button" data-act="dna-org" data-id="${sample.id}">${icon("dna")}Charger un génome</button>` : ""}
       </div>
       <div class="ex-ancestry"><span class="eyebrow">ORIGINE · ${steps.length} lignée${steps.length > 1 ? "s" : ""} depuis le fondateur</span>${ancestryHtml(steps, w.tick)}</div>
       ${kids.length ? `<div class="ex-ancestry"><span class="eyebrow">SOUS-LIGNÉES DIRECTES ET SUIVANTES</span><ul class="ex-kids">${kids.map((k) => `<li><button type="button" class="linklike" data-lineage="${k.id}">n° ${k.id}</button> · née ${k.bornTick} · ${k.count > 0 ? `${k.count} vivants` : `éteinte ${k.extinctTick}`} · max ${k.peakCount}</li>`).join("")}</ul></div>` : ""}`;
-    this.opts.highlightLineage(id);
+  }
+
+  /* ---------- tree tab ---------- */
+
+  private ensureTree(): LineageTreeView {
+    if (this.tree) return this.tree;
+    const tip = document.createElement("div");
+    tip.id = "ex-tree-tip";
+    tip.className = "ex-tree-tip";
+    tip.hidden = true;
+    // Inside the dialog: a modal renders in the top layer, so a body-level fixed element would paint underneath it.
+    this.dialog.append(tip);
+    const w = () => this.opts.world();
+    this.tree = new LineageTreeView(this.q<HTMLCanvasElement>("#ex-tree-canvas"), tip, {
+      onSelect: (id) => {
+        this.selectedLineage = id;
+        this.q("#ex-tree-detail").innerHTML = this.lineageDetailHtml(id);
+        this.opts.highlightLineage(id);
+      },
+      onFocus: (id) => this.showTree(id),
+      strainColor: (sid) => w().strains.get(sid)?.color ?? "#8aa0b5",
+      strainName: (sid) => w().strains.get(sid)?.name ?? "souche inconnue",
+      changeLabel: (n: TreeNode) => {
+        const c = n.change;
+        if (!c) return "";
+        const d = c.to - c.from;
+        return `${TRAIT_LABEL[c.trait]} ${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(2)}`;
+      },
+    });
+    const wrap = this.q("#ex-tree-canvas").parentElement!;
+    this.treeObserver = new ResizeObserver(() => {
+      const r = wrap.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) this.tree!.resize(r.width, r.height);
+    });
+    this.treeObserver.observe(wrap);
+    return this.tree;
+  }
+
+  /** Draw the tree centred on a lineage and show its details beside it. */
+  showTree(focusId: number): void {
+    const w = this.opts.world();
+    this.treeFocus = focusId;
+    this.selectedLineage = focusId;
+    this.setTab("tree");
+    const view = this.ensureTree();
+    const extinct = this.q<HTMLSelectElement>("#ex-tree-extinct").value;
+    const layout = layoutLineageTree(w.lineages, w.innovations, focusId, {
+      now: w.tick,
+      maxDescendants: Number(this.q<HTMLSelectElement>("#ex-tree-budget").value) || 400,
+      siblings: this.q<HTMLInputElement>("#ex-tree-siblings").checked,
+      extinctFor: extinct === "all" ? Infinity : Number(extinct),
+      strainOf: lineageStrainMap(w.organisms, w.deaths, w.innovations, w.lineages),
+    });
+    const wrap = this.q("#ex-tree-canvas").parentElement!;
+    const r = wrap.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) view.resize(r.width, r.height);
+    view.setLayout(layout, w.tick);
+    const hidden = layout.nodes.reduce((sum, n) => sum + n.hiddenDescendants, 0);
+    this.q("#ex-tree-note").textContent = layout.nodes.length
+      ? `${layout.nodes.length} lignée${layout.nodes.length > 1 ? "s" : ""} · trajet de ${layout.path.length} · foyer n° ${focusId}${hidden ? ` · ${hidden} sous-lignées masquées` : ""}`
+      : `Lignée n° ${focusId} inconnue.`;
+    this.q("#ex-tree-detail").innerHTML = this.lineageDetailHtml(focusId);
+    this.opts.highlightLineage(focusId);
+    requestAnimationFrame(() => {
+      const rr = wrap.getBoundingClientRect();
+      if (rr.width > 0 && rr.height > 0) view.resize(rr.width, rr.height);
+      view.focusZoom();
+    });
   }
 
   /* ---------- saved tab ---------- */
@@ -475,13 +569,20 @@ export class Explorer {
   /* ---------- tabs & events ---------- */
 
   private setTab(tab: ExplorerTab): void {
-    for (const t of["organisms", "lineages", "saved"] as const) {
+    for (const t of["organisms", "lineages", "tree", "saved"] as const) {
       this.q(`#ex-tab-${t}`).hidden = t !== tab;
       const b = this.dialog.querySelector(`[data-etab="${t}"]`)!;
       b.classList.toggle("active", t === tab);
       b.setAttribute("aria-selected", String(t === tab));
     }
     if (tab === "saved") void this.refreshSaved();
+    if (tab === "tree" && this.tree) {
+      requestAnimationFrame(() => {
+        const wrap = this.q("#ex-tree-canvas").parentElement!;
+        const r = wrap.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) this.tree!.resize(r.width, r.height);
+      });
+    }
   }
 
   private bind(): void {
@@ -503,6 +604,13 @@ export class Explorer {
       this.renderList();
     });
     this.q("#ex-lin-sort").addEventListener("change", () => this.renderLineages());
+    this.q("#ex-tree-fit").addEventListener("click", () => this.tree?.fit());
+    this.q("#ex-tree-zoom").addEventListener("click", () => this.tree?.focusZoom());
+    for (const id of ["#ex-tree-siblings", "#ex-tree-extinct", "#ex-tree-budget"]) {
+      this.q(id).addEventListener("change", () => {
+        if (this.treeFocus >= 0) this.showTree(this.treeFocus);
+      });
+    }
     this.q("#ex-lin-alive").addEventListener("change", () => this.renderLineages());
 
     d.addEventListener("click", (ev) => {
@@ -563,6 +671,9 @@ export class Explorer {
       case "members":
         this.setFilterInputs({ lineageId: Number(el.dataset.lineage), liveness: "all" }, "best-fitness");
         this.setTab("organisms");
+        return;
+      case "tree":
+        this.showTree(Number(el.dataset.lineage));
         return;
       case "dna":
         if (entry) this.opts.loadGenome(entry.genome, `organisme n° ${entry.id}`);

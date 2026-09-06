@@ -510,3 +510,34 @@ button.linklike:hover { background: none; border: 0; color: #d6f8e1; }
   .explorer-filters { max-height: 40vh; overflow: auto; scrollbar-width: thin; }
   .ex-grid { grid-template-columns: 1fr 1fr 1fr; }
 }
+
+/* ---------- Explorateur : onglet Arbre (arbre des lignées dessiné) ---------- */
+.explorer-body-tree { grid-template-columns: minmax(0, 1fr) 380px; }
+.explorer-tree { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; min-width: 0; overflow: hidden; }
+
+.ex-tree-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); font-size: 11px; }
+.ex-tree-bar button { min-height: 26px; padding: 4px 8px; font-size: 11px; }
+.ex-tree-bar select { padding: 3px 6px; min-height: 24px; font-size: 11px; }
+.ex-tree-bar .ex-inline { margin-top: 0; font-size: 11px; }
+.ex-tree-bar #ex-tree-note { color: var(--muted); }
+
+.ex-tree-legend { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-left: auto; font-size: 9px; line-height: 1.5; color: var(--muted); }
+.ex-tree-legend .dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 100%; flex-shrink: 0; }
+.ex-tree-legend .dot:first-child { margin-left: 0; }
+.ex-tree-legend .dot.faded { background: #3c4f56; }
+
+.ex-tree-wrap { position: relative; min-height: 0; overflow: hidden; background: #070b10; }
+#ex-tree-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#ex-tree-canvas:active { cursor: grabbing; }
+
+.ex-tree-tip { position: fixed; z-index: 60; max-width: 320px; background: #192720; border: 1px solid #54755f; border-radius: 7px; color: var(--text); font-size: 11px; line-height: 1.55; padding: 8px 11px; pointer-events: none; box-shadow: 0 8px 24px #0007; }
+.ex-tree-tip b { color: var(--teal); }
+.ex-tree-tip .tiny { display: block; margin-top: 3px; font-size: 9px; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  /* Stacked like the other explorer bodies: the body scrolls, the canvas keeps a usable height. */
+  .explorer-body-tree { grid-template-columns: 1fr; grid-template-rows: max-content; grid-auto-rows: max-content; overflow: auto; scrollbar-width: thin; }
+  .explorer-tree { overflow: visible; border-bottom: 1px solid var(--line); }
+  .ex-tree-wrap { min-height: 50vh; }
+  .ex-tree-legend { margin-left: 0; }
+}

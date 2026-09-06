@@ -141,6 +141,34 @@ try {
   await page.locator('#ex-records .ex-record').first().click();
   await page.waitForFunction(() => /Organisme n°/.test(document.querySelector('#ex-detail')?.textContent ?? ''));
   assert.ok((await page.locator('#ex-detail .ex-step').count()) >= 1, 'Organism record shows its evolutionary branch');
+  // Arbre: the drawn tree opens on that organism, names a lineage on hover and selects it on click.
+  await page.locator('#ex-detail [data-act="tree"]').click();
+  await page.waitForFunction(() => document.querySelector('#ex-tab-tree')?.hidden === false);
+  await page.waitForFunction(() => Number(document.querySelector('#ex-tree-canvas')?.dataset.nodes) > 0);
+  const treeBox = await page.locator('#ex-tree-canvas').boundingBox();
+  let treePoint = null;
+  // Fit centres the rows; they are 26 px apart with a 9 px hit radius, so sweep rows outward from the middle.
+  for (let k = 0; k <= 30 && !treePoint; k++) {
+    const y = treeBox.y + treeBox.height / 2 + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * 12;
+    if (y < treeBox.y + 4 || y > treeBox.y + treeBox.height - 4) continue;
+    for (const fx of [0.5, 0.3, 0.7]) {
+      const x = treeBox.x + treeBox.width * fx;
+      await page.mouse.move(x, y);
+      if (await page.evaluate(() => document.querySelector('#ex-tree-tip')?.hidden === false)) { treePoint = { x, y }; break; }
+    }
+  }
+  assert.ok(treePoint, 'Tree tooltip appears over a lineage');
+  // showModal() paints the dialog in the top layer, so a tip parented to <body> is shown but never painted.
+  assert.ok(await page.evaluate(() => !!document.querySelector('#ex-tree-tip')?.closest('dialog[open]')), 'Tree tooltip sits inside the open dialog, so it is painted over the tree');
+  await page.mouse.click(treePoint.x, treePoint.y);
+  await page.waitForFunction(() => /Lignée n°/.test(document.querySelector('#ex-tree-detail')?.textContent ?? ''));
+  await page.locator('#ex-tree-fit').click();
+  await page.locator('[data-etab="organisms"]').click();
+  await page.waitForFunction(() => document.querySelector('#ex-tab-organisms')?.hidden === false);
+  if (!/Organisme n°/.test(await page.locator('#ex-detail').textContent() ?? '')) { // the tree detour must not cost the open record
+    await page.locator('#ex-records .ex-record').first().click();
+    await page.waitForFunction(() => /Organisme n°/.test(document.querySelector('#ex-detail')?.textContent ?? ''));
+  }
   await page.locator('#ex-detail [data-act="save"]').click();
   await page.locator('#ex-save-name').fill('Sonde test');
   await page.locator('#ex-save-world').uncheck();

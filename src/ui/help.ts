@@ -177,6 +177,12 @@ export const CONTROL_HELP: Record<string, string> = {
   "ex-lin-alive": "N’affiche que les lignées comptant au moins un organisme vivant.",
   "ex-refresh": "Relit le monde affiché : liste, records et lignées repartent de son état courant.",
   "ex-close": "Ferme l’explorateur et revient au laboratoire. La touche Échap fait la même chose.",
+  "ex-tree-canvas": "Arbre des lignées autour du foyer : le temps va de gauche à droite, chaque barre est une lignée, une lignée fille part de sa mère à sa naissance ; le trajet clair mène du fondateur au foyer, les points ambre marquent une mutation à effet. Glisser : déplacer ; molette : zoomer ; clic : détails ; double-clic : recentrer.",
+  "ex-tree-fit": "Recadre l’arbre entier dans la vue : le zoom et le déplacement reviennent à l’ajustement automatique.",
+  "ex-tree-zoom": "Ramène la vue sur la lignée choisie, au niveau de zoom courant, sans changer les lignées affichées.",
+  "ex-tree-siblings": "Ajoute les lignées sœurs du trajet fondateur → foyer, c’est-à-dire les autres filles de chaque mère, pour situer le foyer parmi ses contemporaines.",
+  "ex-tree-extinct": "Sort de l’arbre les lignées éteintes, toutes ou seulement celles éteintes depuis plus de 200 pas, pour ne garder que ce qui subsiste.",
+  "ex-tree-budget": "Nombre maximal de lignées descendantes dessinées : au-delà, les branches les moins peuplées sont écartées et la note l’indique.",
 };
 
 export const LAB_CONTROL_IDS: readonly string[] = Object.keys(CONTROL_HELP);
