@@ -11,16 +11,17 @@ import {
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,
+  DNA_KITS,
   founderHeterotroph,
-  founderMutualist,
-  founderPhototroph,
-  founderPredator,
-  founderResistant,
+  genomeForKit,
   indelMutate,
   injectStrain,
+  kitById,
   mappingLegend,
   paintTerrain,
   parseJSONSnapshot,
+  phenotypeForKit,
+  placeOrganismAt,
   parseShareURL,
   pointMutate,
   restoreSnapshot,
@@ -49,13 +50,7 @@ const BRUSHES: { id: BrushKind; label: string }[] = [
   { id: "wipeOrgs", label: "wipe" },
 ];
 
-const FOUNDERS: Record<string, () => string> = {
-  phototroph: founderPhototroph,
-  heterotroph: founderHeterotroph,
-  resistant: founderResistant,
-  predator: founderPredator,
-  mutualist: () => founderMutualist(2),
-};
+type LabTool = "inspect" | "paint" | "place";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -91,6 +86,8 @@ export function mount(root: HTMLElement): void {
     radius: 3,
     painting: false,
     paintMode: false,
+    tool: "place" as LabTool,
+    kit: "phototroph",
     selectedId: -1,
     snapshot: null as WorldSnapshot | null,
     lastUi: 0,
@@ -124,7 +121,11 @@ export function mount(root: HTMLElement): void {
   const viz = el("div", { class: "viz" });
   const canvas = el("canvas", { id: "gl" });
   const hud = el("div", { class: "viz-hud" });
-  hud.innerHTML = `<button type="button" id="paint-toggle">inspect (shift-drag paints)</button>`;
+  hud.innerHTML = `
+    <button type="button" id="tool-inspect">inspect</button>
+    <button type="button" id="tool-paint">paint</button>
+    <button type="button" id="tool-place" class="active">place organism</button>
+  `;
   viz.append(canvas, hud);
   const side = el("aside", { class: "side" });
   const charts = el("footer", { class: "charts" });
@@ -136,8 +137,38 @@ export function mount(root: HTMLElement): void {
 
   side.innerHTML = `
     <section class="block">
+      <h2>DNA kit</h2>
+      <p class="muted" id="place-hint" style="margin:0 0 8px;font-size:12px">Pick a kit, then click an empty cell on the plate.</p>
+      <div id="dna-kits" class="kit-grid"></div>
+      <div id="kit-blurb" class="muted" style="margin-top:8px;font-size:12px"></div>
+      <div id="kit-traits" class="kit-focus"></div>
+      <details id="dna-advanced" style="margin-top:10px">
+        <summary class="tiny">Advanced sequence</summary>
+        <div class="stack" style="margin-top:8px">
+          <textarea id="genome-edit" spellcheck="false" placeholder="ACGT sequence — ORFs ATG…TAA"></textarea>
+          <div class="row">
+            <button type="button" id="btn-point">point</button>
+            <button type="button" id="btn-indel">indel</button>
+            <button type="button" id="btn-dup">duplication</button>
+            <button type="button" id="btn-apply">apply to selected</button>
+          </div>
+          <div class="row">
+            <select id="founder">
+              <option value="heterotroph">heterotroph</option>
+              <option value="phototroph">phototroph</option>
+              <option value="resistant">resistant</option>
+              <option value="predator">predator</option>
+              <option value="mutualist">mutualist</option>
+            </select>
+            <button type="button" id="btn-load-founder">load founder</button>
+            <button type="button" id="btn-inject">inject ×24</button>
+          </div>
+        </div>
+      </details>
+    </section>
+    <section class="block">
       <h2>Inspect</h2>
-      <div id="inspect-meta" class="muted">Click an organism on the plate.</div>
+      <div id="inspect-meta" class="muted">Blank plate. Choose a DNA kit, then click an empty cell.</div>
       <div id="inspect-genome"></div>
       <div id="inspect-phenotype"></div>
       <div id="inspect-genes"></div>
@@ -147,35 +178,16 @@ export function mount(root: HTMLElement): void {
       <div id="browser-wrap"><canvas id="gbrowser"></canvas></div>
     </section>
     <section class="block">
-      <h2>Edit / inject</h2>
-      <div class="stack">
-        <textarea id="genome-edit" spellcheck="false" placeholder="ACGT sequence — ORFs ATG…TAA"></textarea>
-        <div class="row">
-          <button type="button" id="btn-point">point</button>
-          <button type="button" id="btn-indel">indel</button>
-          <button type="button" id="btn-dup">duplication</button>
-          <button type="button" id="btn-apply">apply to selected</button>
-        </div>
-        <div class="row">
-          <select id="founder">
-            <option value="heterotroph">heterotroph</option>
-            <option value="phototroph">phototroph</option>
-            <option value="resistant">resistant</option>
-            <option value="predator">predator</option>
-            <option value="mutualist">mutualist</option>
-          </select>
-          <button type="button" id="btn-load-founder">load founder</button>
-          <button type="button" id="btn-inject">inject ×24</button>
-        </div>
-      </div>
-    </section>
-    <section class="block">
       <h2>Sandbox</h2>
       <div class="row" id="brushes"></div>
       <label class="tiny">brush radius <span id="rad-lab">3</span></label>
       <input id="radius" type="range" min="0" max="12" value="3" />
       <label class="tiny">speed <span id="spd-lab">2 /s</span></label>
       <input id="speed" type="range" min="0" max="60" step="1" value="2" />
+      <div class="row" style="margin-top:8px">
+        <label class="tiny" id="opt-terrain"><input type="checkbox" /> random vents & walls</label>
+        <label class="tiny" id="opt-disturb"><input type="checkbox" /> random events</label>
+      </div>
       <div class="row" style="margin-top:8px">
         <button type="button" id="btn-pause">pause</button>
         <button type="button" id="btn-slow">slow</button>
@@ -237,6 +249,32 @@ export function mount(root: HTMLElement): void {
     if (b.id === state.brush) btn.classList.add("active");
     brushRow.append(btn);
   }
+  const kitRow = side.querySelector("#dna-kits")!;
+  const showKit = (id: string) => {
+    state.kit = id;
+    kitRow.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "kit-" + id));
+    const kit = kitById(id);
+    (side.querySelector("#kit-blurb") as HTMLElement).textContent = kit.blurb;
+    const ph = phenotypeForKit(id);
+    const focus = kit.focus;
+    (side.querySelector("#kit-traits") as HTMLElement).textContent =
+      `${focus} ${Number(ph[focus]).toFixed(2)} · uptake ${ph.uptake.toFixed(2)} · photo ${ph.photo.toFixed(2)} · resist ${ph.resist.toFixed(2)}`;
+    (side.querySelector("#genome-edit") as HTMLTextAreaElement).value = genomeForKit(id);
+    (side.querySelector("#founder") as HTMLSelectElement).value = id;
+  };
+  for (const kit of DNA_KITS) {
+    const btn = el("button", { type: "button", id: "kit-" + kit.id, class: "kit-btn" }, kit.label);
+    kitRow.append(btn);
+  }
+  kitRow.addEventListener("click", (ev) => {
+    const t = ev.target as HTMLElement;
+    const id = t.id.startsWith("kit-") ? t.id.slice(4) : "";
+    if (id) {
+      state.tool = "place";
+      hud.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "tool-place"));
+      showKit(id);
+    }
+  });
   const legend = side.querySelector("#legend")!;
   legend.innerHTML = mappingLegend()
     .map((r) => `<div>${r.codon} ${r.aa} → ${r.trait} ${r.delta >= 0 ? "+" : ""}${r.delta}</div>`)
@@ -251,6 +289,16 @@ export function mount(root: HTMLElement): void {
 
   function status(msg: string): void {
     (side.querySelector("#status-line") as HTMLElement).textContent = msg;
+  }
+
+  function setTool(tool: LabTool): void {
+    state.tool = tool;
+    state.paintMode = tool === "paint";
+    hud.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.id === "tool-" + tool));
+    const hint = side.querySelector("#place-hint") as HTMLElement;
+    if (tool === "place") hint.textContent = "Pick a kit, then click an empty cell on the plate.";
+    else if (tool === "paint") hint.textContent = "Click or drag to paint the selected substance (nutrient, toxin, wall…).";
+    else hint.textContent = "Click an organism to inspect its genome.";
   }
 
   function selectOrganism(world: World, id: number, reason: EditorSyncReason = "select"): void {
@@ -272,14 +320,15 @@ export function mount(root: HTMLElement): void {
       }
       return;
     }
+    meta.innerHTML = `id ${org.id} · lin ${org.lineageId} · parent ${org.parentId} · E ${org.energy.toFixed(2)} · fit ${org.fitness.toFixed(3)} · (${org.x},${org.y})`;
+    if (reason === "refresh") return;
     const decoded = decodeGenome(org.genome);
     const track = toGenomeTrack(decoded);
-    meta.innerHTML = `id ${org.id} · lin ${org.lineageId} · parent ${org.parentId} · E ${org.energy.toFixed(2)} · fit ${org.fitness.toFixed(3)} · (${org.x},${org.y})`;
     gEl.textContent = org.genome;
     pEl.innerHTML = phenotypeTableHtml(org.ph);
     genesEl.innerHTML = genesHtml(track);
     syncGenomeEditor(ta, org.genome, reason);
-    if (reason !== "refresh") browser.setSequence(org.genome);
+    browser.setSequence(org.genome);
   }
 
   function layout(): void {
@@ -320,10 +369,11 @@ export function mount(root: HTMLElement): void {
       if (org) selectOrganism(w, org.id, "refresh");
     }
     const now = performance.now();
-    if (now - state.lastUi > 120) {
+    if (now - state.lastUi > 250) {
       const cr = charts.getBoundingClientRect();
-      drawFitness(cFit, cr.width / 3, cr.height, w.history);
-      drawShannon(cShan, cr.width / 3, cr.height, w.history);
+      const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
+      drawFitness(cFit, cr.width / 3, cr.height, hist);
+      drawShannon(cShan, cr.width / 3, cr.height, hist);
       drawPhylogeny(cPhy, cr.width / 3, cr.height, w.lineages.values(), w.tick);
       state.lastUi = now;
     }
@@ -369,19 +419,36 @@ export function mount(root: HTMLElement): void {
     const world = sidePick === "B" ? dual.b : dual.a;
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
     if (!grid) return;
-    const paint = state.paintMode || ev.shiftKey || ev.altKey || ev.buttons === 2;
+    const paint = state.tool === "paint" || state.paintMode || ev.shiftKey || ev.altKey || ev.buttons === 2;
     if (paint) {
       state.painting = true;
       paintTerrain(world, grid.x, grid.y, state.radius, state.brush);
       return;
     }
-    if (down) {
-      const org = world.nearestOrganism(grid.x, grid.y, 4);
-      if (org) {
+    if (!down) return;
+    if (state.tool === "place") {
+      const seq = (side.querySelector("#genome-edit") as HTMLTextAreaElement).value || genomeForKit(state.kit);
+      const child = placeOrganismAt(world, grid.x, grid.y, seq);
+      if (child) {
         dual.active = sidePick;
-        selectOrganism(world, org.id);
+        selectOrganism(world, child.id, "select");
+        status(`placed ${kitById(state.kit).label} at (${grid.x},${grid.y})`);
         refreshMetrics();
+      } else {
+        const occ = world.organismAt(grid.x, grid.y);
+        if (occ) {
+          dual.active = sidePick;
+          selectOrganism(world, occ.id);
+          refreshMetrics();
+        } else status("cell blocked");
       }
+      return;
+    }
+    const org = world.nearestOrganism(grid.x, grid.y, 4);
+    if (org) {
+      dual.active = sidePick;
+      selectOrganism(world, org.id);
+      refreshMetrics();
     }
   }
 
@@ -442,6 +509,26 @@ export function mount(root: HTMLElement): void {
       state.paused = true;
       (side.querySelector("#btn-pause") as HTMLElement).textContent = "run";
     }
+  });
+  const terrainBox = side.querySelector("#opt-terrain input") as HTMLInputElement;
+  const disturbBox = side.querySelector("#opt-disturb input") as HTMLInputElement;
+  terrainBox.checked = dual.a.randomTerrain;
+  disturbBox.checked = dual.a.disturbances;
+  terrainBox.addEventListener("change", () => {
+    if (terrainBox.checked) {
+      dual.a.seedRandomTerrain();
+      dual.b.seedRandomTerrain();
+      status("random vents & walls on");
+    } else {
+      dual.a.clearPresetTerrain();
+      dual.b.clearPresetTerrain();
+      status("cleared preset terrain — paint your own");
+    }
+  });
+  disturbBox.addEventListener("change", () => {
+    dual.a.disturbances = disturbBox.checked;
+    dual.b.disturbances = disturbBox.checked;
+    status(disturbBox.checked ? "random events on" : "random events off");
   });
   side.querySelector("#btn-slow")!.addEventListener("click", () => setSpeed(2));
   side.querySelector("#btn-step-once")!.addEventListener("click", () => {
@@ -560,7 +647,7 @@ export function mount(root: HTMLElement): void {
   });
   side.querySelector("#btn-load-founder")!.addEventListener("click", () => {
     const key = (side.querySelector("#founder") as HTMLSelectElement).value;
-    ta().value = (FOUNDERS[key] ?? founderHeterotroph)();
+    ta().value = genomeForKit(key);
   });
   side.querySelector("#btn-inject")!.addEventListener("click", () => {
     const seq = ta().value || founderHeterotroph();
@@ -590,12 +677,19 @@ export function mount(root: HTMLElement): void {
 
   window.addEventListener("resize", layout);
 
-  hud.querySelector("#paint-toggle")!.addEventListener("click", () => {
-    state.paintMode = !state.paintMode;
-    const b = hud.querySelector("#paint-toggle") as HTMLButtonElement;
-    b.textContent = state.paintMode ? "paint mode" : "inspect (shift-drag paints)";
-    b.classList.toggle("active", state.paintMode);
-  });
+  hud.querySelector("#tool-inspect")!.addEventListener("click", () => setTool("inspect"));
+  hud.querySelector("#tool-paint")!.addEventListener("click", () => setTool("paint"));
+  hud.querySelector("#tool-place")!.addEventListener("click", () => setTool("place"));
+
+  window.__openavidaPlaceAt = (x: number, y: number) => {
+    const w = current();
+    const seq = (side.querySelector("#genome-edit") as HTMLTextAreaElement).value || genomeForKit(state.kit);
+    const child = placeOrganismAt(w, x, y, seq);
+    if (!child) return false;
+    selectOrganism(w, child.id, "select");
+    refreshMetrics();
+    return true;
+  };
 
   window.__openavidaOrgPixel = (index = 0) => {
     const w = current();
@@ -614,12 +708,15 @@ export function mount(root: HTMLElement): void {
     const dt = Math.min(100, now - lastFrame);
     lastFrame = now;
     if (!state.paused && state.speed > 0) {
-      const due = ticksDue(tickAccum, dt, state.speed, 24);
+      const due = ticksDue(tickAccum, dt, state.speed, 3);
       tickAccum = due.accumMs;
-      for (let i = 0; i < due.ticks; i++) {
+      let used = 0;
+      for (let i = 0; i < due.ticks && used < 10; i++) {
+        const t0 = performance.now();
         if (state.view === "split") dual.step("both");
         else if (state.view === "B") dual.b.step();
         else dual.a.step();
+        used += performance.now() - t0;
       }
     } else {
       tickAccum = 0;
@@ -637,6 +734,7 @@ export function mount(root: HTMLElement): void {
 
   layout();
   browser.clear();
-  ta().value = founderHeterotroph();
+  showKit(state.kit);
+  setTool("place");
   requestAnimationFrame(loop);
 }

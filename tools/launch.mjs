@@ -31,15 +31,16 @@ async function probe(page, label) {
   });
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForSelector("#gl", { timeout: 20000 });
-  await page.waitForFunction(() => window.__openavida && window.__openavida.population > 0, null, {
+  await page.waitForFunction(() => window.__openavida && window.__openavida.population >= 0, null, {
     timeout: 20000,
   });
-  await page.waitForTimeout(1400);
+  await page.waitForTimeout(400);
+  const pop0 = await page.evaluate(() => window.__openavida?.population ?? -1);
   await page.locator("#btn-pause").click();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(150);
 
   const hover = {};
-  for (const id of ["btn-pause", "btn-inject"]) {
+  for (const id of ["btn-pause", "tool-place"]) {
     await page.locator("#" + id).hover();
     await page.waitForTimeout(80);
     hover[id] = await page.evaluate((cid) => {
@@ -97,6 +98,9 @@ async function probe(page, label) {
       renderer: gl.getParameter(gl.RENDERER),
     };
   });
+
+  const placed = await page.evaluate(() => window.__openavidaPlaceAt?.(40, 48) === true);
+  await page.waitForFunction(() => (window.__openavida?.population ?? 0) >= 1, null, { timeout: 8000 });
 
   const org = await page.evaluate(() => {
     const pick = window.__openavidaOrgPixel;
@@ -171,7 +175,7 @@ async function probe(page, label) {
     return { g, p, probe: window.__openavida };
   });
 
-  return { label, errors, before, after, pixel, org, editor, hover };
+  return { label, errors, before, after, pixel, org, editor, hover, pop0, placed };
 }
 
 const browser = await chromium.launch({
@@ -209,6 +213,8 @@ const summary = {
     inspectAfter: { genomeLen: r.after.g.length, phenoLen: r.after.p.length, genome: r.after.g.slice(0, 80) },
     editor: r.editor,
     hover: r.hover,
+    pop0: r.pop0,
+    placed: r.placed,
     probe: r.after.probe,
   })),
 };
@@ -227,6 +233,8 @@ const ok = results.every(
     r.editor.wipedByRaf === false &&
     r.editor.pointStuck === true &&
     r.hover?.["btn-pause"]?.titleMatches === true &&
-    r.hover?.["btn-inject"]?.titleMatches === true,
+    r.hover?.["tool-place"]?.titleMatches === true &&
+    r.pop0 === 0 &&
+    r.placed === true,
 );
 process.exit(ok ? 0 : 2);

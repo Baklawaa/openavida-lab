@@ -23,6 +23,35 @@ import {
 } from "../src/sim/index";
 import { normalizeParams } from "../src/sim/types";
 
+describe("optional presets (off by default)", () => {
+  it("default world has no random vents, walls, or toxin orbs", () => {
+    const w = new World({ width: 16, height: 16, startPopulation: 0, seed: 1 });
+    expect(w.randomTerrain).toBe(false);
+    expect(w.disturbances).toBe(false);
+    expect([...w.terrain].every((t) => t === TERRAIN.empty)).toBe(true);
+    expect(Math.max(...w.fields.toxin)).toBe(0);
+  });
+
+  it("seedRandomTerrain is opt-in and paints at least one non-empty cell", () => {
+    const w = new World({ width: 16, height: 16, startPopulation: 0, seed: 1 });
+    w.seedRandomTerrain();
+    expect(w.randomTerrain).toBe(true);
+    expect([...w.terrain].some((t) => t !== TERRAIN.empty)).toBe(true);
+  });
+
+  it("disturbances off do not spawn toxin pulses; on they do", () => {
+    const off = new World({ width: 16, height: 16, startPopulation: 0, seed: 2 });
+    off.fields.toxin.fill(0);
+    for (let i = 0; i < 70; i++) off.step();
+    expect(Math.max(...off.fields.toxin)).toBe(0);
+
+    const on = new World({ width: 16, height: 16, startPopulation: 0, seed: 2, disturbances: true });
+    on.fields.toxin.fill(0);
+    for (let i = 0; i < 70; i++) on.step();
+    expect(Math.max(...on.fields.toxin)).toBeGreaterThan(0);
+  });
+});
+
 describe("paint / inject / bottleneck", () => {
   it("paint terrain changes cells and fields", () => {
     const w = new World({ width: 16, height: 16, startPopulation: 0, seed: 1 });

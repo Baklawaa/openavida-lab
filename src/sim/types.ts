@@ -42,6 +42,10 @@ export interface SimParams {
   maxAge: number;
   predationThreshold: number;
   mutualismShare: number;
+  /** Random vents/walls/shade at start. Off by default — paint them yourself. */
+  randomTerrain: boolean;
+  /** Periodic toxin pulses, droughts, crashes. Off by default. */
+  disturbances: boolean;
 }
 
 export const DEFAULT_PARAMS: SimParams = {
@@ -57,12 +61,14 @@ export const DEFAULT_PARAMS: SimParams = {
   toxinDecay: 0.006,
   temperatureDecay: 0.002,
   lightDecay: 0.03,
-  maxPopulation: 1800,
-  startPopulation: 180,
+  maxPopulation: 1100,
+  startPopulation: 0,
   reproduceEnergy: 1.55,
   maxAge: 260,
   predationThreshold: 0.26,
   mutualismShare: 0.04,
+  randomTerrain: false,
+  disturbances: false,
 };
 
 export interface EnvSample {
@@ -166,6 +172,8 @@ export function normalizeParams(partial: Partial<SimParams> = {}): SimParams {
   p.mutationRate = clamp01(p.mutationRate);
   p.maxPopulation = Math.max(16, p.maxPopulation | 0);
   p.startPopulation = Math.max(0, Math.min(p.maxPopulation, p.startPopulation | 0));
+  p.randomTerrain = Boolean(p.randomTerrain);
+  p.disturbances = Boolean(p.disturbances);
   return p;
 }
 

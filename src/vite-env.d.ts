@@ -19,5 +19,6 @@ interface Window {
   __openavida?: OpenAvidaProbe;
   __openavidaSelectAt?: (x: number, y: number) => boolean;
   __openavidaOrgPixel?: (index?: number) => { x: number; y: number; id: number } | null;
+  __openavidaPlaceAt?: (x: number, y: number) => boolean;
   __openavidaHelp?: Record<string, string>;
 }

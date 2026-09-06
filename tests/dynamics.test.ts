@@ -3,7 +3,7 @@ import { World } from "../src/sim/index";
 
 describe("default-seeded long run (World.step)", () => {
   it("does not cap-out as a lawn and keeps Shannon, turnover, and moving fitness", () => {
-    const w = new World();
+    const w = new World({ startPopulation: 180 });
     expect(w.w).toBe(128);
     expect(w.h).toBe(128);
     let peak = w.organisms.length;

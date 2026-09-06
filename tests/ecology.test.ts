@@ -6,6 +6,7 @@ import {
   founderPredator,
   lineageShannon,
   parentChildEdges,
+  shadeOccupied,
 } from "../src/sim/index";
 
 describe("diffusion fields", () => {
@@ -34,6 +35,44 @@ describe("diffusion fields", () => {
     expect(w.fields.toxin[right]!).toBeGreaterThan(before.toxin);
     expect(w.fields.temperature[right]!).toBeGreaterThan(before.temperature);
     expect(w.fields.light[right]!).toBeGreaterThan(before.light);
+  });
+});
+
+describe("self-shading", () => {
+  it("packed clumps cut light; isolated cells do not", () => {
+    const w = 8;
+    const light = new Float32Array(w * 2);
+    light.fill(1);
+    const occ = new Int32Array(w * 2);
+    occ.fill(-1);
+    // a 2×2 block at (1,0),(2,0),(1,1),(2,1)
+    const clump = [
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+    ];
+    for (let i = 0; i < clump.length; i++) occ[clump[i]!.y * w + clump[i]!.x] = i;
+    occ[7] = 99;
+    shadeOccupied(light, [...clump, { x: 7, y: 0 }], occ, w, 2);
+    expect(light[1]!).toBeLessThan(0.5);
+    expect(light[7]!).toBe(1);
+  });
+
+  it("World.step shades a dense clump more than an isolated neighbor", () => {
+    const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 1 });
+    w.terrain.fill(TERRAIN.empty);
+    const a = w.birth(1, 1, founderPhototroph(), null, false, 1);
+    const b = w.birth(2, 1, founderPhototroph(), null, false, 1);
+    const c = w.birth(1, 2, founderPhototroph(), null, false, 1);
+    const d = w.birth(2, 2, founderPhototroph(), null, false, 1);
+    const iso = w.birth(6, 6, founderPhototroph(), null, false, 1);
+    expect(a && b && c && d && iso).toBeTruthy();
+    w.fields.light.fill(1);
+    w.step();
+    const packed = w.fields.light[1 + 1 * 8]!;
+    const alone = w.fields.light[6 + 6 * 8]!;
+    expect(packed).toBeLessThan(alone);
   });
 });
 

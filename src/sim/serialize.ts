@@ -20,6 +20,8 @@ const PARAM_KEYS: (keyof SimParams)[] = [
   "maxAge",
   "predationThreshold",
   "mutualismShare",
+  "randomTerrain",
+  "disturbances",
 ];
 
 export function paramsToQuery(p: SimParams): string {
@@ -40,6 +42,10 @@ export function paramsFromQuery(qs: string): SimParams {
   for (const k of PARAM_KEYS) {
     const s = usp.get(k);
     if (s === null || s === "") continue;
+    if (k === "randomTerrain" || k === "disturbances") {
+      (partial as Record<string, boolean>)[k] = s === "1" || s === "true";
+      continue;
+    }
     const n = Number(s);
     if (Number.isFinite(n)) (partial as Record<string, number>)[k] = n;
   }

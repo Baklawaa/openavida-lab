@@ -120,7 +120,13 @@ export function drawPhylogeny(
   const w = canvas.width;
   const h = canvas.height;
   frame(ctx, w, h, "phylogeny");
-  const nodes = Array.from(lineages);
+  const all = Array.from(lineages);
+  const live = all.filter((n) => n.count > 0);
+  const recentDead = all
+    .filter((n) => n.count === 0 && n.extinctTick !== null && tick - n.extinctTick < 180)
+    .sort((a, b) => (b.peakCount || 0) - (a.peakCount || 0))
+    .slice(0, 24);
+  const nodes = (live.length > 80 ? live.sort((a, b) => b.count - a.count).slice(0, 80) : live).concat(recentDead);
   if (nodes.length === 0) return;
 
   const byParent = new Map<number, LineageNode[]>();
@@ -151,6 +157,7 @@ export function drawPhylogeny(
   for (const n of nodes) {
     if (!seen.has(n.id)) visit(n, 0);
   }
+  const laidById = new Map(laid.map((l) => [l.n.id, l]));
 
   const maxDepth = laid.reduce((m, l) => Math.max(m, l.depth), 1);
   const maxTick = Math.max(tick, 1);
@@ -179,7 +186,7 @@ export function drawPhylogeny(
     ctx.lineTo(Math.max(x0 + 2, x1), y);
     ctx.stroke();
     if (L.n.parentId >= 0) {
-      const parent = laid.find((p) => p.n.id === L.n.parentId);
+      const parent = laidById.get(L.n.parentId);
       if (parent) {
         const py = padT + (nShow <= 1 ? innerH / 2 : (parent.row / Math.max(1, nShow - 1)) * innerH);
         ctx.strokeStyle = "rgba(80,110,120,0.35)";

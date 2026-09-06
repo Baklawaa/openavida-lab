@@ -17,6 +17,13 @@ Isolated Vite + TypeScript + Vitest app at `openavida-lab/`. Sim core (`src/sim/
 
 Phase 2 hooks (comments only): 3D continuum, biochemistry, multiplayer, LLM brains.
 
+## Round: blank start + place DNA kits (2026-09-06)
+
+- Default `startPopulation` 0, no random orbs. Launch `pop0=0`.
+- `placeOrganismAt` + DNA kits (Phototroph / Heterotroph / Resistant / Predator / Mutualist). Launch placed one phototroph; inspect genome filled.
+- Paint substances still via brushes; tools: inspect / paint / place.
+- Hover catalog includes `tool-place` and `kit-*`.
+
 ## Round: less bloom, lasting dynamics, hover help (2026-09-06)
 
 - Hover catalog `src/ui/help.ts` (`CONTROL_HELP`) attached as `title` + visible `#hover-tip`. Launch: pause and inject titles match the catalog; tip visible.

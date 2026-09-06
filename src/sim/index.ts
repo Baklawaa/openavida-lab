@@ -37,7 +37,16 @@ export {
   type GenomeTrack,
 } from "./genome";
 export { fitness, metabolicDelta, reproduceThreshold } from "./fitness";
+export {
+  DNA_KITS,
+  genomeForKit,
+  kitById,
+  kitMatchesFocus,
+  phenotypeForKit,
+  type DnaKit,
+} from "./kits";
 export { FIELD_NAMES, Fields, type FieldName } from "./fields";
+export { shadeOccupied } from "./ecology";
 export {
   DualWorld,
   applyBottleneck,
@@ -47,6 +56,7 @@ export {
   exportPhylogenyCSV,
   injectStrain,
   paintTerrain,
+  placeOrganismAt,
   paramsFromQuery,
   paramsToQuery,
   parseCSV,

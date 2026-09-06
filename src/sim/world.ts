@@ -5,7 +5,9 @@ import {
   interactNeighbors,
   metabolize,
   moveOrganisms,
+  neighborOccupancyCount,
   sampleNeighborEffects,
+  shadeOccupied,
 } from "./ecology";
 import { Fields } from "./fields";
 import { fitness, reproduceThreshold } from "./fitness";
@@ -64,6 +66,8 @@ export class World {
   lastMutualism = 0;
   lastDisplacements = 0;
   lastStepMs = 0;
+  randomTerrain: boolean;
+  disturbances: boolean;
 
   constructor(partial: Partial<SimParams> = {}) {
     this.params = normalizeParams(partial);
@@ -73,7 +77,10 @@ export class World {
     this.terrain = new Uint8Array(w * h);
     this.occupancy = new Int32Array(w * h);
     this.occupancy.fill(-1);
+    this.randomTerrain = this.params.randomTerrain;
+    this.disturbances = this.params.disturbances;
     this.seedEnvironment();
+    if (this.randomTerrain) this.seedRandomTerrain();
     this.seedPopulation();
     this.recordMetrics();
   }
@@ -95,37 +102,43 @@ export class World {
   }
 
   seedEnvironment(): void {
-    const { w, h, rng, fields, terrain } = this;
+    const { w, h, fields } = this;
     for (let y = 0; y < h; y++) {
-      const sun = 0.28 + 0.72 * (1 - y / Math.max(1, h - 1));
+      const sun = 0.35 + 0.55 * (1 - y / Math.max(1, h - 1));
       for (let x = 0; x < w; x++) {
         const i = y * w + x;
-        fields.solar[i] = sun * (0.85 + rng.next() * 0.15);
-        fields.light[i] = fields.solar[i]!;
-        fields.temperature[i] = 0.35 + 0.45 * (x / Math.max(1, w - 1)) + (rng.next() - 0.5) * 0.04;
-        fields.nutrient[i] = 0;
+        fields.solar[i] = sun;
+        fields.light[i] = sun;
+        fields.temperature[i] = 0.5;
+        fields.nutrient[i] = 0.12;
         fields.toxin[i] = 0;
       }
     }
+  }
+
+  /** Optional preset: random vents, toxin, heat, walls, shade. Off by default. */
+  seedRandomTerrain(): void {
+    const { w, h, rng, fields, terrain } = this;
+    this.randomTerrain = true;
     const vents = 6 + rng.int(5);
     for (let k = 0; k < vents; k++) {
-      const x = 4 + rng.int(w - 8);
-      const y = 4 + rng.int(h - 8);
+      const x = 4 + rng.int(Math.max(1, w - 8));
+      const y = 4 + rng.int(Math.max(1, h - 8));
       const r = 2 + rng.int(4);
       this.paint(x, y, r, "nutrientVent");
       fields.addBlob("nutrient", x, y, r + 3, 0.8);
     }
     const toxN = 3 + rng.int(3);
     for (let k = 0; k < toxN; k++) {
-      const x = 4 + rng.int(w - 8);
-      const y = 4 + rng.int(h - 8);
+      const x = 4 + rng.int(Math.max(1, w - 8));
+      const y = 4 + rng.int(Math.max(1, h - 8));
       this.paint(x, y, 2, "toxinVent");
       fields.addBlob("toxin", x, y, 4, 0.55);
     }
     const hotN = 2 + rng.int(3);
     for (let k = 0; k < hotN; k++) {
       const x = Math.floor(w * 0.55) + rng.int(Math.max(1, Math.floor(w * 0.4)));
-      const y = 4 + rng.int(h - 8);
+      const y = 4 + rng.int(Math.max(1, h - 8));
       this.paint(x, y, 2, "thermalVent");
     }
     const walls = 4 + rng.int(6);
@@ -144,6 +157,13 @@ export class World {
     for (let k = 0; k < shadeN; k++) {
       this.paint(rng.int(w), rng.int(h), 3 + rng.int(4), "shade");
     }
+  }
+
+  clearPresetTerrain(): void {
+    this.randomTerrain = false;
+    this.terrain.fill(TERRAIN.empty);
+    this.fields.toxin.fill(0);
+    this.fields.nutrient.fill(0.12);
   }
 
   seedPopulation(): void {
@@ -272,6 +292,7 @@ export class World {
       typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     this.tick++;
     this.fields.advance(this.terrain, this.params, seasonLight(this.tick));
+    shadeOccupied(this.fields.light, this.organisms, this.occupancy, this.w, this.h);
     this.applyDisturbances();
     const orgs = this.organisms;
     for (let i = 0; i < orgs.length; i++) {
@@ -316,6 +337,7 @@ export class World {
   }
 
   private applyDisturbances(): void {
+    if (!this.disturbances) return;
     const { w, h, rng, tick } = this;
     if (tick >= TOXIN_PULSE_EVERY && tick % TOXIN_PULSE_EVERY === 0) {
       this.fields.addBlob("toxin", rng.int(w), rng.int(h), 5 + rng.int(4), 0.55);
@@ -342,6 +364,7 @@ export class World {
       if (parent.energy < need) continue;
       if (this.organisms.length >= this.params.maxPopulation) break;
       if (pressure > 0.52 && !this.rng.chance(Math.max(0.08, 1 - pressure))) continue;
+      if (neighborOccupancyCount(parent.x, parent.y, this.occupancy, this.w, this.h) >= 4) continue;
       const spot = emptyNeighbor(
         parent.x,
         parent.y,
@@ -500,7 +523,7 @@ export class World {
   snapshot(): WorldSnapshot {
     return {
       version: 1,
-      params: { ...this.params },
+      params: { ...this.params, randomTerrain: this.randomTerrain, disturbances: this.disturbances },
       rngState: this.rng.state(),
       tick: this.tick,
       ...this.fields.toArrays(),
@@ -531,6 +554,8 @@ export class World {
     this.lineages = new Map(snap.lineages.map((l) => [l.id, { ...l }]));
     this.extinctions = snap.extinctions.map((e) => ({ ...e }));
     this.history = snap.history.map((h) => ({ ...h }));
+    this.randomTerrain = Boolean(snap.params.randomTerrain);
+    this.disturbances = Boolean(snap.params.disturbances);
     this.rebuildOccupancy();
   }
 

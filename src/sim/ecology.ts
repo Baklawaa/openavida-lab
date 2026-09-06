@@ -24,7 +24,7 @@ export function neighborIndex(
  * Harvest / pay environment costs. Nutrient is consumed; light/temp/toxin
  * are sampled. Returns the metabolic delta applied to energy.
  */
-export function crowdingPenalty(
+export function neighborOccupancyCount(
   x: number,
   y: number,
   occupancy: Int32Array,
@@ -36,7 +36,35 @@ export function crowdingPenalty(
     const ni = neighborIndex(x, y, d, w, h);
     if (ni !== null && occupancy[ni]! >= 0) n++;
   }
-  return 0.01 * n;
+  return n;
+}
+
+export function crowdingPenalty(
+  x: number,
+  y: number,
+  occupancy: Int32Array,
+  w: number,
+  h: number,
+): number {
+  return 0.012 * neighborOccupancyCount(x, y, occupancy, w, h);
+}
+
+/** Only dense clumps shade themselves — isolated cells still see the sky. */
+export function shadeOccupied(
+  light: Float32Array,
+  organisms: { x: number; y: number }[],
+  occupancy: Int32Array,
+  w: number,
+  h: number,
+): void {
+  for (let i = 0; i < organisms.length; i++) {
+    const o = organisms[i]!;
+    const n = neighborOccupancyCount(o.x, o.y, occupancy, w, h);
+    if (n < 2) continue;
+    const idx = o.y * w + o.x;
+    const k = n >= 5 ? 0.18 : n >= 3 ? 0.4 : 0.7;
+    light[idx] = light[idx]! * k;
+  }
 }
 
 export function metabolize(org: Organism, fields: Fields, params: SimParams): number {

@@ -39,6 +39,17 @@ export function injectStrain(
   return world.injectStrain(genome, count, x, y);
 }
 
+/** Place a single organism on a chosen cell. Returns null if the cell is blocked. */
+export function placeOrganismAt(
+  world: World,
+  x: number,
+  y: number,
+  genome: string,
+  energy = 0.9,
+): ReturnType<World["birth"]> {
+  return world.birth(x, y, genome, null, false, energy);
+}
+
 export function applyBottleneck(world: World, keepFraction: number): number {
   return world.bottleneck(keepFraction);
 }

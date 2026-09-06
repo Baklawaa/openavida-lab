@@ -15,7 +15,11 @@ describe("control help catalog", () => {
       const text = CONTROL_HELP[id];
       expect(text, id).toBeTruthy();
       expect(text!.trim().length, id).toBeGreaterThan(12);
-      const token = id.startsWith("brush-") ? id.slice("brush-".length) : id;
+      const token = id.startsWith("brush-")
+        ? id.slice("brush-".length)
+        : id.startsWith("kit-")
+          ? id.slice("kit-".length)
+          : id;
       expect(appSrc.includes(id) || appSrc.includes(token), `UI references ${id}`).toBe(true);
     }
   });
