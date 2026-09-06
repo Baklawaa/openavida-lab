@@ -57,7 +57,7 @@ To verify the interface with the local server running and Chrome installed:
 node tools/verify-interface.mjs
 ```
 
-This checks the main workflows, keyboard navigation, and five viewport sizes. Screenshots are written to `scratch/interface/`.
+This checks placement, DNA editing, painting, 2D/3D, A/B, snapshots, Espèces (define / inject / rename), presets, a 2-replicate goal run, keyboard navigation, and five viewport sizes. Pass the app URL as the first argument (default `http://127.0.0.1:5174/`). Screenshots are written to `scratch/interface/`.
 
 ES modules will not load from `file://`. Use `npm run dev` or `npm run preview`.
 

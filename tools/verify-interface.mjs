@@ -97,6 +97,33 @@ try {
   await page.locator('#btn-inject').click();
   assert.equal((await probe()).population, 25);
 
+  // Espèces: define a named strain from the editor, inject it, recolor, switch grouping, rename.
+  await page.locator('#kit-heterotroph strong').click();
+  await page.locator('#tab-species').click();
+  await visible('#strain-name');
+  await input('#strain-name', 'Sondes');
+  await page.locator('#btn-strain-define').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.group-name')].some(el => el.value === 'Sondes'));
+  const unplaced = page.locator('.group-card').filter({ has: page.locator('.group-name[value="Sondes"]') });
+  assert.match(await unplaced.locator('.group-state').textContent(), /non placée/);
+  await unplaced.locator('[data-act="inject"]').click();
+  await page.waitForFunction(() => {
+    const input = [...document.querySelectorAll('.group-name')].find(el => el.value === 'Sondes');
+    return Number(input?.closest('.group-card')?.querySelector('.group-count')?.textContent) > 0;
+  });
+  await page.locator('#opt-color-strain input').check();
+  assert.equal(await page.locator('#opt-color-strain input').isChecked(), true);
+  await page.locator('#species-strategies').click();
+  await active('#species-strategies');
+  await page.locator('#species-strains').click();
+  await active('#species-strains');
+  const nameInput = page.locator('.group-name[value="Sondes"]');
+  await nameInput.fill('Sondes-2');
+  await nameInput.press('Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('.group-name')].some(el => el.value === 'Sondes-2'));
+  const popA = (await probe()).population;
+  assert.ok(popA > 25, 'Injected strain increases population');
+
   // Painting a nutrient field updates real sampled values; shortcuts sync UI.
   await page.locator('#tab-environment').click();
   await active('#tool-paint');
@@ -138,7 +165,7 @@ try {
   await page.locator('#view-split').click();
   await active('#view-2d');
   await page.locator('#view-A').click();
-  assert.equal((await probe()).population, 25);
+  assert.equal((await probe()).population, popA);
 
   // Snapshot / restore, exports, and invalid imports have visible outcomes.
   await page.locator('#tab-experiment').click();
@@ -163,6 +190,34 @@ try {
   await page.locator('#import-file').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('invalid') });
   await page.waitForFunction(() => document.querySelector('#status-line').textContent.includes('Import impossible'));
   assert.equal((await probe()).population, snapshotPopulation);
+
+  // Presets: save, load into the active world, remove until the list is empty.
+  while (await page.locator('.preset-row [data-act="remove"]').count()) {
+    await page.locator('.preset-row [data-act="remove"]').first().click();
+    await page.waitForTimeout(80);
+  }
+  await input('#preset-name', 'Vérif');
+  await page.locator('#btn-preset-save').click();
+  await page.waitForSelector('.preset-row');
+  await page.locator('.preset-row [data-act="load"]').first().click();
+  await page.waitForFunction(n => window.__openavida.population === n, snapshotPopulation);
+  await page.locator('.preset-row [data-act="remove"]').first().click();
+  await page.waitForFunction(() => document.querySelectorAll('.preset-row').length === 0);
+
+  // Goal run: toxin template, 2 replicates, 60-step budget.
+  await page.locator('#goal-example').evaluate(el => { el.value = 'toxin'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+  await input('#goal-reps', 2);
+  await input('#goal-max', 60);
+  await page.locator('#btn-goal-run').click();
+  await page.waitForFunction(() => document.querySelectorAll('.goal-result').length >= 2, null, { timeout: 45000 });
+  assert.match(await page.locator('#goal-summary').textContent(), /Réussite/);
+  await page.locator('.goal-result [data-open]').first().click();
+  await page.waitForFunction(() => window.__openavida.world === 'B');
+  const csvEvent = page.waitForEvent('download');
+  await page.locator('#btn-goal-csv').click();
+  const csv = await csvEvent;
+  assert.match(csv.suggestedFilename(), /\.csv$/);
+  await page.locator('#view-A').click();
 
   // Focus view and keyboard navigation, including the native help dialog.
   await page.locator('#btn-focus').click();
@@ -213,7 +268,7 @@ try {
     }
   }
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, keyboard, and 5 responsive sizes.');
+  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, presets, goal runs, keyboard, and 5 responsive sizes.');
 } finally {
   await browser.close();
 }

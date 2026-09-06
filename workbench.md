@@ -110,6 +110,11 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - Expérience → Recette: toggle, op count, copy link / export / import / replay in B. `parseShareURL` path applies `?recipe=` to world A at startup.
 - Decision: `worldFromSnapshot` clears recording so goal trials do not accumulate a step op. Toggle off drops the list; on again starts empty.
 
+## Task 5 — Interface coverage (2026-09-06)
+
+- `tools/verify-interface.mjs` (still one linear script): Espèces define/inject/color/stratégies/rename; presets save/load/remove to empty list; goal toxin template, 2×60, two `.goal-result`, `#goal-summary` « Réussite », Ouvrir dans B → `__openavida.world === "B"`, CSV download.
+- Runtime ~8 s. Strain defined from the heterotroph kit so the card starts « non placée » (phototrophs already occupy the plate).
+
 ## Metrics (gating)
 
 | Check | Result |
