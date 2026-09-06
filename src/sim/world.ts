@@ -538,6 +538,34 @@ export class World {
     }
     m.strains = strains;
     m.strategies = strategies;
+    const tracks: Record<string, [number, number, number, number, number]> = {};
+    const acc = new Map<string, { n: number; sx: number; sy: number; st: number; sn: number }>();
+    for (const o of this.organisms) {
+      const k = String(o.strainId);
+      let a = acc.get(k);
+      if (!a) {
+        a = { n: 0, sx: 0, sy: 0, st: 0, sn: 0 };
+        acc.set(k, a);
+      }
+      const env = this.fields.sample(o.x, o.y);
+      a.n++;
+      a.sx += o.x;
+      a.sy += o.y;
+      a.st += env.temperature;
+      a.sn += env.nutrient;
+    }
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    for (const [k, a] of acc) {
+      const cx = a.sx / a.n;
+      const cy = a.sy / a.n;
+      let d2 = 0;
+      for (const o of this.organisms) {
+        if (String(o.strainId) !== k) continue;
+        d2 += (o.x - cx) ** 2 + (o.y - cy) ** 2;
+      }
+      tracks[k] = [r2(cx), r2(cy), r2(Math.sqrt(d2 / a.n)), r2(a.st / a.n), r2(a.sn / a.n)];
+    }
+    m.strainTracks = tracks;
     this.history.push(m);
     if (this.history.length > 4000) this.history.splice(0, this.history.length - 3000);
     return m;

@@ -58,6 +58,8 @@ export const CONTROL_HELP: Record<string, string> = {
   "species-strategies": "Regroupe les organismes par stratégie actuelle, déduite du phénotype : prédateur, mutualiste, phototrophe, hétérotrophe ou mixotrophe.",
   "opt-color-strain": "Colore chaque organisme de la vue 2D avec la couleur de sa souche, pour suivre les groupes sur la plaque.",
   "chart-groups": "Effectif vivant de chaque groupe au fil des pas. Une courbe qui monte pendant qu’une autre chute signale un remplacement.",
+  "chart-strain-map": "Carte du monde : trajet du centre de masse de chaque souche, du plus ancien (fade) au plus récent. Le disque est la position actuelle ; les losanges sont les sources (nutriment, toxine, chaleur).",
+  "chart-strain-temp": "Température locale moyenne au centre de chaque souche au fil des pas. Une baisse indique un éloignement des sources thermiques.",
   "species-list": "Une carte par groupe : effectif, fitness, position moyenne, milieu local, phénotype moyen, dérive depuis le fondateur et mutations clés.",
   "strain-name": "Nom de la souche à créer à partir du génome courant de l’éditeur d’ADN.",
   "btn-strain-define": "Crée une souche nommée avec le génome de l’éditeur. Placez-la ou injectez-la depuis sa carte pour la comparer aux autres.",

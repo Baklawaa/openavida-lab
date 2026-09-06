@@ -96,6 +96,13 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - Espèces → Changements clés → « Voir la mutation » opens Organismes and scrolls the editor.
 - Probe `window.__openavidaMutate(n)` steps with mutationRate 1 (test only). verify-interface asserts `#dna-strip .nt-diff` ≥ 1.
 
+## Task 3 — Group trajectories over time (2026-09-06)
+
+- `MetricsSample.strainTracks`: per strain `[cx, cy, spread, temperature, nutrient]`, 2-decimal, no RNG. Optional on snapshots.
+- `strainTrack(history, id, every)` keeps every n-th row plus the last. Tests on a hand-built history and a two-organism centroid.
+- Espèces (Souches): Trajectoires card — world-aspect centroid map (fade old→new, current disc, vent diamonds) + mean local T° (`drawTrackSeries`). Cards: « Déplacement du centre depuis le fondateur : n cellules ».
+- Decision: letterbox the square world inside the 140 px-tall map so the path is not stretched on a wide card. Hidden in Stratégies mode.
+
 ## Metrics (gating)
 
 | Check | Result |

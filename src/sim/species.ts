@@ -15,7 +15,7 @@
  * descendants of the lineage that mutation created.
  */
 import { TRAIT_NAMES, type Phenotype, type TraitName } from "./mapping";
-import type { DeathCause, DeathRecord, EnvSample, LineageNode, MutationKind, Organism } from "./types";
+import type { DeathCause, DeathRecord, EnvSample, LineageNode, MetricsSample, MutationKind, Organism } from "./types";
 
 export interface Strain {
   id: number;
@@ -55,6 +55,41 @@ export interface Innovation {
 export const STRAIN_COLORS = [
   "#3ee0c0", "#f0d35a", "#ff6b8a", "#6ea8ff", "#c87bff", "#ff9d45", "#9dffb0", "#e8c4ff", "#57c7ff", "#ffd1a1",
 ] as const;
+
+export interface StrainTrackPoint {
+  tick: number;
+  cx: number;
+  cy: number;
+  spread: number;
+  temperature: number;
+  nutrient: number;
+}
+
+/** Sampled centroid path for one strain. `every` keeps every n-th history row plus the last. */
+export function strainTrack(
+  history: readonly MetricsSample[],
+  strainId: string | number,
+  every: number,
+): StrainTrackPoint[] {
+  const key = String(strainId);
+  const step = Math.max(1, every | 0);
+  const out: StrainTrackPoint[] = [];
+  const last = history.length - 1;
+  for (let i = 0; i < history.length; i++) {
+    if (i !== last && i % step !== 0) continue;
+    const t = history[i]!.strainTracks?.[key];
+    if (!t) continue;
+    out.push({
+      tick: history[i]!.tick,
+      cx: t[0],
+      cy: t[1],
+      spread: t[2],
+      temperature: t[3],
+      nutrient: t[4],
+    });
+  }
+  return out;
+}
 
 export function strainColor(index: number): string {
   return STRAIN_COLORS[Math.max(0, index) % STRAIN_COLORS.length]!;

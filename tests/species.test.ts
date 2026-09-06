@@ -11,11 +11,13 @@ import {
   phenotypeChanges,
   placeOrganismAt,
   restoreSnapshot,
+  strainTrack,
   strategyOf,
   takeSnapshot,
   traitDrift,
   worldFromSnapshot,
 } from "../src/sim/index";
+import type { MetricsSample } from "../src/sim/types";
 
 describe("strains (founding-genome groups)", () => {
   it("tags founders by genome and children inherit the tag, mutants included", () => {
@@ -137,5 +139,56 @@ describe("strains (founding-genome groups)", () => {
     const founders = w2.organisms.filter((o) => o.parentId < 0);
     expect(founders.every((o) => o.strainId > 0)).toBe(true);
     expect(w2.organisms.every((o) => o.strainId >= 0)).toBe(true);
+  });
+});
+
+function metric(tick: number, tracks?: MetricsSample["strainTracks"]): MetricsSample {
+  return {
+    tick,
+    population: 0,
+    meanFitness: 0,
+    maxFitness: 0,
+    shannon: 0,
+    shannonGenotype: 0,
+    lineageCount: 0,
+    extinctTotal: 0,
+    fixationFraction: 0,
+    fixationLineageId: 0,
+    strainTracks: tracks,
+  };
+}
+
+describe("strainTrack", () => {
+  it("keeps every n-th history row plus the last, and skips missing keys", () => {
+    const history: MetricsSample[] = [
+      metric(0, { "1": [10, 10, 1, 0.2, 0.5] }),
+      metric(1, { "1": [11, 10, 1, 0.2, 0.5] }),
+      metric(2, { "1": [12, 11, 1.5, 0.3, 0.4] }),
+      metric(3, { "2": [0, 0, 0, 0, 0] }),
+      metric(4, { "1": [20, 18, 2, 0.5, 0.1] }),
+    ];
+    const pts = strainTrack(history, 1, 2);
+    expect(pts.map((p) => p.tick)).toEqual([0, 2, 4]);
+    expect(pts[0]).toEqual({ tick: 0, cx: 10, cy: 10, spread: 1, temperature: 0.2, nutrient: 0.5 });
+    expect(pts[2]!.cx).toBe(20);
+    const short = [metric(0, { "1": [0, 0, 0, 0, 0] }), metric(1, { "1": [1, 1, 0, 0, 0] }), metric(2, { "1": [2, 2, 0, 0, 0] }), metric(3, { "1": [9, 8, 0, 0.4, 0.1] })];
+    expect(strainTrack(short, "1", 2).map((p) => p.tick)).toEqual([0, 2, 3]);
+    expect(strainTrack(history, 2, 1)).toHaveLength(1);
+    expect(strainTrack([metric(0), metric(1)], 1, 1)).toEqual([]);
+  });
+
+  it("records 2-decimal centroid tracks on the world history", () => {
+    const w = new World({ width: 16, height: 16, seed: 1 });
+    placeOrganismAt(w, 2, 3, founderPhototroph());
+    placeOrganismAt(w, 4, 3, founderPhototroph());
+    w.recordMetrics();
+    const t = w.history.at(-1)!.strainTracks!["1"];
+    expect(t).toBeTruthy();
+    expect(t![0]).toBe(3);
+    expect(t![1]).toBe(3);
+    expect(t![2]).toBe(1);
+    for (const v of t!) expect(v).toBe(Math.round(v * 100) / 100);
+    const restored = worldFromSnapshot(takeSnapshot(w));
+    expect(restored.history.at(-1)!.strainTracks!["1"]).toEqual(t);
   });
 });

@@ -210,6 +210,124 @@ export interface SweepChartPoint {
   max: number | null;
 }
 
+export interface TrackSeries {
+  key: string;
+  color: string;
+  points: Array<{ tick: number; value: number }>;
+}
+
+export interface StrainMapSeries {
+  color: string;
+  points: Array<{ cx: number; cy: number }>;
+}
+
+export interface StrainMapVent {
+  x: number;
+  y: number;
+  kind: "nutrient" | "toxin" | "thermal";
+}
+
+const VENT_FILL: Record<StrainMapVent["kind"], string> = {
+  nutrient: "#a2dfbd",
+  toxin: "#ed809d",
+  thermal: "#df9d6b",
+};
+
+/** World-aspect map of strain centroids. Paths fade old → new; a disc marks the current centre; diamonds mark vents. */
+export function drawStrainMap(
+  canvas: HTMLCanvasElement,
+  w: number,
+  h: number,
+  worldW: number,
+  worldH: number,
+  series: StrainMapSeries[],
+  vents: StrainMapVent[],
+): void {
+  const ctx = prepare(canvas, w, h);
+  if (w <= 0 || h <= 0) return;
+  const pad = 8;
+  const innerW = w - pad * 2;
+  const innerH = h - pad * 2;
+  if (innerW <= 0 || innerH <= 0) return;
+  const aspect = worldW / Math.max(1, worldH);
+  let plotW = innerW;
+  let plotH = innerH;
+  if (plotW / plotH > aspect) plotW = plotH * aspect;
+  else plotH = plotW / aspect;
+  const ox = pad + (innerW - plotW) / 2;
+  const oy = pad + (innerH - plotH) / 2;
+  const X = (x: number) => ox + (x / Math.max(1, worldW - 1)) * plotW;
+  const Y = (y: number) => oy + (y / Math.max(1, worldH - 1)) * plotH;
+  ctx.strokeStyle = GRID;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox + 0.5, oy + 0.5, plotW, plotH);
+  for (const v of vents) {
+    const x = X(v.x);
+    const y = Y(v.y);
+    ctx.fillStyle = VENT_FILL[v.kind];
+    ctx.beginPath();
+    ctx.moveTo(x, y - 3.2);
+    ctx.lineTo(x + 3.2, y);
+    ctx.lineTo(x, y + 3.2);
+    ctx.lineTo(x - 3.2, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (!series.some((s) => s.points.length)) {
+    empty(ctx, w, h, "Les trajectoires de souche apparaîtront ici");
+    return;
+  }
+  for (const s of series) {
+    const pts = s.points;
+    if (!pts.length) continue;
+    for (let i = 1; i < pts.length; i++) {
+      const a = i / (pts.length - 1);
+      ctx.globalAlpha = 0.18 + 0.82 * a;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(X(pts[i - 1]!.cx), Y(pts[i - 1]!.cy));
+      ctx.lineTo(X(pts[i]!.cx), Y(pts[i]!.cy));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const last = pts[pts.length - 1]!;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.arc(X(last.cx), Y(last.cy), 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#0b1014";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+/** One line per series of (tick, value) samples — e.g. mean local temperature per strain. */
+export function drawTrackSeries(canvas: HTMLCanvasElement, w: number, h: number, series: TrackSeries[]): void {
+  const ctx = prepare(canvas, w, h);
+  if (w <= 0) return;
+  const pts = series.flatMap((s) => s.points);
+  if (!pts.length) { empty(ctx, w, h, "Les trajectoires de température apparaîtront ici"); return; }
+  const values = pts.map((p) => p.value);
+  const [floor, ceiling] = chartDomain(values);
+  const start = Math.min(...pts.map((p) => p.tick));
+  const end = Math.max(...pts.map((p) => p.tick), start + 1);
+  axes(ctx, w, h, floor, ceiling, start, end);
+  const plotW = w - PAD.left - PAD.right;
+  const plotH = h - PAD.top - PAD.bottom;
+  const X = (t: number) => PAD.left + ((t - start) / Math.max(1, end - start)) * plotW;
+  const Y = (v: number) => PAD.top + (1 - (v - floor) / Math.max(1e-9, ceiling - floor)) * plotH;
+  for (const s of series) {
+    if (!s.points.length) continue;
+    ctx.beginPath();
+    s.points.forEach((p, i) => { if (i === 0) ctx.moveTo(X(p.tick), Y(p.value)); else ctx.lineTo(X(p.tick), Y(p.value)); });
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.7; ctx.lineJoin = "round"; ctx.stroke();
+    const last = s.points[s.points.length - 1]!;
+    ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(X(last.tick), Y(last.value), 2.4, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 /** Median ticks-to-goal vs sweep value, with a min–max band. */
 export function drawSweep(canvas: HTMLCanvasElement, w: number, h: number, points: SweepChartPoint[]): void {
   const ctx = prepare(canvas, w, h);

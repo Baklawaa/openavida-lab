@@ -164,6 +164,8 @@ export interface MetricsSample {
   /** Living count per strain id / per strategy at this tick. */
   strains?: Record<string, number>;
   strategies?: Record<string, number>;
+  /** Per strain: [cx, cy, spread, temperature, nutrient], 2-decimal. */
+  strainTracks?: Record<string, [number, number, number, number, number]>;
 }
 
 export interface MutationRates {

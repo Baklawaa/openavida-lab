@@ -5,12 +5,13 @@
  * strategies (deterministic phenotype classes). Cards show live statistics,
  * drift from the founder, and the key innovations that spread.
  */
-import { drawGroupSeries, type GroupSeries } from "../render/charts";
+import { drawGroupSeries, drawStrainMap, drawTrackSeries, type GroupSeries, type StrainMapVent } from "../render/charts";
 import {
   CAUSE_COLOR,
   STRATEGIES,
   STRATEGY_COLOR,
   STRATEGY_LABEL,
+  TERRAIN,
   TRAIT_COLOR,
   TRAIT_NAMES,
   World,
@@ -18,6 +19,7 @@ import {
   groupStats,
   innovationSpread,
   keyInnovations,
+  strainTrack,
   strategyOf,
   traitDrift,
   type DeathCause,
@@ -77,6 +79,13 @@ function template(): string {
       </div>
       <p class="muted" id="species-mode-hint">Souche = génome fondateur. Les descendants, mutants compris, gardent l’étiquette.</p>
       <div class="chart-card species-chart"><div class="chart-heading"><h3>Effectifs par groupe</h3><span id="species-legend"></span></div><canvas id="chart-groups" role="img" aria-label="Effectifs par groupe au fil du temps"></canvas></div>
+      <div class="chart-card species-chart" id="species-tracks">
+        <div class="chart-heading"><h3>Trajectoires</h3><span id="species-track-legend"></span></div>
+        <div class="track-caption">Carte · centre de masse</div>
+        <canvas id="chart-strain-map" role="img" aria-label="Trajectoire du centre de chaque souche dans le monde"></canvas>
+        <div class="track-caption">Température locale moyenne</div>
+        <canvas id="chart-strain-temp" role="img" aria-label="Température locale moyenne par souche"></canvas>
+      </div>
       <div id="species-list" class="species-list"></div>
     </section>
     <section class="block">
@@ -185,6 +194,13 @@ export class SpeciesPanel {
       drawGroupSeries(canvas, cw, 110, hist, series, this.mode);
     }
 
+    const tracksCard = this.q("#species-tracks");
+    tracksCard.toggleAttribute("hidden", this.mode !== "strains");
+    if (this.mode === "strains") {
+      const tw = tracksCard.clientWidth - 28;
+      if (tw > 0) this.drawTracks(w, series, tw);
+    }
+
     // Do not rebuild the cards while a name is being edited.
     const list = this.q("#species-list");
     if (list.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement) return;
@@ -211,13 +227,18 @@ export class SpeciesPanel {
       ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="Charger ce génome dans l’éditeur et activer Placer">Placer</button><button type="button" data-act="inject" data-strain="${strain.id}" title="Injecter 24 organismes de cette souche">+24</button></span>`
       : "";
     const state = extinct ? `<span class="tiny group-state">${everLived ? "éteinte" : "non placée"}</span>` : `<span class="tiny">${(s.share * 100).toFixed(0)} %</span>`;
+    const path = strainTrack(w.history, s.key, Math.max(1, w.history.length - 1));
+    const displace = path.length
+      ? `<span class="span-2">Déplacement du centre depuis le fondateur : <b>${Math.hypot(path[path.length - 1]!.cx - path[0]!.cx, path[path.length - 1]!.cy - path[0]!.cy).toFixed(0)}</b> cellules</span>`
+      : "";
     const facts = extinct
-      ? ""
+      ? (everLived && displace ? `<div class="group-facts">${displace}</div>` : "")
       : `<div class="group-facts">
           <span>Fitness <b>${fmt(s.meanFitness, 3)}</b></span>
           <span>Énergie <b>${fmt(s.meanEnergy)}</b></span>
           <span>Âge <b>${s.meanAge.toFixed(0)}</b></span>
           <span>Centre <b>(${s.centroid.x.toFixed(0)}, ${s.centroid.y.toFixed(0)})</b> ± ${s.spread.toFixed(0)}</span>
+          ${displace}
         </div>
         <div class="group-env">Milieu local · T <b>${fmt(s.env.temperature)}</b> · Nutr <b>${fmt(s.env.nutrient)}</b> · Tox <b>${fmt(s.env.toxin)}</b> · Lum <b>${fmt(s.env.light)}</b></div>`;
     const traits = `<div class="trait-strip" aria-label="Phénotype moyen">${TRAIT_NAMES.map((t) => `<span title="${TRAIT_LABEL[t]} ${fmt(s.traits[t], 3)}"><i style="height:${pct(t, s.traits[t]).toFixed(0)}%;background:${TRAIT_COLOR[t]}"></i><small>${TRAIT_ABBR[t]}</small></span>`).join("")}</div>`;
@@ -299,5 +320,46 @@ export class SpeciesPanel {
     list.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" && (ev.target as HTMLElement).classList.contains("group-name")) (ev.target as HTMLInputElement).blur();
     });
+  }
+
+  private drawTracks(w: World, series: GroupSeries[], cw: number): void {
+    this.q("#species-track-legend").innerHTML = series.slice(0, 6).map((g) => `<i class="dot" style="background:${g.color}"></i>${g.label}`).join(" ");
+    const every = w.history.length > 160 ? Math.ceil(w.history.length / 80) : 1;
+    const tracks = series.map((s) => ({
+      key: s.key,
+      color: s.color,
+      points: strainTrack(w.history, s.key, every),
+    }));
+    const vents: StrainMapVent[] = [];
+    const terrain = w.terrain;
+    for (let i = 0; i < terrain.length; i++) {
+      const t = terrain[i]!;
+      if (t !== TERRAIN.nutrientVent && t !== TERRAIN.toxinVent && t !== TERRAIN.thermalVent) continue;
+      vents.push({
+        x: i % w.w,
+        y: (i / w.w) | 0,
+        kind: t === TERRAIN.nutrientVent ? "nutrient" : t === TERRAIN.toxinVent ? "toxin" : "thermal",
+      });
+    }
+    const mapH = Math.max(72, Math.min(140, Math.round(cw * (w.h / Math.max(1, w.w)))));
+    drawStrainMap(
+      this.q<HTMLCanvasElement>("#chart-strain-map"),
+      cw,
+      mapH,
+      w.w,
+      w.h,
+      tracks.map((t) => ({ color: t.color, points: t.points })),
+      vents,
+    );
+    drawTrackSeries(
+      this.q<HTMLCanvasElement>("#chart-strain-temp"),
+      cw,
+      110,
+      tracks.map((t) => ({
+        key: t.key,
+        color: t.color,
+        points: t.points.map((p) => ({ tick: p.tick, value: p.temperature })),
+      })),
+    );
   }
 }

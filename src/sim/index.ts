@@ -133,11 +133,13 @@ export {
   keyInnovations,
   phenotypeChanges,
   strainColor,
+  strainTrack,
   strategyOf,
   traitDrift,
   type GroupStats,
   type Innovation,
   type Strain,
+  type StrainTrackPoint,
   type Strategy,
   type TraitChange,
 } from "./species";

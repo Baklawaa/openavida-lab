@@ -279,8 +279,11 @@ dialog { width: min(520px, calc(100vw - 32px)); background: #121d20; color: var(
 .species-mode { justify-content: space-between; margin-top: 8px; }
 .species-chart { margin: 12px 0; }
 .species-chart canvas { display: block; }
-#species-legend { display: flex; gap: 7px; flex-wrap: wrap; font-size: 9px; white-space: normal; }
-#species-legend .dot { width: 5px; height: 5px; margin: 0 2px 1px 0; }
+#species-legend, #species-track-legend { display: flex; gap: 7px; flex-wrap: wrap; font-size: 9px; white-space: normal; }
+#species-legend .dot, #species-track-legend .dot { width: 5px; height: 5px; margin: 0 2px 1px 0; }
+#species-tracks .track-caption { font-size: 9px; color: var(--muted); letter-spacing: .04em; margin: 6px 0 2px; }
+#chart-strain-map, #chart-strain-temp { display: block; }
+.group-facts .span-2 { grid-column: 1 / -1; }
 .species-list { display: flex; flex-direction: column; gap: 10px; }
 .species-list > .muted { margin: 0; }
 .group-card { padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--g); border-radius: 6px; background: #111b20; }
