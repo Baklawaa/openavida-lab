@@ -129,6 +129,16 @@ Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not produc
 - Gates: Vitest 100/100 (`tests/simHost.test.ts` adds 4: op parity with direct calls by hash, frame round trip by hash, incremental history, InlineHost), perf hash **9d4c0f2b**; `tools/verify-worker.mjs` → identical hash in both hosts after 48 steps; `verify-interface.mjs` passes inline and with `?worker=1`; `launch.mjs` passes inline, `?worker=1`, and `?view3d=1&worker=1`; build emits `simWorker-*.js`.
 - Known limits: multiplayer host snapshots and the room protocol read the mirror (not the authoritative snapshot); in worker mode `takeSnapshot` for restore points also reads the mirror (its RNG state is carried by frames, so it is exact between frames but can lag one batch).
 
+## Round: predators feed, grow and hunt (2026-09-06)
+
+User: « Les prédateurs devraient se nourrir et grossir en mangeant d'autres organismes. » Before: a kill gave `prey.energy × (0.35+0.4·agg)`, movement ignored prey, size was purely genetic, all organisms rendered at one size. Control run (96×96, 240 prey, 12 predators): every predator starved by step 50 with 8 kills total.
+
+- `src/sim/body.ts`: `mass` (Organism, snapshot-compatible, default 0), `bodySize`, `maintenanceScale`, `huntingPower`, `preyGap` (genome-only eligibility), `feed` (energy + biomass bonus 0.45 × body, mass +0.22 +0.1·agg), `decayMass` (0.004/step), `energyCap`, `canBreed` (predators need mass ≥ 0.25).
+- `src/sim/ecology.ts`: `nearestPrey` (radius 6 window), chemotaxis pulls predators toward it; `moveOrganisms` eats prey on entry and eats movers that walk into a predator; `params` passed for the threshold. `fitness`/`metabolicDelta` take a maintenance scale.
+- Render: per-organism `aSize` attribute (stride 28) in `src/render/webgl.ts`; 3D column height uses `bodySize`. Inspect shows Corpulence · Taille effective · Âge.
+- Iterations recorded by control sims (`scratch/pred-sim.ts`, `pred-causes.ts`): (1) sensing raised kills 8 → 41 but predators still starved (meal ≈ 16 steps of upkeep); (2) biomass bonus 0.12 → 0.45 made them grow (mass 0.66 mean) but 37/55 predator deaths were cannibalism from the mass bonus; (3) genome-only eligibility removed cannibalism; (4) breeding gate on mass. Final: 8 fed predators at step 100 (mass up to 1.0), 87 kills; boom-and-bust afterwards on a uniform plate.
+- **Perf hash baseline changed deliberately: 9d4c0f2b → c2c03a81** (the perf world seeds predators). `tests/predation.test.ts` (6). Vitest 106/106; verify-interface, verify-worker (hash identical inline/worker), launch, build all green.
+
 ## Metrics (gating)
 
 | Check | Result |

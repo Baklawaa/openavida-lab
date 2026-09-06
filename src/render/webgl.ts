@@ -1,3 +1,4 @@
+import { bodySize } from "../sim/body";
 import type { World } from "../sim/world";
 import { TRAIT_COLOR } from "../sim/mapping";
 import { TERRAIN } from "../sim/types";
@@ -95,13 +96,14 @@ precision highp float;
 layout(location=0) in vec2 aPosition;
 layout(location=1) in vec3 aColor;
 layout(location=2) in float aSelected;
+layout(location=3) in float aSize;
 uniform float uSize;
 uniform float uDpr;
 out vec3 vColor;
 out float vSelected;
 void main() {
   gl_Position = vec4(aPosition, 0.0, 1.0);
-  gl_PointSize = uSize + aSelected * 6.0 * uDpr;
+  gl_PointSize = uSize * aSize + aSelected * 6.0 * uDpr;
   vColor = aColor;
   vSelected = aSelected;
 }
@@ -232,9 +234,9 @@ export class LabRenderer {
     this.organismVao = gl.createVertexArray()!;
     gl.bindVertexArray(this.organismVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.organismBuffer);
-    for (const [index, size, offset] of [[0, 2, 0], [1, 3, 8], [2, 1, 20]]) {
+    for (const [index, size, offset] of [[0, 2, 0], [1, 3, 8], [2, 1, 20], [3, 1, 24]]) {
       gl.enableVertexAttribArray(index!);
-      gl.vertexAttribPointer(index!, size!, gl.FLOAT, false, 24, offset!);
+      gl.vertexAttribPointer(index!, size!, gl.FLOAT, false, 28, offset!);
     }
     gl.bindVertexArray(null);
     this.texA = this.makeTex(false);
@@ -388,7 +390,8 @@ export class LabRenderer {
         if (u < 0 || u > 1 || v < 0 || v > 1) continue;
         const strain = this.colorByStrain ? world.strains.get(org.strainId) : undefined;
         const color = strain ? hexRgb(strain.color) : organismRgb(org.ph, org.lineageId);
-        data.push((u + side) / worlds.length * 2 - 1, 1 - v * 2, ...color, org.id === this.selectedId && (worlds.length === 1 || (side === 0 ? "A" : "B") === this.selectedWorld) ? 1 : 0);
+        const sizeFactor = Math.max(0.6, Math.min(2.2, 0.7 + 0.35 * bodySize(org)));
+        data.push((u + side) / worlds.length * 2 - 1, 1 - v * 2, ...color, org.id === this.selectedId && (worlds.length === 1 || (side === 0 ? "A" : "B") === this.selectedWorld) ? 1 : 0, sizeFactor);
       }
     }
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -401,7 +404,7 @@ export class LabRenderer {
     gl.uniform1f(gl.getUniformLocation(this.organismProg, "uDpr"), dpr);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.POINTS, 0, data.length / 6);
+    gl.drawArrays(gl.POINTS, 0, data.length / 7);
     gl.bindVertexArray(null);
     gl.disable(gl.BLEND);
   }

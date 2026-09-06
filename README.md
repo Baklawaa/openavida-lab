@@ -61,6 +61,17 @@ This checks placement, DNA editing, painting, 2D/3D, A/B, snapshots, Espèces (d
 
 ES modules will not load from `file://`. Use `npm run dev` or `npm run preview`.
 
+## Predators: feeding, growth, hunting
+
+Predation is a real trophic link (`src/sim/body.ts`, `src/sim/ecology.ts`):
+
+- **Feeding.** A kill transfers the prey's stored energy (`× (0.35 + 0.4 × aggression)`) plus its body (`0.45 × effective size`), so a meal is worth roughly 25–30 steps of maintenance.
+- **Growth.** Each organism carries a body condition `mass` (0–1), not a gene. Every kill adds about 0.3; it decays by 0.004 per step. Effective size = genome size × (1 + 0.6 × mass): it raises the energy cap, slightly raises maintenance (× (1 + 0.2 × mass)), strengthens hunting (aggression + 0.15 × mass), and drives the rendered size in 2D and 3D. The inspect panel shows Corpulence and effective size.
+- **Hunting.** Predators (aggression ≥ `predationThreshold`) sense edible prey within 6 cells and steer toward it; moving onto prey eats it, and prey walking into a predator is eaten. Eligibility uses genome aggression only (a gap of ≥ 0.1), so a well-fed predator does not eat identical kin; mass only improves the odds of an uncertain attack.
+- **Breeding.** A predator reproduces only once its mass reaches 0.25, so booms follow real feeding.
+
+Predator–prey dynamics remain boom-and-bust on a uniform plate: predators deplete local prey, then starve. The tuning constants live in `src/sim/body.ts`.
+
 ## Simulation in a worker
 
 `?worker=1` runs the visible simulation in a Web Worker. The app talks to a `SimHost` (`src/sim/simHost.ts`): the inline host steps the worlds on the main thread (default); the worker host (`src/ui/workerHost.ts`) keeps a mirror on the main thread that every panel reads, applies each mutation to the mirror immediately, forwards it to `src/sim/simWorker.ts`, and overwrites the mirror with the frames the worker streams back (field buffers are transferred). All mutations share one implementation, `applySimOp`, so inline, worker and mirror agree by construction. To check that:

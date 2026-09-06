@@ -179,6 +179,22 @@ export {
   type TrialSummary,
 } from "./goals";
 export {
+  MASS_DECAY,
+  MASS_PER_KILL,
+  MASS_SIZE_GAIN,
+  MASS_TO_BREED,
+  PREY_SENSE_RADIUS,
+  bodySize,
+  canBreed,
+  maintenanceScale,
+  decayMass,
+  energyCap,
+  feed,
+  huntingPower,
+  preyGap,
+} from "./body";
+export { chemotaxisDir, interactNeighbors, moveOrganisms, nearestPrey } from "./ecology";
+export {
   InlineHost,
   applyFrame,
   applySimOp,

@@ -15,7 +15,7 @@ You are an autonomous engineer working in the repository at the current director
 - Interface language is **French**. Tone is a scientific instrument: terse, descriptive labels, no taglines, no encouragement copy. Describe mechanism and measurement.
 - Every new interactive control with an id **must** get a `CONTROL_HELP` entry, and `tests/tooltips.test.ts` must list the source file that references the id in its `appSrc` array.
 - Snapshots (`WorldSnapshot`, version 1) must stay backward compatible: new fields are optional and `World.restore` must tolerate their absence.
-- The seeded core is a contract: `tests/perf.test.ts` prints `"lastHash":"9d4c0f2b"`. Any change to the order or count of `Rng` draws inside `World.step` breaks it. Never draw random numbers from the world RNG in analysis code.
+- The seeded core is a contract: `tests/perf.test.ts` prints `"lastHash":"c2c03a81"` (baseline set with the predator model; before that it was 9d4c0f2b). Any change to the order or count of `Rng` draws inside `World.step` breaks it. Never draw random numbers from the world RNG in analysis code.
 - Existing element ids are relied on by `tools/verify-interface.mjs` and `tools/launch.mjs`. Do not rename or remove ids; add new ones.
 - Keep the plate first: the workspace grid, letterboxing in `layout()` in `src/app.ts`, and the `wide-workspace` mode must keep working at 1440×900, 2000×700, 1100×768, 768×1024, 390×844.
 - Reference docs: `README.md` (user-facing), `workbench.md` (engineering log; append one section per task with what shipped and the gate results).
@@ -24,7 +24,7 @@ You are an autonomous engineer working in the repository at the current director
 
 ```bash
 npx tsc --noEmit
-npx vitest run            # all files pass; output must contain "lastHash":"9d4c0f2b"
+npx vitest run            # all files pass; output must contain "lastHash":"c2c03a81"
 npm run build             # emits dist/ with no errors
 ```
 

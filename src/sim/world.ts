@@ -24,6 +24,7 @@ import {
 } from "./genome";
 import { MAX_GENOME, copyPhenotype } from "./mapping";
 import { classifyEnergyDeath, deathFromOrganism } from "./deaths";
+import { canBreed, decayMass, energyCap, maintenanceScale } from "./body";
 import { applyPolicyMoves, type BrainRuntime } from "./brains";
 import { parentChildEdges, sampleMetrics } from "./metrics";
 import type { DeathRecord } from "./types";
@@ -267,6 +268,7 @@ export class World {
       parentId: parent ? parent.id : -1,
       fitness: 0,
       strainId: parent ? parent.strainId : this.strainFor(decoded.sequence, decoded.phenotype).id,
+      mass: 0,
     };
     if (!parent) {
       org.lineageId = this.createLineage(-1, org);
@@ -397,7 +399,7 @@ export class World {
       this.h,
       this.params,
     );
-    org.fitness = fitness(org.ph, env, neighbors);
+    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org));
   }
 
   rebuildOccupancy(): void {
@@ -419,6 +421,7 @@ export class World {
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
       o.age++;
+      decayMass(o);
       metabolize(o, this.fields, this.params);
       if (o.energy <= 0 && !o.pendingDeath) {
         o.pendingDeath = classifyEnergyDeath(o.ph, this.fields.sample(o.x, o.y));
@@ -439,7 +442,7 @@ export class World {
     this.lastMutualism = inter.mutualismEvents;
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
-      const cap = 3.2 + 1.2 * o.ph.size;
+      const cap = energyCap(o);
       if (o.energy > cap) o.energy = cap;
     }
     const mv =
@@ -463,6 +466,7 @@ export class World {
             this.w,
             this.h,
             this.rng,
+            this.params,
           );
     this.lastDisplacements = mv.displacements;
     this.reproduceAll();
@@ -504,6 +508,7 @@ export class World {
       if (parent.energy <= 0) continue;
       const need = reproduceThreshold(parent.ph, this.params.reproduceEnergy);
       if (parent.energy < need) continue;
+      if (!canBreed(parent, this.params.predationThreshold)) continue;
       if (this.organisms.length >= this.params.maxPopulation) break;
       if (pressure > 0.52 && !this.rng.chance(Math.max(0.08, 1 - pressure))) continue;
       if (neighborOccupancyCount(parent.x, parent.y, this.occupancy, this.w, this.h) >= 4) continue;
@@ -764,6 +769,7 @@ export class World {
       ...o,
       ph: copyPhenotype(o.ph),
       strainId: o.strainId ?? 0,
+      mass: o.mass ?? 0,
     }));
     // Older snapshots carry no strain tags: rebuild them from founders' genomes where possible.
     for (const o of this.organisms) {

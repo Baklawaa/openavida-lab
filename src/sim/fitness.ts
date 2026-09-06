@@ -13,20 +13,20 @@ import type { EnvSample, NeighborEffects } from "./types";
  *
  * Hue is display-only and does not enter fitness.
  */
-export function fitness(ph: Phenotype, env: EnvSample, neighbors: NeighborEffects): number {
+export function fitness(ph: Phenotype, env: EnvSample, neighbors: NeighborEffects, bodyScale = 1): number {
   const harvest = ph.uptake * env.nutrient + ph.photo * env.light;
   const tox = env.toxin * (1 - ph.resist) * 1.15;
   const therm = Math.abs(env.temperature - ph.tpref) * 0.85;
-  const maintain = 0.04 + 0.05 * ph.size;
+  const maintain = 0.04 + 0.05 * ph.size * bodyScale;
   const v = harvest - tox - therm - maintain + neighbors.predationGain + neighbors.mutualismGain;
   return Number.isFinite(v) ? v : 0;
 }
 
-export function metabolicDelta(ph: Phenotype, env: EnvSample): number {
+export function metabolicDelta(ph: Phenotype, env: EnvSample, bodyScale = 1): number {
   const gain = ph.uptake * env.nutrient * 0.21 + ph.photo * env.light * 0.14;
   const tox = env.toxin * (1 - ph.resist) * 0.3;
   const therm = Math.abs(env.temperature - ph.tpref) * 0.12;
-  const maintain = 0.04 + 0.028 * ph.size;
+  const maintain = 0.04 + 0.028 * ph.size * bodyScale;
   const v = gain - tox - therm - maintain;
   return Number.isFinite(v) ? v : 0;
 }

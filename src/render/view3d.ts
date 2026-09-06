@@ -2,6 +2,7 @@
  * WebGL2 3D continuum view of the same World the 2D plate draws.
  * Height = nutrient + light; toxin tints magenta; organisms are lit columns.
  */
+import { bodySize } from "../sim/body";
 import type { World } from "../sim/world";
 import { TERRAIN } from "../sim/types";
 import { hexRgb, organismRgb } from "./webgl";
@@ -394,7 +395,7 @@ export class View3D {
       const [r, g, b] = strain ? hexRgb(strain.color) : organismRgb(o.ph, o.lineageId);
       const off = i * 7;
       inst[off] = o.x + 0.5;
-      inst[off + 1] = h + o.ph.size * 0.55;
+      inst[off + 1] = h + bodySize(o) * 0.55;
       inst[off + 2] = o.y + 0.5;
       inst[off + 3] = r;
       inst[off + 4] = g;

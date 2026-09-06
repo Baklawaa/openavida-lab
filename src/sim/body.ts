@@ -1,0 +1,79 @@
+/**
+ * Body condition ("corpulence").
+ *
+ * `Organism.mass` (0–1) is a somatic state, not a gene: it rises with every
+ * prey eaten and decays slowly. It scales the effective body size, which in
+ * turn raises the energy cap and the maintenance cost, strengthens hunting,
+ * and drives the rendered size. Genome-coded `ph.size` is unchanged.
+ */
+import type { Organism } from "./types";
+
+/** Mass gained per kill, plus a share of the predator's aggression. */
+export const MASS_PER_KILL = 0.22;
+export const MASS_KILL_AGGRESSION = 0.1;
+/** Mass lost per tick when not feeding (full mass fades in ~250 ticks). */
+export const MASS_DECAY = 0.004;
+/** Effective size = ph.size × (1 + MASS_SIZE_GAIN × mass). */
+export const MASS_SIZE_GAIN = 0.6;
+/** Hunting power = aggression + MASS_HUNT_BONUS × mass. */
+export const MASS_HUNT_BONUS = 0.15;
+/** Chemotaxis bonus for moving toward the nearest edible prey. */
+export const PREY_ATTRACTION = 0.3;
+/** How far (in cells) a predator senses prey. */
+export const PREY_SENSE_RADIUS = 6;
+/** Maintenance multiplier = 1 + MASS_MAINTENANCE × mass (much weaker than the size gain, so growing pays). */
+export const MASS_MAINTENANCE = 0.2;
+/** Predators (aggression ≥ threshold) reproduce only once this fed: breeding follows growth. */
+export const MASS_TO_BREED = 0.25;
+/** Extra energy from a prey's body, per unit of its effective size. */
+export const MEAL_BODY_BONUS = 0.45;
+
+type Body = Pick<Organism, "ph"> & { mass?: number };
+
+export function bodySize(o: Body): number {
+  return o.ph.size * (1 + MASS_SIZE_GAIN * (o.mass ?? 0));
+}
+
+/** Maintenance multiplier relative to the genome-coded size. */
+export function maintenanceScale(o: Body): number {
+  return 1 + MASS_MAINTENANCE * (o.mass ?? 0);
+}
+
+export function huntingPower(o: Body): number {
+  return o.ph.aggression + MASS_HUNT_BONUS * (o.mass ?? 0);
+}
+
+/**
+ * Gap that decides a kill, or null when `pred` cannot prey on `other`.
+ * Eligibility uses genome aggression only (so well-fed predators do not
+ * start eating identical kin); body mass then widens the gap, i.e. the
+ * chance that an uncertain attack succeeds.
+ */
+export function preyGap(pred: Body, other: Body, predationThreshold: number): number | null {
+  if (pred.ph.aggression < predationThreshold) return null;
+  if (pred.ph.aggression - other.ph.aggression < 0.1) return null;
+  return huntingPower(pred) - other.ph.aggression;
+}
+
+/** Predator eats prey: energy transferred, mass gained. Returns the meal energy. */
+export function feed(pred: Organism, prey: Organism): number {
+  const meal = prey.energy * (0.35 + 0.4 * pred.ph.aggression) + MEAL_BODY_BONUS * bodySize(prey);
+  pred.energy += meal;
+  pred.mass = Math.min(1, (pred.mass ?? 0) + MASS_PER_KILL + MASS_KILL_AGGRESSION * pred.ph.aggression);
+  prey.energy = 0;
+  prey.pendingDeath = "predation";
+  return meal;
+}
+
+export function decayMass(o: Organism): void {
+  if (o.mass > 0) o.mass = Math.max(0, o.mass - MASS_DECAY);
+}
+
+/** Lean predators cannot breed; everyone else can. */
+export function canBreed(o: Body, predationThreshold: number): boolean {
+  return o.ph.aggression < predationThreshold || (o.mass ?? 0) >= MASS_TO_BREED;
+}
+
+export function energyCap(o: Body): number {
+  return 3.2 + 1.2 * bodySize(o);
+}

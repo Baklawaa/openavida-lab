@@ -1,3 +1,4 @@
+import { feed, maintenanceScale, preyGap, PREY_ATTRACTION, PREY_SENSE_RADIUS } from "./body";
 import { metabolicDelta } from "./fitness";
 import type { Fields } from "./fields";
 import type { Organism, SimParams } from "./types";
@@ -72,7 +73,7 @@ export function metabolize(org: Organism, fields: Fields, params: SimParams): nu
   const env = fields.sample(org.x, org.y);
   const take = fields.consumeNutrient(org.x, org.y, org.ph.uptake * 0.16);
   const envPaid = { ...env, nutrient: take > 0 ? take / 0.16 : env.nutrient };
-  const d = metabolicDelta(org.ph, envPaid);
+  const d = metabolicDelta(org.ph, envPaid, maintenanceScale(org));
   org.energy += d;
   return d;
 }
@@ -118,15 +119,11 @@ export function interactNeighbors(
         mutualismEvents++;
       }
 
-      if (pred.ph.aggression < params.predationThreshold) continue;
-      const gap = pred.ph.aggression - other.ph.aggression;
-      if (gap < 0.1) continue;
+      const gap = preyGap(pred, other, params.predationThreshold);
+      if (gap === null) continue;
       const certain = gap >= 0.5;
       if (!certain && !rng.chance(gap)) continue;
-      const meal = other.energy * (0.35 + 0.4 * pred.ph.aggression);
-      pred.energy += meal;
-      other.energy = 0;
-      other.pendingDeath = "predation";
+      feed(pred, other);
       predationEvents++;
       kills++;
     }
@@ -134,6 +131,45 @@ export function interactNeighbors(
   return { predationEvents, mutualismEvents, kills };
 }
 
+/** Nearest edible prey within PREY_SENSE_RADIUS (Chebyshev window, Euclidean pick), or null. */
+export function nearestPrey(
+  org: Organism,
+  occupancy: Int32Array,
+  organisms: readonly Organism[],
+  w: number,
+  h: number,
+  predationThreshold: number,
+  radius = PREY_SENSE_RADIUS,
+): Organism | null {
+  if (org.ph.aggression < predationThreshold) return null;
+  let best: Organism | null = null;
+  let bestD = Infinity;
+  const x0 = Math.max(0, org.x - radius);
+  const x1 = Math.min(w - 1, org.x + radius);
+  const y0 = Math.max(0, org.y - radius);
+  const y1 = Math.min(h - 1, org.y + radius);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const j = occupancy[y * w + x]!;
+      if (j < 0) continue;
+      const other = organisms[j]!;
+      if (other === org || other.energy <= 0) continue;
+      if (preyGap(org, other, predationThreshold) === null) continue;
+      const d = (x - org.x) ** 2 + (y - org.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = other;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Best neighbour by harvest, toxin, temperature and crowding. With
+ * `organisms` given, predators are pulled toward the nearest edible prey
+ * they can sense, and a cell holding such prey attracts instead of repels.
+ */
 export function chemotaxisDir(
   org: Organism,
   fields: Fields,
@@ -142,9 +178,14 @@ export function chemotaxisDir(
   w: number,
   h: number,
   rng: Rng,
+  organisms: readonly Organism[] | null = null,
+  predationThreshold = 0.26,
 ): number {
   let best = rng.int(8);
   let bestScore = -1e9;
+  const prey = organisms ? nearestPrey(org, occupancy, organisms, w, h, predationThreshold) : null;
+  const pull = PREY_ATTRACTION * (0.5 + org.ph.aggression);
+  const here = prey ? Math.hypot(prey.x - org.x, prey.y - org.y) : 0;
   for (let d = 0; d < 8; d++) {
     const ni = neighborIndex(org.x, org.y, d, w, h);
     if (ni === null) continue;
@@ -155,7 +196,14 @@ export function chemotaxisDir(
     let s = org.ph.uptake * env.nutrient + org.ph.photo * env.light;
     s -= env.toxin * (1 - org.ph.resist);
     s -= Math.abs(env.temperature - org.ph.tpref) * 0.5;
-    if (occupancy[ni] >= 0) s -= 0.15;
+    if (occupancy[ni]! >= 0) {
+      const other = organisms ? organisms[occupancy[ni]!] : undefined;
+      if (other && other.energy > 0 && preyGap(org, other, predationThreshold) !== null) s += pull;
+      else s -= 0.15;
+    } else if (prey) {
+      // Closing the distance to the sensed prey scores like moving up a gradient.
+      s += pull * Math.max(0, here - Math.hypot(prey.x - x, prey.y - y));
+    }
     s += rng.next() * 0.05;
     if (s > bestScore) {
       bestScore = s;
@@ -182,7 +230,9 @@ export function moveOrganisms(
   w: number,
   h: number,
   rng: Rng,
+  params?: Pick<SimParams, "predationThreshold">,
 ): MoveResult {
+  const threshold = params?.predationThreshold ?? 0.26;
   let moved = 0;
   let displacements = 0;
   const n = organisms.length;
@@ -191,7 +241,7 @@ export function moveOrganisms(
     if (org.energy <= 0) continue;
     if (!rng.chance(org.ph.motility)) continue;
     const dir = rng.chance(0.72)
-      ? chemotaxisDir(org, fields, terrain, occupancy, w, h, rng)
+      ? chemotaxisDir(org, fields, terrain, occupancy, w, h, rng, organisms, threshold)
       : rng.int(8);
     const ni = neighborIndex(org.x, org.y, dir, w, h);
     if (ni === null) continue;
@@ -209,6 +259,23 @@ export function moveOrganisms(
     }
     if (occ === i) continue;
     const other = organisms[occ]!;
+    if (preyGap(org, other, threshold) !== null) {
+      // Moving onto prey is a hunt: the prey is eaten, the predator takes its cell.
+      feed(org, other);
+      occupancy[other.y * w + other.x] = -1;
+      occupancy[org.y * w + org.x] = -1;
+      org.x = nx;
+      org.y = ny;
+      occupancy[ni] = i;
+      moved++;
+      continue;
+    }
+    if (preyGap(other, org, threshold) !== null) {
+      // Walking into a predator: the mover is eaten where it stands.
+      feed(other, org);
+      occupancy[org.y * w + org.x] = -1;
+      continue;
+    }
     if (other.energy <= 0) {
       occupancy[org.y * w + org.x] = -1;
       org.x = nx;

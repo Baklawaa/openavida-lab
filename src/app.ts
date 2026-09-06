@@ -10,6 +10,7 @@ import {
   DualWorld,
   InlineHost,
   World,
+  bodySize,
   applyRecipe,
   buildShareURL,
   canDriveClock,
@@ -490,7 +491,7 @@ export function mount(root: HTMLElement): void {
     }
     root.querySelector("#selection-tag")!.textContent = `N° ${org.id}`;
     actions.hidden = false;
-    meta.innerHTML = `<div class="selection-metrics"><span>Énergie<b>${org.energy.toFixed(2)}</b></span><span>Fitness<b>${org.fitness.toFixed(3)}</b></span></div><div class="selection-info">Lignée ${org.lineageId} · Position (${org.x}, ${org.y}) · Parent ${org.parentId < 0 ? "fondateur" : org.parentId}</div>`;
+    meta.innerHTML = `<div class="selection-metrics"><span>Énergie<b>${org.energy.toFixed(2)}</b></span><span>Fitness<b>${org.fitness.toFixed(3)}</b></span></div><div class="selection-info">Lignée ${org.lineageId} · Position (${org.x}, ${org.y}) · Parent ${org.parentId < 0 ? "fondateur" : org.parentId}</div><div class="selection-info">Corpulence ${(org.mass * 100).toFixed(0)} % · Taille effective ${bodySize(org).toFixed(2)} (génome ${org.ph.size.toFixed(2)}) · Âge ${org.age}</div>`;
     if (reason === "refresh") return;
     const decoded = decodeGenome(org.genome);
     const track = toGenomeTrack(decoded);
