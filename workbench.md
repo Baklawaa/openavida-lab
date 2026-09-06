@@ -232,6 +232,13 @@ User: make the lineage tree clickable to understand what happened; per replicate
 - Decision: widen the band to `|n−m|` so a global alignment always exists when lengths differ by more than 48.
 - GATES: tsc ok; vitest 134/134 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0. Screenshot `scratch/interface/align-detail.png`.
 
+## Task 9 — Experiment report export (2026-09-07)
+
+- `src/ui/report.ts` `buildReportHtml` is pure: fixture in, HTML string out. Sections always present. PNG canvases are data URLs.
+- `#btn-goal-report` in Expérience step 4. Tree PNG if the explorer is open. Saved organisms whose founding genome matches the start snapshot.
+- Test: every French heading + 3 table body rows for 3 results.
+- GATES: tsc ok; vitest 135/135 `lastHash":"c2c03a81"`; build ok; verify-interface inline and `?worker=1`; verify-worker `afbcc3ec`; launch.mjs exit 0.
+
 ## Metrics (gating)
 
 | Check | Result |

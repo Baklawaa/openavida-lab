@@ -193,6 +193,15 @@ export class Explorer {
     return this.dialog.open;
   }
 
+  treePng(): string | null {
+    if (!this.dialog.open) return null;
+    try {
+      return this.q<HTMLCanvasElement>("#ex-tree-canvas").toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }
+
   open(view: ExplorerView = {}): void {
     if (!this.dialog.open) this.dialog.showModal();
     this.reload();

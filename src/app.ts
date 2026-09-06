@@ -346,10 +346,12 @@ export function mount(root: HTMLElement): void {
     },
   });
   const editorGenome = (): string => dna.sequence || genomeForKit(state.kit);
+  let explorerRef: Explorer | null = null;
   const goals = new GoalPanel(root.querySelector<HTMLElement>("#panel-goals")!, {
     status,
     world: () => current(),
     activeWorld: () => dual.active,
+    reportExtras: () => ({ treePng: explorerRef?.treePng() ?? null }),
     restoreInto: (target, snap) => {
       if (target === "B") {
         host.apply({ kind: "restore", which: "B", snapshot: snap });
@@ -474,6 +476,7 @@ export function mount(root: HTMLElement): void {
       refreshMetrics();
     },
   });
+  explorerRef = explorer;
 
   function loadSeqIntoBuilder(seq: string): void {
     dna.load(seq);

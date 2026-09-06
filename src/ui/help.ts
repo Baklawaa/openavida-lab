@@ -105,6 +105,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "btn-goal-run": "Lance les réplicats depuis l’état de départ. Le monde affiché continue indépendamment.",
   "btn-goal-stop": "Arrête les réplicats en cours ; les résultats déjà obtenus restent affichés.",
   "btn-goal-csv": "Télécharge les résultats des réplicats au format CSV : graine, pas d’atteinte (une colonne par objectif), valeur finale, population.",
+  "btn-goal-report": "Télécharge un rapport HTML autonome : configuration, recette, programme, objectifs, synthèse, tableau, graphique, arbre si l’explorateur est ouvert, organismes enregistrés cités.",
   "chart-goal": "Mesure de l’objectif au fil des pas pour chaque réplicat ; la ligne pointillée est la cible.",
   "sweep-var": "Paramètre balayé : taux de mutation, plafond de population, seuil de reproduction, ou facteur d’échelle d’un champ du snapshot de départ.",
   "sweep-from": "Borne inférieure de la grille linéaire (incluse).",

@@ -37,6 +37,7 @@ import {
   type WorldSnapshot,
 } from "../sim/index";
 import { runReplicates, type RunHandle } from "./goalRunner";
+import { buildReportHtml } from "./report";
 import { TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
 import { PresetStore, type PresetMeta } from "./presetStore";
@@ -53,6 +54,7 @@ export interface GoalPanelOptions {
   openCatalog(snapshot: WorldSnapshot): void;
   setRecording(on: boolean): void;
   applyRecipe(recipe: Recipe, target: "active" | "B"): void;
+  reportExtras(): { treePng: string | null };
 }
 
 /** Replicate ceilings: runs are long but the UI must stay responsive, so rendering is throttled and capped. */
@@ -250,6 +252,7 @@ function template(): string {
 
       <div class="goal-step">
         <span class="eyebrow">4 · RÉSULTATS</span>
+        <div class="row"><button type="button" id="btn-goal-report" class="quiet" disabled>${icon("save")}Rapport HTML</button></div>
         <div id="goal-summary" class="goal-summary"></div>
         <div class="chart-card goal-chart"><div class="chart-heading"><h3>Mesure par réplicat</h3><span id="goal-chart-note"></span></div><canvas id="chart-goal" role="img" aria-label="Évolution de la mesure pour chaque réplicat"></canvas></div>
         <div class="goal-table-head"><label class="tiny" for="goal-sort">Trier</label><select id="goal-sort">${RESULT_SORTS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}</select><span id="goal-table-note" class="tiny"></span></div>
@@ -366,6 +369,7 @@ export class GoalPanel {
     this.lastTableRender = 0;
     this.renderResults();
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = false;
+    this.q<HTMLButtonElement>("#btn-goal-report").disabled = false;
     const when = new Date(rec.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
     this.q("#goal-table-note").textContent = `${rec.results.length} réplicats · course du ${when} restaurée · depuis ${rec.label}`;
     this.opts.status(`Dernière course restaurée (${rec.results.length} réplicats depuis ${rec.label}, ${when}) : tableau, tri et rejeu disponibles.`);
@@ -574,6 +578,7 @@ export class GoalPanel {
     this.q<HTMLButtonElement>("#btn-sweep-run").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = true;
+    this.q<HTMLButtonElement>("#btn-goal-report").disabled = true;
     this.q("#goal-summary").innerHTML = "";
     this.q("#goal-results").innerHTML = "";
     this.renderProgress(maxTicks);
@@ -597,6 +602,7 @@ export class GoalPanel {
     this.q<HTMLButtonElement>("#btn-sweep-run").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = all.length === 0;
+    this.q<HTMLButtonElement>("#btn-goal-report").disabled = all.length === 0;
     this.renderProgress(maxTicks);
     this.lastTableRender = 0;
     this.renderResults();
@@ -1038,6 +1044,55 @@ export class GoalPanel {
       : "";
   }
 
+  private async exportReport(): Promise<void> {
+    if (!this.lastRun || !this.lastGoal) {
+      this.opts.status("Aucune course à rapporter.");
+      return;
+    }
+    const done = this.results.filter(Boolean);
+    if (!done.length) {
+      this.opts.status("Aucun réplicat à rapporter.");
+      return;
+    }
+    let chartPng: string | undefined;
+    try {
+      chartPng = this.q<HTMLCanvasElement>("#chart-goal").toDataURL("image/png");
+    } catch {
+      chartPng = undefined;
+    }
+    const extras = this.opts.reportExtras();
+    const genomes = new Set((this.lastRun.snapshot.strains ?? []).map((s) => s.genome));
+    for (const o of this.lastRun.snapshot.organisms) genomes.add(o.genome);
+    const saved = [];
+    for (const meta of await this.store.listOrganisms()) {
+      const rec = await this.store.loadOrganism(meta.id);
+      if (rec && genomes.has(rec.entry.genome)) saved.push({ name: rec.name, genome: rec.entry.genome, strainName: rec.strainName });
+    }
+    const goals = this.lastGoals.length ? this.lastGoals : [this.lastGoal];
+    const html = buildReportHtml({
+      generatedAt: new Date().toLocaleString("fr-FR"),
+      startLabel: this.lastRun.label,
+      params: this.lastRun.snapshot.params,
+      recipeOps: recipeFromWorld(this.opts.world()).ops,
+      schedule: this.lastRun.snapshot.schedule ?? [],
+      goals,
+      goalLabels: goals.map((g) => describeGoal(g, this.lastStrains)),
+      summary: summarizeTrials(done),
+      results: done,
+      maxTicks: this.lastRun.configs[0]?.maxTicks ?? 0,
+      chartPng,
+      treePng: extras.treePng ?? undefined,
+      saved,
+    });
+    const blob = new Blob([html], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `openavida-rapport-${Date.now()}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.opts.status(`Rapport HTML : ${done.length} réplicats.`);
+  }
+
   private exportCsv(): void {
     const nGoals = Math.max(1, this.lastGoals.length);
     const extra = nGoals > 1 ? this.lastGoals.map((_, gi) => `reached_tick_${gi + 1}`) : [];
@@ -1186,6 +1241,7 @@ export class GoalPanel {
       this.opts.status("Réplicats arrêtés.");
     });
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
+    this.q("#btn-goal-report").addEventListener("click", () => void this.exportReport());
     this.q("#btn-sweep-csv").addEventListener("click", () => this.exportSweepCsv());
     this.q("#tournament-picks").addEventListener("change", () => this.limitTournamentPicks());
     this.q("#btn-tournament-run").addEventListener("click", () => void this.runTournament());
