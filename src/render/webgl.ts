@@ -205,7 +205,7 @@ export function organismRgb(
   return [br * 0.68 + lr * 0.32, bg * 0.68 + lg * 0.32, bb * 0.68 + lb * 0.32];
 }
 
-export type FieldMode = 0 | 1 | 2 | 3 | 4;
+export type FieldMode = 0 | 1 | 2 | 3 | 4 | 5;
 export type ViewMode = "A" | "B" | "split";
 
 export class LabRenderer {
@@ -383,7 +383,9 @@ export class LabRenderer {
     gl.uniform2f(gl.getUniformLocation(this.fieldProg, "uRes"), this.canvas.width, this.canvas.height);
     gl.uniform2f(gl.getUniformLocation(this.fieldProg, "uWorld"), primary.w, primary.h);
     gl.uniform1f(gl.getUniformLocation(this.fieldProg, "uTime"), timeSec);
-    gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uMode"), this.fieldMode);
+    // Layer 5 is the exudate overlay: the plate keeps the composite rendering
+    // and the field is drawn as an R8 texture on top (see uploadHeat).
+    gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uMode"), this.fieldMode === 5 ? 0 : this.fieldMode);
     this.cropA = viewCrop(this.zoom);
     this.cropB = viewCrop(this.zoom);
     gl.uniform1i(gl.getUniformLocation(this.fieldProg, "uSplit"), split ? 1 : 0);

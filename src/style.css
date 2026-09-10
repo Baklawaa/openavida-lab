@@ -210,6 +210,11 @@ textarea#genome-edit { width: 100%; min-height: 90px; resize: vertical; color: v
 .codon.role-junk { border-top-color: transparent; opacity: .5; }
 .codon.role-open { border-top: 2px dashed var(--amber); }
 .codon.role-reg { border-top: 2px dotted #b08cff; opacity: .85; }
+.research-grid { display: grid; gap: 10px; }
+.research-grid > div { border-left: 2px solid var(--line); padding-left: 8px; }
+.research-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; font-size: 11px; }
+.research-row b { flex: 1 1 40%; }
+.research-traits { display: flex; flex-wrap: wrap; gap: 10px; font: 600 10px var(--mono); }
 .codon.role-start { border-top-left-radius: 6px; }
 .codon.role-stop { border-top-right-radius: 6px; }
 .nt { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 20px; border-radius: 3px; font: 600 10px var(--mono); color: #08121a; cursor: text; }

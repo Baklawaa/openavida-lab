@@ -66,6 +66,8 @@ import { CONTROL_HELP, attachControlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
+import { ModelPanel } from "./ui/modelPanel";
+import { researchHtml } from "./ui/researchCard";
 import { BRUSH_LABEL, BRUSH_ORDER, DEATH_LABEL, FIELD_LABEL, SCHED_PARAM_LABEL } from "./ui/labels";
 
 const BRUSHES: { id: BrushKind; label: string }[] = BRUSH_ORDER.map((id) => ({
@@ -495,6 +497,8 @@ export function mount(root: HTMLElement): void {
         })
         .join("");
     }
+    const research = root.querySelector("#research-body");
+    if (research) research.innerHTML = researchHtml(w);
     const eventLog = root.querySelector("#event-log")!;
     const recentEvents = w.events.slice(-40).reverse();
     root.querySelector("#event-count")!.textContent = String(w.events.length);
@@ -842,7 +846,7 @@ export function mount(root: HTMLElement): void {
       const f = world.fields.sample(grid.x, grid.y);
       const readout = root.querySelector<HTMLElement>("#cell-readout")!;
       readout.hidden = false;
-      readout.textContent = `(${grid.x}, ${grid.y}) · Nutr. ${f.nutrient.toFixed(2)} · Tox. ${f.toxin.toFixed(2)} · Temp. ${f.temperature.toFixed(2)} · Lum. ${f.light.toFixed(2)}`;
+      readout.textContent = `(${grid.x}, ${grid.y}) · Nutr. ${f.nutrient.toFixed(2)} · Tox. ${f.toxin.toFixed(2)} · Temp. ${f.temperature.toFixed(2)} · Lum. ${f.light.toFixed(2)} · Exs. ${f.exudate.toFixed(2)}`;
     }
     if (ev.buttons === 0) return;
     const action = pointerAction({
@@ -1055,6 +1059,18 @@ export function mount(root: HTMLElement): void {
     host.apply({ kind: "disturbances", on: disturbBox.checked });
     status(disturbBox.checked ? "Perturbations aléatoires activées." : "Perturbations aléatoires désactivées.");
   });
+  // Model parameters: the form is generated from PARAM_SPEC (see modelPanel.ts).
+  let model: ModelPanel | null = null;
+  model = new ModelPanel(root.querySelector<HTMLElement>("#model-form")!, {
+    status,
+    params: () => current().params,
+    apply: (patch, target) => {
+      const sides: Side[] = target === "both" ? ["A", "B"] : [target];
+      for (const side of sides) host.apply({ kind: "setParams", which: side, params: patch });
+      paintFeeds();
+      refreshMetrics();
+    },
+  });
   const schedAt = root.querySelector<HTMLInputElement>("#sched-at")!;
   const schedAction = root.querySelector<HTMLSelectElement>("#sched-action")!;
   const schedArg = root.querySelector<HTMLInputElement>("#sched-arg")!;
@@ -1188,6 +1204,7 @@ export function mount(root: HTMLElement): void {
   function setView(view: ViewMode): void {
     state.view = view;
     renderer.view = view;
+    model?.refresh();
     dual.active = view === "B" ? "B" : "A";
     // The highlighted lineage belongs to the world we are leaving.
     renderer.highlightLineage = -1;
@@ -1205,7 +1222,8 @@ export function mount(root: HTMLElement): void {
   root.querySelectorAll<HTMLElement>(".view").forEach(b => b.addEventListener("click", () => setView(b.dataset.view as ViewMode)));
   function setField(mode: FieldMode): void {
     renderer.fieldMode = mode;
-    if (view3d) view3d.fieldMode = mode;
+    // 3D has no exudate plane of its own; layer 5 falls back to the composite there.
+    if (view3d) view3d.fieldMode = (mode === 5 ? 0 : mode) as FieldMode;
     root.querySelectorAll<HTMLElement>(".fm").forEach(b => {
       const active = Number(b.dataset.fm) === mode;
       b.classList.toggle("active", active);
@@ -1217,6 +1235,7 @@ export function mount(root: HTMLElement): void {
       'Toxines <span class="legend-scale toxin-scale"></span> faible → élevé',
       'Température <span class="legend-scale temperature-scale"></span> froid → chaud',
       'Lumière <span class="legend-scale light-scale"></span> faible → élevée',
+      'Exsudat <span class="legend-scale"></span> relâché par les phototrophes productifs, consommé par les récepteurs',
     ];
     root.querySelector("#field-legend")!.innerHTML = legends[mode]!;
   }
@@ -1405,7 +1424,7 @@ export function mount(root: HTMLElement): void {
     if (ev.key.toLowerCase() === "i") setTool("inspect");
     if (ev.key.toLowerCase() === "o") setTool("place");
     if (ev.key.toLowerCase() === "p") setTool("paint");
-    if (/^[1-5]$/.test(ev.key)) setField((Number(ev.key) - 1) as FieldMode);
+    if (/^[1-6]$/.test(ev.key)) setField((Number(ev.key) - 1) as FieldMode);
     if (ev.key === "Escape" && root.classList.contains("focus-mode")) (root.querySelector("#btn-focus") as HTMLElement).click();
   });
 
@@ -1487,6 +1506,22 @@ export function mount(root: HTMLElement): void {
     }
   }
 
+  const exudateLayer = { data: new Float32Array(0), w: 0, h: 0 };
+  /** Normalised (0–1) exudate field for the layer overlay, in a reused buffer. */
+  function exudateOverlay(w: World): Float32Array {
+    const n = w.w * w.h;
+    if (exudateLayer.data.length !== n) exudateLayer.data = new Float32Array(n);
+    exudateLayer.w = w.w;
+    exudateLayer.h = w.h;
+    const out = exudateLayer.data;
+    const src = w.fields.exudate;
+    let max = 0;
+    for (let i = 0; i < n; i++) if (src[i]! > max) max = src[i]!;
+    const scale = max > 0 ? 1 / max : 0;
+    for (let i = 0; i < n; i++) out[i] = src[i]! * scale;
+    return out;
+  }
+
   let lastFrame = performance.now();
   let tickAccum = 0;
   let lastLoopError = 0;
@@ -1516,13 +1551,20 @@ export function mount(root: HTMLElement): void {
       const shown = viewWorld();
       const a = state.preview && side === "A" ? state.preview : dual.a;
       const b = state.preview && side === "B" ? state.preview : dual.b;
-      const heatId = shown.heatStrainId;
-      renderer.heatStrain = heatId === null ? null : shown.heat.normalized(heatId);
       renderer.heatSize = [shown.w, shown.h];
-      const strain = heatId !== null ? shown.strains.get(heatId) : undefined;
-      if (strain) {
-        const n = parseInt(strain.color.slice(1), 16);
-        renderer.heatColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+      if (renderer.fieldMode === 5) {
+        // Exudate layer: the fifth field normalised to its own maximum, drawn
+        // through the same R8 overlay path as the strain heat map.
+        renderer.heatStrain = exudateOverlay(shown);
+        renderer.heatColor = [0.72, 0.45, 1];
+      } else {
+        const heatId = shown.heatStrainId;
+        renderer.heatStrain = heatId === null ? null : shown.heat.normalized(heatId);
+        const strain = heatId !== null ? shown.strains.get(heatId) : undefined;
+        if (strain) {
+          const n = parseInt(strain.color.slice(1), 16);
+          renderer.heatColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+        }
       }
       renderer.draw(a, b, now / 1000);
       drawTrail(shown);

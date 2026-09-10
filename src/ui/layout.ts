@@ -70,6 +70,7 @@ export function createLabLayout(root: HTMLElement) {
             <button id="fm-2" data-fm="2" class="fm" aria-pressed="false"><i class="dot toxin"></i><span>Toxines</span></button>
             <button id="fm-3" data-fm="3" class="fm" aria-pressed="false"><i class="dot temperature"></i><span>Température</span></button>
             <button id="fm-4" data-fm="4" class="fm" aria-pressed="false"><i class="dot light"></i><span>Lumière</span></button>
+            <button id="fm-5" data-fm="5" class="fm" aria-pressed="false"><i class="dot diversity"></i><span>Exsudat</span></button>
           </div>
           <div class="spacer"></div>
           <span id="run-state" class="run-state"><i></i> En cours</span>
@@ -160,6 +161,7 @@ export function createLabLayout(root: HTMLElement) {
             </div>
             <div id="sched-list"></div>
           </section>
+          <section class="block" id="model-panel"><div class="section-heading"><h2>Modèle</h2><span class="tag">PARAMÈTRES</span></div><p class="muted">Chaque paramètre est borné par sa spécification, appliqué au monde choisi et enregistré dans le manifeste. « Profil v1 » restaure les réglages d’avant la mise à niveau.</p><div id="model-form"></div></section>
           <section class="block info-note">${icon("sun")}<p>Diffusion à 4 voisins à chaque pas, bloquée par les obstacles. Une source émet en continu ; une touche de pinceau est ponctuelle.</p></section>
         </div>
         <div id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
@@ -169,6 +171,7 @@ export function createLabLayout(root: HTMLElement) {
             <div class="section-heading"><h2>Événements</h2><span class="tag" id="event-count">0</span></div>
             <div id="event-log" class="feed"></div>
           </section>
+          <section class="block"><div class="section-heading"><h2>Recherche</h2><span class="tag">MESURES</span></div><div id="research-body"></div></section>
           <section class="block"><h2>Classement par fitness</h2><div id="leaderboard" class="feed"></div></section>
           <section class="block"><h2>Journal des décès</h2><div id="death-tally" class="death-tally"></div><div id="death-log" class="feed"></div></section>
           <section class="block"><details><summary>Table codon → trait</summary><p class="muted">ORF = ATG … TAA/TAG/TGA, lecture dans tous les cadres. phénotype[trait] = squash(basal + Σ deltas). La couleur n’entre pas dans la fitness.</p><div class="mapping-legend" id="legend"></div></details></section>

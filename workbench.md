@@ -402,3 +402,26 @@ tsc ok; vitest **200/200**; build ok; `node tools/gates.mjs` → all four browse
 - **Interop**: `tools/openavida_reader.py` (standard library only) loads a run directory into manifest/summary/env/results/metrics/events; `docs/research.md` documents the whole workflow, the output table and the reproduction protocol; `tools/verify-reproduce.mjs` re-runs a stored run and compares every `finalHash`.
 - **End-to-end evidence** (`runs/demo`, gitignored): a 48×48 cross-feeding manifest with 8 replicates ran in two shards → 8/8 successes, median 74.5 ticks (bootstrap CI 73–86), 730 research events, 74 metric rows; `--resume` added nothing; `verify-reproduce` reported **8/8 replicate hashes identical (first `3aad9d7a`)**; the Python reader printed the summary without importing the project.
 - Tests: `tests/manifest.test.ts` (identity, round trip, rejection reasons, replicate configs, start kinds) and `tests/cli.test.ts` (full run directory, identical results for 1 vs 3 shards, resume, Python reader).
+
+## Upgrade Stage 5 — research UI (in progress, 2026-09-10)
+
+**No behaviour change: the perf hash stays `185d6460`.**
+
+### 5.1 Model parameter panel — done
+- `src/ui/modelPanel.ts`: the form is generated from `PARAM_SPEC` and grouped (monde / métabolisme / écologie / exsudat et chimie / évolution), with each parameter's unit, bounds, default and English description. Only the parameters that actually changed are sent, to A, B or both, through `SimOp.setParams`; `Défauts` restores the published defaults and `Profil v1` applies the documented legacy profile (senescence 0, regulation off, no recombination, no exudate, no genome costs, 8 meals per tick, light diffusion 0.22). Controls carry `CONTROL_HELP` entries, and `tests/tooltips.test.ts` now reads `modelPanel.ts` as one of the UI sources.
+- Mounted in Milieu (`#model-panel`); the panel refreshes when the world selection changes. Tests: `tests/modelPanel.test.ts` (one control per spec, form coercion drops unknown keys, the legacy profile stays inside the current spec and survives normalization).
+- Because `PARAM_SPEC` is the single source, a new parameter appears in this panel, in the query string and in the generated documentation at the same time.
+
+### 5.2 Exudate field layer — done
+- `FieldMode` gains `5`. The plate keeps the composite rendering for that mode (the shader is untouched) and the exudate field is normalised to its own maximum and drawn through the same R8 overlay path as the strain heat map, in violet. Toolbar gains `fm-5`, the legend explains the layer, keys `1–6` select layers and the cell readout reports `Exs.`.
+- 3D has no exudate plane yet: selecting layer 5 falls back to the composite there (documented in the code).
+
+### 5.4 Research card in Analyse — done
+- `src/ui/researchCard.ts` (pure, `researchHtml(world)`) renders four readouts from the run's own history and neutral log: the **selection coefficient** of the leading strains (slope of logit(frequency) per tick, from the per-strain counts already stored in `MetricsSample.strains`), the **neutral drift** count and molecular clock, **realised fitness** (offspring per adult that died, plus fixation), and the **trait distribution** (mean ± sd for uptake, photo, resist, size, mutator). Strain names are HTML-escaped, so a renamed strain cannot inject markup.
+- Mounted in Analyse (`#research-body`) and refreshed with the rest of the panel. Tests: `tests/researchCard.test.ts` (ranking and shares, the four readouts, escaping, empty world).
+
+### 5.3 Experiment journal and comparison — not started
+This is the one remaining Stage 5 item: a multi-run store in `PresetStore`, a run list with notes, a 2–4 run comparison table (success rate ± CI, median ticks ± CI, effect size) and overlaid curves. `compareConditions` in `src/sim/compare.ts` and the run's `manifest.json` / `summary.json` already provide the statistics and the provenance it needs.
+
+### GATES (partial stage)
+tsc ok; vitest **221/221**; build ok; `node tools/gates.mjs` → all four browser checks OK (which also covers the model panel and research card mounting without page errors); baseline unchanged `185d6460`.
