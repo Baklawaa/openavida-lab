@@ -129,6 +129,14 @@ export function metabolize(org: Organism, fields: Fields, params: SimParams): Me
   return { delta, leaked, taken };
 }
 
+/**
+ * Optional per-event hook. The world passes one only while the research event
+ * log is recording, so the ecology functions stay pure otherwise.
+ */
+export interface InteractionSink {
+  meal?(pred: Organism, prey: Organism, amount: number): void;
+}
+
 export interface InteractResult {
   predationEvents: number;
   kills: number;
@@ -149,6 +157,7 @@ export function interactNeighbors(
   h: number,
   rng: Rng,
   params: SimParams,
+  sink?: InteractionSink | null,
 ): InteractResult {
   let predationEvents = 0;
   let kills = 0;
@@ -170,7 +179,8 @@ export function interactNeighbors(
       if (gap === null) continue;
       const certain = gap >= 0.5;
       if (!certain && !rng.chance(gap)) continue;
-      feed(pred, other);
+      const meal = feed(pred, other);
+      sink?.meal?.(pred, other, meal);
       meals[i] = meals[i]! + 1;
       predationEvents++;
       kills++;
@@ -284,6 +294,7 @@ export function moveOrganisms(
   rng: Rng,
   params?: Pick<SimParams, "predationThreshold" | "maxMealsPerTick" | "kinThreshold">,
   meals: Int32Array | null = null,
+  sink?: InteractionSink | null,
 ): MoveResult {
   const threshold = params?.predationThreshold ?? 0.26;
   const kin = params?.kinThreshold ?? KIN_THRESHOLD;
@@ -320,7 +331,8 @@ export function moveOrganisms(
       // Moving onto prey is a hunt: the predator eats and takes the cell.
       // A predator at its meal budget is simply blocked by the prey.
       if (!hasBudget(i)) continue;
-      feed(org, other);
+      const meal = feed(org, other);
+      sink?.meal?.(org, other, meal);
       if (meals) meals[i] = meals[i]! + 1;
       occupancy[other.y * w + other.x] = -1;
       occupancy[org.y * w + org.x] = -1;
@@ -334,7 +346,8 @@ export function moveOrganisms(
       // Walking into a predator: the mover is eaten where it stands, unless
       // the predator has already eaten its fill this tick.
       if (!hasBudget(occ)) continue;
-      feed(other, org);
+      const meal = feed(other, org);
+      sink?.meal?.(other, org, meal);
       if (meals) meals[occ] = meals[occ]! + 1;
       occupancy[org.y * w + org.x] = -1;
       continue;

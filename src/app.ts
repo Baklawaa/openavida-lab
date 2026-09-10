@@ -18,6 +18,7 @@ import {
   canMutateWorld,
   handleIncoming,
   decodeGenome,
+  exportEventsJSONL,
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,
@@ -1282,6 +1283,23 @@ export function mount(root: HTMLElement): void {
   });
   root.querySelector("#btn-phylo")!.addEventListener("click", () => {
     download(`openavida-phylo-t${current().tick}.csv`, exportPhylogenyCSV(current()), "text/csv");
+  });
+  root.querySelector("#btn-events")!.addEventListener("click", () => {
+    const w = current();
+    if (w.eventLog.length === 0) {
+      status("Journal d’événements vide : activez « Journal d’événements » puis laissez tourner la simulation.");
+      return;
+    }
+    download(`openavida-events-t${w.tick}.jsonl`, exportEventsJSONL(w, provenanceOf(w)), "application/x-ndjson");
+    status(`${w.eventLog.length} événements exportés.`);
+  });
+  const eventsBox = root.querySelector("#opt-events input") as HTMLInputElement;
+  eventsBox.checked = dual.a.params.recordEvents;
+  eventsBox.addEventListener("change", () => {
+    host.apply({ kind: "setParams", which: sideOf(current()), params: { recordEvents: eventsBox.checked } });
+    status(eventsBox.checked
+      ? "Journal d’événements activé (borné, export JSONL)."
+      : "Journal d’événements désactivé.");
   });
   root.querySelector("#btn-import")!.addEventListener("click", () => {
     (root.querySelector("#import-file") as HTMLInputElement).click();

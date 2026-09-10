@@ -131,6 +131,17 @@ export function exportPhylogenyCSV(world: World): string {
   return [provenanceLine(provenanceOf(world)), header, ...rows].join("\n");
 }
 
+/**
+ * One research event per line (JSON Lines). The first line is a provenance
+ * comment starting with '#'; readers should skip comment lines.
+ */
+export function exportEventsJSONL(world: World, provenance?: ExportProvenance): string {
+  const lines: string[] = [];
+  if (provenance) lines.push(provenanceLine(provenance));
+  for (const e of world.eventLog) lines.push(JSON.stringify(e));
+  return lines.join("\n");
+}
+
 export function parseCSV(text: string): { header: string[]; rows: string[][] } {
   const lines = text
     .replace(/\r\n/g, "\n")

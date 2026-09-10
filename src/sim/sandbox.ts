@@ -1,5 +1,6 @@
 import {
   buildShareURL,
+  exportEventsJSONL,
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,
@@ -104,6 +105,7 @@ export class DualWorld {
 
 export {
   buildShareURL,
+  exportEventsJSONL,
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,

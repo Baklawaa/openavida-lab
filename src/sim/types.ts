@@ -108,6 +108,8 @@ export interface SimParams {
   toxinPulseRate: number;
   droughtRate: number;
   crashRate: number;
+  /** Record the per-organism research event stream (off by default: it costs memory). */
+  recordEvents: boolean;
   /** Chemostat washout fraction per tick; 0 keeps the closed batch world. */
   dilutionRate: number;
   /** Nutrient concentration the inflow restores when dilutionRate > 0. */
@@ -227,6 +229,35 @@ export type MutationKind = "point" | "indel" | "duplication" | "recombination";
 /** Current snapshot schema version. The upgrade path lives in src/sim/migrate.ts. */
 export const SNAPSHOT_VERSION = 2;
 
+/** Per-organism research event stream; see World.eventLog. */
+export type ResearchEventKind = "birth" | "death" | "meal" | "exudate" | "recombination" | "neutral";
+
+export interface ResearchEvent {
+  kind: ResearchEventKind;
+  tick: number;
+  orgId: number;
+  parentId?: number;
+  preyId?: number;
+  donorId?: number;
+  lineageId: number;
+  strainId: number;
+  x: number;
+  y: number;
+  /** Organism energy at the event. */
+  energy: number;
+  mass: number;
+  /** Meal energy (meal) or leaked exudate (exudate). */
+  amount?: number;
+  cause?: DeathCause;
+  genomeSignature?: string;
+  hueFrom?: number;
+  hueTo?: number;
+}
+
+/** Research event log size: keep the last RESEARCH_LOG_KEEP past RESEARCH_LOG_MAX. */
+export const RESEARCH_LOG_MAX = 20000;
+export const RESEARCH_LOG_KEEP = 10000;
+
 export interface WorldSnapshot {
   version: typeof SNAPSHOT_VERSION;
   /** Engine that produced this snapshot. Optional on payloads written before provenance existed. */
@@ -240,6 +271,8 @@ export interface WorldSnapshot {
   toxin: number[];
   temperature: number[];
   light: number[];
+  /** Optional on v1 payloads; the migration fills zeros. */
+  exudate?: number[];
   solar: number[];
   terrain: number[];
   organisms: Organism[];

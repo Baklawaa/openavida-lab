@@ -89,6 +89,7 @@ export {
   applyBottleneck,
   buildShareURL,
   exportJSON,
+  exportEventsJSONL,
   exportMetricsCSV,
   exportPhylogenyCSV,
   injectStrain,
@@ -114,7 +115,9 @@ export {
 } from "./metrics";
 export { DEFAULT_PARAMS, World } from "./world";
 export { BRUSH_KINDS, DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type EnvSample, type NeighborEffects, type SimParams, type WorldSnapshot } from "./types";
-export { SNAPSHOT_VERSION } from "./types";
+export { RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX, SNAPSHOT_VERSION } from "./types";
+export type { ResearchEvent, ResearchEventKind } from "./types";
+export { SNAPSHOT_BIN_MAGIC, SNAPSHOT_BIN_VERSION, decodeSnapshot, encodeSnapshot } from "./snapshotBin";
 export { migrateSnapshot, snapshotVersion } from "./migrate";
 export {
   PARAMS_EXHAUSTIVE,

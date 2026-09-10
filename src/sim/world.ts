@@ -7,6 +7,7 @@ import { migrateSnapshot } from "./migrate";
 import {
   crowdingPenalty,
   emptyNeighbor,
+  type InteractionSink,
   interactNeighbors,
   metabolize,
   moveOrganisms,
@@ -44,10 +45,14 @@ import {
   DEATH_LOG_KEEP,
   DEATH_LOG_MAX,
   DEFAULT_PARAMS,
+  RESEARCH_LOG_KEEP,
+  RESEARCH_LOG_MAX,
   SNAPSHOT_VERSION,
   TERRAIN,
   normalizeParams,
   type BrushKind,
+  type ResearchEvent,
+  type ResearchEventKind,
   type ExtinctionRecord,
   type LineageNode,
   type MetricsSample,
@@ -119,6 +124,12 @@ export class World {
    * current run only.
    */
   neutralLog: NeutralSubstitution[] = [];
+  /**
+   * Per-organism research event stream, gated by params.recordEvents and
+   * bounded like the death log. Not snapshotted: restore clears it, so it
+   * always describes the current run.
+   */
+  eventLog: ResearchEvent[] = [];
   private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {
@@ -361,6 +372,24 @@ export class World {
     this.organisms.push(org);
     this.occupancy[i] = this.organisms.length - 1;
     this.refreshFitness(org);
+    if (this.params.recordEvents) {
+      this.pushEvent("birth", org, {
+        ...(org.parentId >= 0 ? { parentId: org.parentId } : {}),
+        genomeSignature: genomeSignature(org.genome),
+      });
+      if (origin?.kind === "recombination") {
+        this.pushEvent("recombination", org, {
+          ...(origin.donorOrgId !== undefined ? { donorId: origin.donorOrgId } : {}),
+          genomeSignature: genomeSignature(org.genome),
+        });
+      }
+      if (parent && neutralOnly(parent.ph, org.ph)) {
+        this.pushEvent("neutral", org, {
+          hueFrom: parent.ph.hue,
+          hueTo: org.ph.hue,
+        });
+      }
+    }
     if (!parent) this.pushRecipe({ type: "place", x, y, genome: org.genome });
     return org;
   }
@@ -486,7 +515,10 @@ export class World {
       o.age++;
       decayMass(o);
       const met = metabolize(o, this.fields, this.params);
-      if (met.leaked > 0) exudateEvents++;
+      if (met.leaked > 0) {
+        exudateEvents++;
+        this.pushEvent("exudate", o, { amount: met.leaked });
+      }
       if (o.energy <= 0 && !o.pendingDeath) {
         o.pendingDeath = classifyEnergyDeath(o.ph, this.fields.sample(o.x, o.y));
       }
@@ -496,6 +528,7 @@ export class World {
       this.refreshFitness(o);
     }
     this.lastExudate = exudateEvents;
+    const sink = this.params.recordEvents ? this.interactionSink : null;
     const inter = interactNeighbors(
       orgs,
       this.occupancy,
@@ -503,6 +536,7 @@ export class World {
       this.h,
       this.rng,
       this.params,
+      sink,
     );
     this.lastPredation = inter.predationEvents;
     for (let i = 0; i < orgs.length; i++) {
@@ -533,6 +567,7 @@ export class World {
             this.rng,
             this.params,
             inter.meals,
+            sink,
           );
     this.lastDisplacements = mv.displacements;
     this.reproduceAll();
@@ -629,6 +664,36 @@ export class World {
   }
 
   /** Age-dependent mortality hazard; senescenceRate = 0 keeps the hard cutoff only. */
+  /**
+   * Append one research event when recording is on. Drops the oldest half once
+   * the log exceeds RESEARCH_LOG_MAX, so memory stays bounded on long runs.
+   */
+  private pushEvent(kind: ResearchEventKind, org: Organism, extra: Partial<ResearchEvent> = {}): void {
+    if (!this.params.recordEvents) return;
+    this.eventLog.push({
+      kind,
+      tick: this.tick,
+      orgId: org.id,
+      lineageId: org.lineageId,
+      strainId: org.strainId,
+      x: org.x,
+      y: org.y,
+      energy: Math.round(org.energy * 1000) / 1000,
+      mass: Math.round(org.mass * 1000) / 1000,
+      ...extra,
+    });
+    if (this.eventLog.length > RESEARCH_LOG_MAX) {
+      this.eventLog.splice(0, this.eventLog.length - RESEARCH_LOG_KEEP);
+    }
+  }
+
+  /** Meal hook: the ecology functions call it only when the log is recording. */
+  private readonly interactionSink: InteractionSink = {
+    meal: (pred: Organism, prey: Organism, amount: number) => {
+      this.pushEvent("meal", pred, { preyId: prey.id, amount });
+    },
+  };
+
   private applySenescence(o: Organism): void {
     const rate = this.params.senescenceRate;
     if (rate <= 0 || o.pendingDeath) return;
@@ -742,6 +807,10 @@ export class World {
       const rec = deathFromOrganism(o, this.tick, cause);
       rec.seq = this.nextDeathSeq++;
       this.deaths.push(rec);
+      this.pushEvent("death", o, {
+        cause,
+        ...(o.parentId >= 0 ? { parentId: o.parentId } : {}),
+      });
       if (this.deaths.length > DEATH_LOG_MAX) this.deaths.splice(0, this.deaths.length - DEATH_LOG_KEEP);
     }
     for (const lin of this.lineages.values()) {
@@ -999,6 +1068,9 @@ export class World {
       ? { dominant: [...snap.eventFlags.dominant], sweep: [...snap.eventFlags.sweep], firstPredation: snap.eventFlags.firstPredation }
       : { ...EMPTY_EVENT_FLAGS, dominant: [], sweep: [] };
     this.schedule = snap.schedule?.length ? copySchedule(snap.schedule) : [];
+    // The event log is not snapshotted: a restored world starts a fresh log.
+    this.eventLog = [];
+    this.neutralLog = [];
     this.rebuildOccupancy();
   }
 

@@ -198,6 +198,11 @@ const PARAM_SPEC_LIST = [
     description: "Per-tick hazard of a population crash when disturbances are enabled (default 1/120).",
   },
   {
+    key: "recordEvents", label: "Journal d’événements", unit: "", group: "world", kind: "boolean",
+    min: 0, max: 1, step: 1, default: false,
+    description: "Record every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring).",
+  },
+  {
     key: "dilutionRate", label: "Taux de dilution", unit: "par pas", group: "world", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0,
     description: "Chemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. 0 = closed batch world.",
