@@ -8,6 +8,7 @@ function res(seed: number, ticks: number | null): TrialResult {
     ticks: ticks ?? 100,
     reachedTick: ticks,
     reachedTicks: [ticks],
+    finalHash: "00000000",
     finalValue: 1,
     finalPopulation: 10,
     extinct: false,

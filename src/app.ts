@@ -1284,6 +1284,15 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-phylo")!.addEventListener("click", () => {
     download(`openavida-phylo-t${current().tick}.csv`, exportPhylogenyCSV(current()), "text/csv");
   });
+  root.querySelector("#btn-manifest")!.addEventListener("click", () => {
+    const manifest = goals.manifest();
+    if (!manifest) {
+      status("Aucune course à décrire : lancez une expérience ciblée, puis exportez son manifeste.");
+      return;
+    }
+    download("openavida-manifest.json", JSON.stringify(manifest, null, 2), "application/json");
+    status(`Manifeste exporté : ${manifest.name} · ${manifest.run.replicates} réplicats · ${manifest.paramsDigest}.`);
+  });
   root.querySelector("#btn-events")!.addEventListener("click", () => {
     const w = current();
     if (w.eventLog.length === 0) {

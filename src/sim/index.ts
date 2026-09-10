@@ -323,6 +323,17 @@ export {
 } from "./stats";
 export { hillNumbers, shannonEvenness, richness, chao1, rarefy } from "./diversity";
 export {
+  MANIFEST_VERSION,
+  configsForManifest,
+  makeManifest,
+  manifestFromWorld,
+  startSnapshot,
+  validateManifest,
+  type Manifest,
+  type ManifestRun,
+  type ManifestStart,
+} from "./manifest";
+export {
   compareConditions,
   summarizeCondition,
   type ConditionComparison,

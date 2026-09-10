@@ -22,9 +22,12 @@ import {
   trialGoalTicks,
   summarizeTournament,
   worldForTrial,
+  asGoals,
+  makeManifest,
   worldFromSnapshot,
   type FieldName,
   type Goal,
+  type Manifest,
   type GoalMetric,
   type Recipe,
   type Strain,
@@ -1102,6 +1105,30 @@ export class GoalPanel {
       host.innerHTML = `<span class="dead">✗ <span class="mono">${ha}</span> ≠ <span class="mono">${hb}</span></span>`;
       this.opts.status(`Déterminisme : hashes distincts ${ha} et ${hb}.`);
     }
+  }
+
+  /**
+   * Manifest of the last run (start state, goals, replicate plan) or null when
+   * nothing has run yet. The headless runner consumes it unchanged.
+   */
+  manifest(): Manifest | null {
+    if (!this.lastRun || this.lastGoals.length === 0) return null;
+    const config = this.lastRun.configs[0];
+    return makeManifest({
+      name: this.lastRun.label,
+      params: this.lastRun.snapshot.params,
+      start: { kind: "snapshot", snapshot: this.lastRun.snapshot },
+      schedule: this.lastRun.snapshot.schedule ?? [],
+      goals: asGoals(this.lastGoals),
+      run: {
+        replicates: Math.max(1, this.lastRun.configs.length),
+        seed: config?.seed ?? this.lastRun.snapshot.params.seed,
+        maxTicks: config?.maxTicks ?? 100,
+        sampleEvery: config?.sampleEvery ?? 1,
+        ...(config?.overrides ? { overrides: config.overrides } : {}),
+        ...(config?.overrides?.recordEvents ? { recordEvents: true } : {}),
+      },
+    });
   }
 
   private async exportReport(): Promise<void> {

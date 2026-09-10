@@ -18,6 +18,7 @@ function result(reachedTick: number | null): TrialResult {
     ticks: 100,
     reachedTick,
     reachedTicks: [reachedTick],
+    finalHash: "00000000",
     finalValue: 1,
     finalPopulation: 10,
     extinct: false,

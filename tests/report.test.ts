@@ -8,6 +8,7 @@ describe("experiment HTML report", () => {
       seed: 10 + i,
       startTick: 0,
       ticks: 20,
+      finalHash: "00000000",
       reachedTick: i === 3 ? null : 10 + i,
       reachedTicks: [i === 3 ? null : 10 + i],
       finalValue: 0.4,

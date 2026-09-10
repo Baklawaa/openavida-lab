@@ -149,6 +149,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "btn-csv": "Télécharge l’historique des indicateurs au format CSV.",
   "btn-phylo": "Télécharge les lignées, leurs parents, dates d’apparition et d’extinction au format CSV.",
   "btn-events": "Télécharge le journal d’événements par organisme (JSON Lines : naissances, morts, repas, exsudat). Activez d’abord le journal dans Expérience.",
+  "btn-manifest": "Exporte le manifeste de la dernière course ciblée (état de départ, objectifs, graine, réplicats, paramètres) : le fichier se rejoue à l’identique avec le lanceur sans interface.",
   "opt-events": "Enregistre chaque événement par organisme dans un journal borné, exportable en JSON Lines pour l’analyse externe. Coûte de la mémoire sur les longues courses.",
   "btn-import": "Charge dans le monde actif un fichier JSON exporté depuis OpenAvida.",
   "fm-0": "Affiche les nutriments, les toxines, la température et la lumière ensemble. Raccourci : 1.",

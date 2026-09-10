@@ -13,6 +13,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "gates": "node tools/gates.mjs",
+    "sim": "node tools/build-cli.mjs && node dist-cli/openavida.mjs",
+    "reproduce": "node tools/verify-reproduce.mjs",
     "launch": "node tools/launch.mjs"
   },
   "devDependencies": {

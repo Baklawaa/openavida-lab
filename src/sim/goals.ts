@@ -11,7 +11,7 @@ import { applyRecipeOp } from "./recipe";
 import { copySchedule, type ScheduledOp } from "./schedule";
 import { Rng } from "./rng";
 import { bootstrapCI, quantileSorted, wilsonInterval } from "./stats";
-import type { SimParams, WorldSnapshot } from "./types";
+import type { MetricsSample, ResearchEvent, SimParams, WorldSnapshot } from "./types";
 import { World, worldFromSnapshot } from "./world";
 
 export type GoalMetric =
@@ -66,10 +66,24 @@ export interface TrialConfig {
   maxTicks: number;
   /** Record the metric every n ticks (plus the last tick). */
   sampleEvery: number;
-  overrides?: Partial<Pick<SimParams, "mutationRate" | "disturbances" | "maxPopulation" | "reproduceEnergy">> & {
+  overrides?: Partial<
+    Pick<
+      SimParams,
+      | "mutationRate"
+      | "disturbances"
+      | "maxPopulation"
+      | "reproduceEnergy"
+      | "recordEvents"
+      | "recordTraitDistribution"
+    >
+  > & {
     fieldScale?: Partial<Record<FieldName, number>>;
   };
   keepSnapshot?: boolean;
+  /** Keep the world's per-tick history on the result (used for the run's metrics.csv). */
+  collectHistory?: boolean;
+  /** Keep the research event log on the result (requires overrides.recordEvents). */
+  collectEvents?: boolean;
   /** Applied after the trial seed is set, so any RNG they use is the trial's. */
   ops?: RecipeOp[];
   /** Tournament pair (contestant indices) and founding genomes, for share scoring. */
@@ -92,10 +106,16 @@ export interface TrialResult {
   /** Stopped early because the goal can no longer be met (e.g. the tracked strain died out). */
   unreachable: boolean;
   series: Array<[number, number]>;
+  /** Final world hash, so any replicate can be checked against a re-run. */
+  finalHash: string;
   snapshot?: WorldSnapshot;
   pair?: [number, number];
   /** Living shares of pairGenomes[0] and pairGenomes[1] at the end of the trial. */
   shares?: [number, number];
+  /** Per-tick metrics, when config.collectHistory is set. */
+  history?: MetricsSample[];
+  /** Research events, when config.collectEvents is set. */
+  events?: ResearchEvent[];
 }
 
 export interface GoalHitSummary {
@@ -258,7 +278,10 @@ export function runTrial(
       extinct: w.organisms.length === 0,
       unreachable: false,
       series: [[w.tick, 0]],
+      finalHash: w.hashState(),
     };
+    if (config.collectHistory) empty.history = w.history.map((h) => ({ ...h }));
+    if (config.collectEvents) empty.events = w.eventLog.map((e) => ({ ...e }));
     if (config.pair) empty.pair = config.pair;
     if (config.pairGenomes) empty.shares = [foundingShare(w, config.pairGenomes[0]!), foundingShare(w, config.pairGenomes[1]!)];
     return empty;
@@ -312,7 +335,10 @@ export function runTrial(
     extinct,
     unreachable,
     series,
+    finalHash: w.hashState(),
   };
+  if (config.collectHistory) result.history = w.history.map((h) => ({ ...h }));
+  if (config.collectEvents) result.events = w.eventLog.map((e) => ({ ...e }));
   if (config.keepSnapshot) result.snapshot = w.snapshot();
   if (config.pair) result.pair = config.pair;
   if (config.pairGenomes) {
