@@ -110,6 +110,7 @@ export const ENZYMES: readonly EnzymeSpec[] = [
   { id: "synthase", name: "Autoinducer synthase", trait: "signal", color: TRAIT_COLOR.signal, description: "Exudate receptor; gates cross-feeding uptake" },
   { id: "pigment", name: "Pigment", trait: "hue", color: TRAIT_COLOR.hue, description: "Display only — not a fitness input" },
   { id: "replicase", name: "Replicase", trait: "fecundity", color: TRAIT_COLOR.fecundity, description: "Lowers energy threshold to divide" },
+  { id: "mutase", name: "Mutase", trait: "mutator", color: TRAIT_COLOR.mutator, description: "Scales the mutation rate of this organism's births" },
   { id: "structin", name: "Structural protein", trait: "size", color: TRAIT_COLOR.size, description: "Body size; raises maintenance" },
 ] as const;
 
@@ -255,6 +256,7 @@ const TRAIT_ENZYME: Record<TraitName, string> = {
   hue: "pigment",
   fecundity: "replicase",
   size: "structin",
+  mutator: "mutase",
 };
 
 export function enzymesFromDecoded(decoded: DecodedGenome): EnzymeLevel[] {

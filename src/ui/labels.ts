@@ -12,7 +12,7 @@ export const DEATH_LABEL: Record<DeathCause, string> = {
 export const TRAIT_LABEL: Record<TraitName, string> = {
   uptake: "Nutrition", photo: "Photosynthèse", resist: "Résistance", tpref: "Température",
   motility: "Mobilité", aggression: "Prédation", signal: "Coopération", hue: "Couleur",
-  fecundity: "Reproduction", size: "Taille",
+  fecundity: "Reproduction", size: "Taille", mutator: "Mutabilité",
 };
 
 export const TRAIT_HINT: Record<TraitName, string> = {
@@ -26,6 +26,7 @@ export const TRAIT_HINT: Record<TraitName, string> = {
   hue: "Modifie la couleur, sans effet sur la fitness.",
   fecundity: "Modifie la capacité à se reproduire.",
   size: "Modifie la taille et le coût énergétique d’entretien.",
+  mutator: "Multiplie le taux de mutation des naissances de cet organisme (0,25 à 4).",
 };
 
 /** Every brush, in the order the Milieu palette shows them. */

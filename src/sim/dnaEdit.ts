@@ -10,6 +10,7 @@ import {
   CODON_LEN,
   MAX_GENOME,
   MIN_GENOME,
+  REG_MAX,
   START_CODON,
   TRAIT_COLOR,
   TRAIT_NAMES,
@@ -20,7 +21,7 @@ import {
 } from "./mapping";
 import type { Gene } from "./types";
 
-export type CodonRole = "start" | "coding" | "stop" | "junk" | "open";
+export type CodonRole = "start" | "coding" | "stop" | "junk" | "open" | "reg";
 
 export interface CodonCell {
   /** Index of the first base of this cell in the sequence. */
@@ -221,7 +222,25 @@ export function annotateSequence(sequence: string): DnaAnnotation {
   let cursor = 0;
   decoded.genes.forEach((g, gi) => {
     const color = TRAIT_COLOR[g.dominant as TraitName] ?? "#8aa0b5";
-    junk(cursor, g.start);
+    const reg = decoded.regulation[gi];
+    const regFrom = reg ? Math.max(cursor, reg.from) : g.start;
+    junk(cursor, regFrom);
+    if (reg) {
+      for (let i = regFrom; i < g.start; i += CODON_LEN) {
+        const codon = seq.slice(i, Math.min(g.start, i + CODON_LEN));
+        const rule = codon.length === CODON_LEN ? CODON_INDEX[codon] : undefined;
+        cells.push({
+          start: i,
+          bases: codon,
+          role: "reg",
+          gene: gi,
+          aa: "",
+          trait: rule?.trait ?? null,
+          delta: 0,
+          color,
+        });
+      }
+    }
     cells.push({ start: g.start, bases: seq.slice(g.start, g.start + CODON_LEN), role: "start", gene: gi, aa: "M", trait: null, delta: 0, color });
     for (let k = g.start + CODON_LEN; k < g.stop; k += CODON_LEN) {
       const codon = seq.slice(k, k + CODON_LEN);
@@ -253,6 +272,11 @@ export function validateSequence(annotation: DnaAnnotation): DnaIssue[] {
   else if (n < MIN_GENOME) out.push({ level: "warn", text: `Génome très court (${n} bases). Les organismes viables ont au moins ${MIN_GENOME} bases.` });
   if (n >= MAX_GENOME) out.push({ level: "warn", text: `Taille maximale atteinte (${MAX_GENOME} bases). Les insertions sont tronquées.` });
   if (openFrom >= 0) out.push({ level: "warn", text: `Gène non terminé à partir de la base ${openFrom} : ajoutez TAA, TAG ou TGA. Cette partie est ignorée.` });
+  for (const r of decoded.regulation) {
+    if (r.multiplier >= REG_MAX - 1e-9) {
+      out.push({ level: "info", text: `Gène ${r.geneIndex + 1} à expression maximale (×${r.multiplier.toFixed(2)}) : les codons amont supplémentaires n’ajoutent rien.` });
+    }
+  }
   if (n > 0 && decoded.genes.length === 0 && openFrom < 0) out.push({ level: "info", text: "Aucun gène lisible : le phénotype reste basal." });
   return out;
 }

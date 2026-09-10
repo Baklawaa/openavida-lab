@@ -15,6 +15,10 @@ export {
   CODON_TABLE,
   MAX_GENOME,
   MIN_GENOME,
+  REG_CROSS,
+  REG_MAX,
+  REG_SELF,
+  REG_WINDOW,
   START_CODON,
   STOP_CODONS,
   TRAIT_COLOR,
@@ -27,6 +31,7 @@ export {
   type Phenotype,
   type TraitName,
 } from "./mapping";
+export type { GeneRegulation } from "./genome";
 export {
   assembleGenome,
   decodeGenome,
@@ -41,6 +46,7 @@ export {
   mutate,
   pointMutate,
   randomGenome,
+  recombine,
   sanitizeSequence,
   toGenomeTrack,
   type DecodedGenome,

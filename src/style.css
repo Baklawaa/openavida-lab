@@ -209,6 +209,7 @@ textarea#genome-edit { width: 100%; min-height: 90px; resize: vertical; color: v
 .codon { position: relative; display: inline-flex; gap: 1px; padding-top: 3px; border-top: 2px solid var(--g); border-radius: 2px 2px 0 0; }
 .codon.role-junk { border-top-color: transparent; opacity: .5; }
 .codon.role-open { border-top: 2px dashed var(--amber); }
+.codon.role-reg { border-top: 2px dotted #b08cff; opacity: .85; }
 .codon.role-start { border-top-left-radius: 6px; }
 .codon.role-stop { border-top-right-radius: 6px; }
 .nt { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 20px; border-radius: 3px; font: 600 10px var(--mono); color: #08121a; cursor: text; }

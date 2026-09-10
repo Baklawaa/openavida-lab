@@ -133,6 +133,21 @@ const PARAM_SPEC_LIST = [
     description: "Relative weight of tandem duplications among mutations.",
   },
   {
+    key: "recombinationRate", label: "Recombinaison", unit: "par naissance", group: "evolution", kind: "number",
+    min: 0, max: 1, step: 0.01, default: 0,
+    description: "Probability that a birth takes a single-point crossover with a nearby neighbour (sex and horizontal transfer share this operator).",
+  },
+  {
+    key: "recombinationRadius", label: "Rayon de recombinaison", unit: "cellules", group: "evolution", kind: "number",
+    min: 0, max: 32, step: 1, integer: true, default: 3,
+    description: "Chebyshev radius within which a recombination partner is drawn.",
+  },
+  {
+    key: "regulationEnabled", label: "Régulation cis", unit: "", group: "evolution", kind: "boolean",
+    min: 0, max: 1, step: 1, default: true,
+    description: "Amplify a gene by the codons upstream of its ATG (cis-regulatory layer). Off restores the purely additive decoder.",
+  },
+  {
     key: "lightDiffusion", label: "Diffusion lumière", unit: "par pas", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0,
     description: "Diffusion of the light field. 0 keeps light where the solar recharge and shade put it.",

@@ -24,6 +24,7 @@ import {
   genomeSignature,
   mutate,
   randomGenome,
+  recombine,
 } from "./genome";
 import { MAX_GENOME, copyPhenotype } from "./mapping";
 import { classifyEnergyDeath, deathFromOrganism } from "./deaths";
@@ -48,6 +49,7 @@ import {
   type ExtinctionRecord,
   type LineageNode,
   type MetricsSample,
+  type MutationKind,
   type MutationRates,
   type Organism,
   type SimParams,
@@ -143,6 +145,13 @@ export class World {
   }
   get h(): number {
     return this.params.height;
+  }
+
+  /** Base rates scaled by the organism's mutator trait (1 = the base rate). */
+  mutationRatesFor(org: Organism): MutationRates {
+    const base = this.mutationRates();
+    const mult = Number.isFinite(org.ph.mutator) ? Math.max(0, org.ph.mutator) : 1;
+    return { ...base, rate: base.rate * mult };
   }
 
   mutationRates(): MutationRates {
@@ -272,13 +281,14 @@ export class World {
     parent: Organism | null,
     mutant: boolean,
     energy: number,
+    origin?: { kind: MutationKind; donorOrgId?: number },
   ): Organism | null {
     if (this.organisms.length >= this.params.maxPopulation) return null;
     if (!this.fields.inBounds(x, y)) return null;
     const i = y * this.w + x;
     if (this.terrain[i] === TERRAIN.barrier) return null;
     if (this.occupancy[i] >= 0) return null;
-    const decoded = decodeGenome(genome);
+    const decoded = decodeGenome(genome, { regulation: this.params.regulationEnabled });
     const org: Organism = {
       id: this.nextOrgId++,
       x,
@@ -309,11 +319,12 @@ export class World {
           orgId: org.id,
           parentOrgId: parent.id,
           lineageId: org.lineageId,
-          kind: genome.length === parent.genome.length ? "point" : Math.abs(genome.length - parent.genome.length) <= 3 ? "indel" : "duplication",
+          kind: origin?.kind ?? (genome.length === parent.genome.length ? "point" : Math.abs(genome.length - parent.genome.length) <= 3 ? "indel" : "duplication"),
           changes,
           env: this.fields.sample(x, y),
           parentGenome: parent.genome.length > MAX_GENOME ? parent.genome.slice(0, MAX_GENOME) : parent.genome,
           genome: org.genome.length > MAX_GENOME ? org.genome.slice(0, MAX_GENOME) : org.genome,
+          ...(origin?.donorOrgId !== undefined ? { donorOrgId: origin.donorOrgId } : {}),
         });
         if (this.innovations.length > 900) this.pruneInnovations();
       }
@@ -618,12 +629,63 @@ export class World {
         this.rng,
       );
       if (!spot) continue;
-      const mut = mutate(parent.genome, this.rng, this.mutationRates());
-      const mutant = mut.kind !== null && mut.seq !== parent.genome;
+      const child = this.childGenome(parent);
+      const mutant = child.kind !== null && child.genome !== parent.genome;
       const childEnergy = parent.energy * 0.42;
       parent.energy *= 0.5;
-      this.birth(spot.x, spot.y, mut.seq, parent, mutant, childEnergy);
+      this.birth(
+        spot.x,
+        spot.y,
+        child.genome,
+        parent,
+        mutant,
+        childEnergy,
+        child.kind ? { kind: child.kind, donorOrgId: child.donorOrgId } : undefined,
+      );
     }
+  }
+
+  /**
+   * Child genome of a birth: a single-point crossover with a nearby neighbour
+   * when `recombinationRate` fires, otherwise a mutation. The returned kind is
+   * recorded on the innovation, so the mutation label is never inferred from a
+   * length difference again.
+   */
+  private childGenome(parent: Organism): { genome: string; kind: MutationKind | null; donorOrgId?: number } {
+    if (this.params.recombinationRate > 0 && this.rng.chance(this.params.recombinationRate)) {
+      const donor = this.donorNear(parent, this.params.recombinationRadius);
+      if (donor) {
+        const genome = recombine(parent.genome, donor.genome, this.rng);
+        return {
+          genome,
+          kind: genome === parent.genome ? null : "recombination",
+          donorOrgId: donor.id,
+        };
+      }
+    }
+    const mut = mutate(parent.genome, this.rng, this.mutationRatesFor(parent));
+    return { genome: mut.seq, kind: mut.kind };
+  }
+
+  /** Random living organism within a Chebyshev radius, or null. */
+  private donorNear(parent: Organism, radius: number): Organism | null {
+    if (radius <= 0) return null;
+    const x0 = Math.max(0, parent.x - radius);
+    const x1 = Math.min(this.w - 1, parent.x + radius);
+    const y0 = Math.max(0, parent.y - radius);
+    const y1 = Math.min(this.h - 1, parent.y + radius);
+    const candidates: Organism[] = [];
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const j = this.occupancy[y * this.w + x]!;
+        if (j < 0) continue;
+        const other = this.organisms[j];
+        if (!other || other === parent || other.energy <= 0) continue;
+        candidates.push(other);
+      }
+    }
+    if (candidates.length === 0) return null;
+    return candidates[this.rng.int(candidates.length)]!;
   }
 
   private reap(): void {

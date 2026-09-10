@@ -36,6 +36,7 @@ export const TRAIT_NAMES = [
   "hue",
   "fecundity",
   "size",
+  "mutator",
 ] as const;
 export type TraitName = (typeof TRAIT_NAMES)[number];
 
@@ -109,6 +110,12 @@ export const TRAIT_SPEC: Record<TraitName, TraitSpec> = {
     squash: "clamp",
     description: "Body size; raises maintenance cost and point size",
   },
+  mutator: {
+    min: 0.25,
+    max: 4,
+    squash: "clamp",
+    description: "Multiplier on this organism's mutation rate (secondary codon effect)",
+  },
 };
 
 export const TRAIT_COLOR: Record<TraitName, string> = {
@@ -122,6 +129,7 @@ export const TRAIT_COLOR: Record<TraitName, string> = {
   hue: "#e8e8ff",
   fecundity: "#b08cff",
   size: "#8aa0b5",
+  mutator: "#ffd1a1",
 };
 
 export const BASE_COLOR: Record<Base, string> = {
@@ -142,7 +150,20 @@ export interface Phenotype {
   hue: number;
   fecundity: number;
   size: number;
+  mutator: number;
 }
+
+/**
+ * Cis-regulation. A gene's expression is amplified by the codons immediately
+ * upstream of its ATG, bounded by the previous ORF's stop: same-trait codons
+ * amplify it (self), the most frequent other trait amplifies it (cross). The
+ * wiring is therefore evolvable through intergenic sequence and gene order —
+ * the additive decoder becomes a small regulatory network.
+ */
+export const REG_WINDOW = 21;
+export const REG_SELF = 0.35;
+export const REG_CROSS = 0.2;
+export const REG_MAX = 3;
 
 /** Basal trait vector for a genome with no ORFs. */
 export const BASAL: Phenotype = {
@@ -156,6 +177,7 @@ export const BASAL: Phenotype = {
   hue: 0.55,
   fecundity: 0.55,
   size: 0.9,
+  mutator: 1,
 };
 
 export interface CodonRule {
@@ -164,7 +186,23 @@ export interface CodonRule {
   trait: TraitName;
   delta: number;
   label: string;
+  /**
+   * Secondary contributions of the same codon. Used by the mutator trait:
+   * every sense codon already carries a primary trait, so a new trait has to
+   * ride along with existing ones. The coupling is part of the documented
+   * design of the table, not hidden in the decoder.
+   */
+  extras: ReadonlyArray<{ trait: TraitName; delta: number }>;
 }
+
+/** Secondary contributions, by codon. Proline codons and TGG also raise mutator. */
+const CODON_EXTRAS: Record<string, ReadonlyArray<{ trait: TraitName; delta: number }>> = {
+  CCT: [{ trait: "mutator", delta: 0.1 }],
+  CCC: [{ trait: "mutator", delta: 0.1 }],
+  CCA: [{ trait: "mutator", delta: 0.1 }],
+  CCG: [{ trait: "mutator", delta: 0.1 }],
+  TGG: [{ trait: "mutator", delta: 0.15 }],
+};
 
 interface AaGroup {
   aa: string;
@@ -213,6 +251,7 @@ function buildCodonTable(): CodonRule[] {
         trait: g.trait,
         delta: g.delta,
         label: `${g.aa} → ${g.trait} ${sign}${g.delta}`,
+        extras: CODON_EXTRAS[codon] ?? [],
       });
     }
   }
@@ -274,6 +313,7 @@ export function copyPhenotype(p: Phenotype): Phenotype {
     hue: p.hue,
     fecundity: p.fecundity,
     size: p.size,
+    mutator: p.mutator,
   };
 }
 
@@ -282,8 +322,13 @@ export function geneColor(trait: TraitName): string {
   return TRAIT_COLOR[trait];
 }
 
+/** Codons whose primary or secondary contribution raises a trait. */
 export function codonsForTrait(trait: TraitName): string[] {
-  return CODON_TABLE.filter((r) => r.trait === trait && r.delta > 0).map((r) => r.codon);
+  return CODON_TABLE.filter(
+    (r) =>
+      (r.trait === trait && r.delta > 0) ||
+      r.extras.some((e) => e.trait === trait && e.delta > 0),
+  ).map((r) => r.codon);
 }
 
 export function mappingLegend(): { codon: string; aa: string; trait: TraitName; delta: number }[] {

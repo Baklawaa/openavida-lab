@@ -72,6 +72,12 @@ export interface SimParams {
   pointWeight: number;
   indelWeight: number;
   duplicationWeight: number;
+  /** Probability that a birth recombines with a neighbour instead of mutating. */
+  recombinationRate: number;
+  /** Chebyshev radius (cells) within which a recombination partner is sought. */
+  recombinationRadius: number;
+  /** Apply the cis-regulatory layer to decoded genomes. */
+  regulationEnabled: boolean;
   diffusionRate: number;
   nutrientDecay: number;
   toxinDecay: number;
@@ -208,7 +214,7 @@ export interface MutationRates {
   duplication: number;
 }
 
-export type MutationKind = "point" | "indel" | "duplication";
+export type MutationKind = "point" | "indel" | "duplication" | "recombination";
 
 /** Current snapshot schema version. The upgrade path lives in src/sim/migrate.ts. */
 export const SNAPSHOT_VERSION = 2;

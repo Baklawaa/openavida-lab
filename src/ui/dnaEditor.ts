@@ -358,6 +358,7 @@ export class DnaEditor {
       else if (c.role === "stop") help = `${c.bases} · fin du gène ${c.gene + 1} (${label})`;
       else if (c.role === "coding") help = c.trait ? `${c.bases} → ${c.aa} · ${TRAIT_LABEL[c.trait]} ${fmtDelta(c.delta)}` : `${c.bases} · sans effet`;
       else if (c.role === "open") help = `${c.bases} · gène non terminé : ignoré par l’organisme`;
+      else if (c.role === "reg") help = `${c.bases} · région régulatrice : amplifie l’expression du gène ${c.gene + 1}`;
       else help = `${c.bases} · hors gène : sans effet`;
       const tiles = [...c.bases]
         .map((b, k) => {

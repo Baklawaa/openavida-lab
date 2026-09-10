@@ -55,7 +55,7 @@ export interface SpeciesPanelOptions {
 
 const TRAIT_ABBR: Record<TraitName, string> = {
   uptake: "Nut", photo: "Pho", resist: "Rés", tpref: "T°", motility: "Mob",
-  aggression: "Pré", signal: "Coo", hue: "Cou", fecundity: "Rep", size: "Tai",
+  aggression: "Pré", signal: "Coo", hue: "Cou", fecundity: "Rep", size: "Tai", mutator: "Mut",
 };
 
 function pct(t: TraitName, v: number): number {

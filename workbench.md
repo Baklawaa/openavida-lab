@@ -353,3 +353,15 @@ Research-grade upgrade, stage 1. **Behaviour change: `ENGINE_VERSION` 2.0.0, `MO
 
 ### GATES
 tsc ok; vitest **165/165**; build ok; `node tools/gates.mjs` → verify-interface, verify-worker, verify-determinism, launch all OK; baseline `9df52ec5` at engine 2.0.0 / revision 2.
+
+## Upgrade Stage 2 — evolvability (2026-09-10)
+
+Research-grade upgrade, stage 2. **Behaviour change: `ENGINE_VERSION` 2.1.0, `MODEL_REVISION` 3, baseline `9df52ec5` → `185d6460`.**
+
+- **Mutator trait (11th trait).** Every sense codon already carried a primary trait, so `CodonRule` gained `extras` (secondary contributions) and the mutator rides on the four proline codons (+0.1) and TGG (+0.15) — a coupling that is documented in the codon table rather than hidden in the decoder. `codonsForTrait` now returns codons whose primary *or* secondary contribution raises a trait, so `geneCassette("mutator", n)` works. `World.mutationRatesFor(org)` scales the base rate by the trait; the DNA editor, biochem enzymes (Mutase), strategy strip, labels and `gene-add-mutator` help follow automatically. Tests: `tests/evolution.test.ts` (rate scaling, lineages per birth).
+- **Recombination.** `recombine(a,b,rng)` is a single-point crossover with independent cut points, used for both sex and horizontal transfer; `recombinationRate` (default 0) and `recombinationRadius` (3 cells) drive a donor drawn from the occupancy window at each birth. `MutationKind` gains `"recombination"` and the innovation records `donorOrgId`. This also removed a latent bug: the innovation kind used to be *inferred* from a length difference, so point and indel mutations were mislabelled; the true kind from the operator is recorded now. Tests: chimera composition (prefix/suffix of the two parents) and an end-to-end run that records recombinants with their donor.
+- **Cis-regulation.** A gene is amplified by the codons immediately upstream of its ATG, read backwards in triplets (frame anchored at the gene start, bounded by the previous ORF's stop and `REG_WINDOW = 21`): same-trait codons give `REG_SELF = 0.35` each, the most frequent other trait gives `REG_CROSS = 0.2`, capped at `REG_MAX = 3`. The wiring is therefore evolvable through intergenic sequence and gene order, turning the additive decoder into a small regulatory network. `decodeGenome(seq, { regulation })` is switchable, `params.regulationEnabled` (default true) drives the world, `GeneRegulation` exposes the window and multiplier, the DNA editor marks `reg` cells with a help line and the annotator flags genes at the cap. Tests: `tests/regulation.test.ts` — kit genomes are provably additive, upstream codons amplify the phenotype, the cap binds, disabling restores the additive phenotype exactly, and the effect is heritable through the sequence.
+- Editor/UI follow-ups: `role-reg` styling, regulatory help text, Mutase enzyme and the mutator trait in every trait-keyed map (labels, abbreviations, innovation thresholds).
+
+### GATES
+tsc ok; vitest **174/174**; build ok; `node tools/gates.mjs` → verify-interface, verify-worker, verify-determinism, launch all OK; baseline `185d6460` at engine 2.1.0 / revision 3.

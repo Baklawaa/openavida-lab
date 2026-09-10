@@ -51,6 +51,8 @@ export interface Innovation {
   parentGenome?: string;
   /** Mutant genome at birth (≤ MAX_GENOME). Optional on legacy snapshots. */
   genome?: string;
+  /** Recombination partner, when this innovation came from a crossover. */
+  donorOrgId?: number;
 }
 
 export const STRAIN_COLORS = [
@@ -99,7 +101,7 @@ export function strainColor(index: number): string {
 /** Minimum phenotype delta that counts as a notable change. */
 export const INNOVATION_THRESHOLD: Record<TraitName, number> = {
   uptake: 0.06, photo: 0.06, resist: 0.06, tpref: 0.05, motility: 0.05,
-  aggression: 0.06, signal: 1, hue: 1e9, fecundity: 0.05, size: 0.05,
+  aggression: 0.06, signal: 1, hue: 1e9, fecundity: 0.05, size: 0.05, mutator: 0.15,
 };
 
 export function phenotypeChanges(parent: Phenotype, child: Phenotype): TraitChange[] {

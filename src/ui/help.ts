@@ -24,6 +24,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "kit-resistant": "Résiste mieux aux dommages causés par les toxines.",
   "kit-predator": "Chasse les organismes voisins plus faibles et récupère leur énergie.",
   "kit-mutualist": "Photosynthétise et porte un récepteur d’exsudat : il récupère une part du surplus relâché par les phototrophes voisins.",
+  "gene-add-mutator": "Ajoute une cassette de mutabilité : elle multiplie le taux de mutation des naissances de cet organisme.",
   "dna-builder": "Chaque carte est un gène lu dans la séquence. La force est son nombre de codons ; réordonnez, renforcez ou retirez les gènes sans perdre vos autres modifications.",
   "dna-strip-section": "La séquence base par base. Les rails colorés délimitent les gènes (ATG → TAA/TAG/TGA). Sélectionnez des bases pour les remplacer, les supprimer ou les dupliquer.",
   "dna-strip": "Cliquez sur une base pour la sélectionner, glissez pour une plage, double-cliquez pour un codon. Tapez A, C, G ou T pour remplacer ; Retour arrière supprime ; ⌘Z annule.",

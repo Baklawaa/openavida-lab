@@ -53,22 +53,23 @@ describe("environment mechanics", () => {
     expect(silent.fields.toxin.reduce((s, v) => s + v, 0)).toBe(0);
   });
 
-  it("keeps a chemostat population alive and away from the cap", () => {
-    const pops: number[] = [];
-    for (const seed of [1, 2, 3, 4, 5]) {
-      const w = new World({ width: 24, height: 24, startPopulation: 40, seed, mutationRate: 0.05 });
-      Object.assign(w.params, {
-        dilutionRate: 0.05,
-        inflowNutrient: 0.6,
-        maxPopulation: 4000,
-      });
-      for (let i = 0; i < 200; i++) w.step();
-      pops.push(w.organisms.length);
-      expect(w.fields.nutrient.reduce((s, v) => s + v, 0)).toBeGreaterThan(0);
-    }
-    const mean = pops.reduce((a, b) => a + b, 0) / pops.length;
-    expect(mean).toBeGreaterThan(5);
-    expect(mean).toBeLessThan(4000);
-    for (const p of pops) expect(p).toBeLessThan(4000);
+  it("refreshes the medium and washes organisms out in chemostat mode", () => {
+    const meanOf = (w: World) => w.fields.nutrient.reduce((s, v) => s + v, 0) / w.fields.nutrient.length;
+
+    const chemostat = new World({ width: 16, height: 16, startPopulation: 24, seed: 3, mutationRate: 0 });
+    Object.assign(chemostat.params, { dilutionRate: 0.1, inflowNutrient: 1, maxPopulation: 4000 });
+    chemostat.fields.nutrient.fill(0);
+    for (let i = 0; i < 40; i++) chemostat.step();
+    expect(meanOf(chemostat)).toBeGreaterThan(0.5);
+    expect(chemostat.deaths.some((d) => d.cause === "washout")).toBe(true);
+    expect(chemostat.lastWashout).toBeGreaterThanOrEqual(0);
+    expect(chemostat.organisms.length).toBeLessThan(4000);
+
+    // Closed control: the same world without dilution runs the medium down.
+    const closed = new World({ width: 16, height: 16, startPopulation: 24, seed: 3, mutationRate: 0 });
+    closed.fields.nutrient.fill(0);
+    for (let i = 0; i < 40; i++) closed.step();
+    expect(meanOf(chemostat)).toBeGreaterThan(meanOf(closed));
+    expect(closed.deaths.some((d) => d.cause === "washout")).toBe(false);
   });
 });

@@ -5,6 +5,10 @@ import {
   CODON_LEN,
   MAX_GENOME,
   MIN_GENOME,
+  REG_CROSS,
+  REG_MAX,
+  REG_SELF,
+  REG_WINDOW,
   START_CODON,
   STOP_CODONS,
   TRAIT_NAMES,
@@ -19,11 +23,44 @@ import {
 import type { Rng } from "./rng";
 import type { Gene, MutationKind, MutationRates } from "./types";
 
+export interface GeneRegulation {
+  geneIndex: number;
+  /** Upstream window, bounded by the previous ORF's end. */
+  from: number;
+  to: number;
+  upstream: Partial<Record<TraitName, number>>;
+  multiplier: number;
+}
+
 export interface DecodedGenome {
   sequence: string;
   genes: Gene[];
   raw: Record<TraitName, number>;
   phenotype: Phenotype;
+  /** One entry per decoded gene (empty when regulation is disabled). */
+  regulation: GeneRegulation[];
+}
+
+/**
+ * Codon counts in a gene's upstream window, read backwards from the ATG in
+ * triplets so the reading frame is anchored at the gene start (intergenic
+ * sequence has no frame of its own; anchoring at the ATG is deterministic and
+ * matches how the window is edited in the DNA editor).
+ */
+function upstreamCounts(
+  seq: string,
+  from: number,
+  to: number,
+): { counts: Record<TraitName, number>; from: number } {
+  const counts = zeroTraits();
+  const limit = Math.max(from, to - REG_WINDOW);
+  let lo = to;
+  while (lo - CODON_LEN >= limit) {
+    const rule = CODON_INDEX[seq.slice(lo - CODON_LEN, lo)];
+    if (rule) counts[rule.trait] += 1;
+    lo -= CODON_LEN;
+  }
+  return { counts, from: lo };
 }
 
 export interface GenomeTrack {
@@ -66,14 +103,21 @@ function dominantTrait(contrib: Record<TraitName, number>): TraitName {
  * Scan ORFs (ATG … TAA/TAG/TGA) in any frame. Translation skips the start
  * codon. Unclosed ORFs are ignored. Trait deltas come only from CODON_INDEX.
  */
-export function decodeGenome(sequence: string): DecodedGenome {
+export function decodeGenome(
+  sequence: string,
+  opts: { regulation?: boolean } = {},
+): DecodedGenome {
+  const regulationEnabled = opts.regulation !== false;
   const seq = sanitizeSequence(sequence);
   const genes: Gene[] = [];
+  const regulation: GeneRegulation[] = [];
   const raw = zeroTraits();
+  let lastOrfEnd = 0;
   let i = 0;
   while (i + CODON_LEN <= seq.length) {
     if (seq.slice(i, i + CODON_LEN) === START_CODON) {
       const geneStart = i;
+      const prevEnd = lastOrfEnd;
       i += CODON_LEN;
       let aas = "";
       const contrib = zeroTraits();
@@ -89,12 +133,37 @@ export function decodeGenome(sequence: string): DecodedGenome {
         if (rule) {
           aas += rule.aa;
           contrib[rule.trait] += rule.delta;
+          for (const extra of rule.extras) contrib[extra.trait] += extra.delta;
         }
         i += CODON_LEN;
       }
       if (!closed) break;
-      if (aas.length === 0) continue;
+      if (aas.length === 0) {
+        lastOrfEnd = i;
+        continue;
+      }
       const dominant = dominantTrait(contrib);
+      let multiplier = 1;
+      const up = upstreamCounts(seq, prevEnd, geneStart);
+      lastOrfEnd = i;
+      if (regulationEnabled) {
+        let cross = 0;
+        for (const t of TRAIT_NAMES) {
+          if (t === dominant) continue;
+          const c = up.counts[t];
+          if (c > cross) cross = c;
+        }
+        multiplier = Math.min(REG_MAX, 1 + REG_SELF * (up.counts[dominant] ?? 0) + REG_CROSS * cross);
+        if (multiplier !== 1) {
+          for (const t of TRAIT_NAMES) contrib[t] *= multiplier;
+        }
+      }
+      const upstream: Partial<Record<TraitName, number>> = {};
+      for (const t of TRAIT_NAMES) {
+        const c = up.counts[t];
+        if (c > 0) upstream[t] = c;
+      }
+      regulation.push({ geneIndex: genes.length, from: up.from, to: geneStart, upstream, multiplier });
       const gene: Gene = {
         name: `${dominant.slice(0, 3)}_${geneStart}`,
         start: geneStart,
@@ -110,7 +179,7 @@ export function decodeGenome(sequence: string): DecodedGenome {
       i += 1;
     }
   }
-  return { sequence: seq, genes, raw, phenotype: phenotypeFromRaw(raw) };
+  return { sequence: seq, genes, raw, phenotype: phenotypeFromRaw(raw), regulation };
 }
 
 export function toGenomeTrack(decoded: DecodedGenome): GenomeTrack {
@@ -174,6 +243,19 @@ export function duplicateMutate(seq: string, rng: Rng): { seq: string; copied: s
   }
   const ins = rng.int(seq.length + 1);
   return { seq: seq.slice(0, ins) + copied + seq.slice(ins), copied };
+}
+
+/**
+ * Single-point crossover with independent cut points, sanitized and capped.
+ * Used for both sex and horizontal transfer; the caller records the donor.
+ */
+export function recombine(a: string, b: string, rng: Rng): string {
+  if (a.length === 0 || b.length === 0) return a || b;
+  const cutA = rng.int(a.length + 1);
+  const cutB = rng.int(b.length + 1);
+  const child = sanitizeSequence(a.slice(0, cutA) + b.slice(cutB));
+  if (child.length < MIN_GENOME) return a.length >= b.length ? a : b;
+  return child;
 }
 
 export function mutate(
