@@ -8,7 +8,7 @@ import {
   replaceRange,
 } from "../src/sim/index";
 
-const HIGH_LIGHT = { nutrient: 0.05, toxin: 0, temperature: 0.5, light: 1 };
+const HIGH_LIGHT = { nutrient: 0.05, toxin: 0, temperature: 0.5, light: 1, exudate: 0 };
 
 describe("fitness landscape", () => {
   it("enumerates 61 sense codons, stays inside ORFs, and ranks a photo-raising substitution", () => {

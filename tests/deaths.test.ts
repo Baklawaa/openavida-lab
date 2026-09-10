@@ -16,10 +16,10 @@ describe("death causes", () => {
   it("classifies toxin vs starvation from phenotype × environment", () => {
     const ph = decodeGenome(genomeForKit("heterotroph")).phenotype;
     expect(
-      classifyEnergyDeath(ph, { nutrient: 0, toxin: 0.8, temperature: 0.5, light: 0 }),
+      classifyEnergyDeath(ph, { nutrient: 0, toxin: 0.8, temperature: 0.5, light: 0, exudate: 0 }),
     ).toBe("toxin");
     expect(
-      classifyEnergyDeath(ph, { nutrient: 0, toxin: 0, temperature: 0.5, light: 0 }),
+      classifyEnergyDeath(ph, { nutrient: 0, toxin: 0, temperature: 0.5, light: 0, exudate: 0 }),
     ).toBe("starvation");
   });
 

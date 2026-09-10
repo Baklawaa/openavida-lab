@@ -13,7 +13,8 @@ export type DeathCause =
   | "competition"
   | "crash"
   | "wipe"
-  | "bottleneck";
+  | "bottleneck"
+  | "washout";
 
 export interface DeathRecord {
   tick: number;
@@ -81,7 +82,30 @@ export interface SimParams {
   reproduceEnergy: number;
   maxAge: number;
   predationThreshold: number;
-  mutualismShare: number;
+  /** Maximum prey a predator can eat per tick (interaction and movement phases combined). */
+  maxMealsPerTick: number;
+  /** Minimum aggression gap required for a kill; 0 allows cannibalism of identical phenotypes. */
+  kinThreshold: number;
+  /** Diffusion of the light field (0 = light only recharges from the solar field). */
+  lightDiffusion: number;
+  /** Scale of the age-dependent mortality hazard; 0 keeps only the hard maxAge cutoff. */
+  senescenceRate: number;
+  /** Share of gross photosynthesis a saturated phototroph leaks as exudate. */
+  exudateLeak: number;
+  exudateDecay: number;
+  exudateDiffusion: number;
+  /** Energy upkeep per genome base per tick. */
+  genomeUpkeep: number;
+  /** Energy charged per genome base at division. */
+  replicationCost: number;
+  /** Per-tick hazards of the three disturbance kinds when disturbances are enabled. */
+  toxinPulseRate: number;
+  droughtRate: number;
+  crashRate: number;
+  /** Chemostat washout fraction per tick; 0 keeps the closed batch world. */
+  dilutionRate: number;
+  /** Nutrient concentration the inflow restores when dilutionRate > 0. */
+  inflowNutrient: number;
   /** Random vents/walls/shade at start. Off by default — paint them yourself. */
   randomTerrain: boolean;
   /** Periodic toxin pulses, droughts, crashes. Off by default. */
@@ -100,11 +124,12 @@ export interface EnvSample {
   toxin: number;
   temperature: number;
   light: number;
+  /** Cross-feeding metabolite leaked by rich phototrophs; see src/sim/chemistry.ts. */
+  exudate: number;
 }
 
 export interface NeighborEffects {
   predationGain: number;
-  mutualismGain: number;
 }
 
 export interface Organism {

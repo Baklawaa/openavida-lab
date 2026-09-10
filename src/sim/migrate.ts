@@ -57,6 +57,7 @@ function v1ToV2(s: Raw): Raw {
     params,
     organisms,
     strains,
+    exudate: s.exudate ?? new Array(params.width * params.height).fill(0),
     nextStrainId: s.nextStrainId ?? 1,
     engine: s.engine ?? engineInfo(),
     paramsDigest: s.paramsDigest ?? paramsDigest(params),

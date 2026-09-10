@@ -6,6 +6,7 @@ export const DEATH_LABEL: Record<DeathCause, string> = {
   starvation: "Manque de nourriture ou de lumière", toxin: "Intoxication", crowding: "Surpopulation",
   "old-age": "Vieillesse", predation: "Prédation", competition: "Compétition",
   crash: "Événement aléatoire", wipe: "Retrait au pinceau", bottleneck: "Goulot d’étranglement",
+  washout: "Évacuation (changement de milieu)",
 };
 
 export const TRAIT_LABEL: Record<TraitName, string> = {
@@ -52,6 +53,7 @@ export const FIELD_LABEL: Record<FieldName, string> = {
   toxin: "toxines",
   temperature: "température",
   light: "lumière",
+  exudate: "exsudat",
 };
 
 /** Parameters a scheduled programme can write. */

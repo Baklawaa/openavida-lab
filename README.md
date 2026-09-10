@@ -126,7 +126,7 @@ npm run build
 - Genome: ACGT sequence, ATG…stop ORFs, documented codon → trait table
 - Mutations: point, indel, duplication
 - Fields: nutrient / toxin / temperature / light with diffusion
-- Ecology: competition, predation, mutualism, extinction
+- Ecology: competition, predation, cross-feeding (exudate overflow), extinction
 - Sandbox: paint, inject, bottleneck, snapshots, deterministic seeds, A/B worlds, shareable URL, JSON/CSV export
 - WebGL plate + genome browser + fitness / Shannon / phylogeny panels
 

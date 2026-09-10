@@ -8,7 +8,7 @@ import { decodeGenome } from "./genome";
 import { BASES, TRAIT_NAMES, isStopCodon, type TraitName } from "./mapping";
 import type { EnvSample, NeighborEffects } from "./types";
 
-export const ZERO_NEIGHBORS: NeighborEffects = { predationGain: 0, mutualismGain: 0 };
+export const ZERO_NEIGHBORS: NeighborEffects = { predationGain: 0 };
 
 export function senseCodons(): string[] {
   const out: string[] = [];

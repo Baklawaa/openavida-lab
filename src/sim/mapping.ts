@@ -89,7 +89,7 @@ export const TRAIT_SPEC: Record<TraitName, TraitSpec> = {
     min: 0,
     max: 7,
     squash: "quant7",
-    description: "Mutualism channel 0–7; matching neighbors share energy",
+    description: "Exudate receptor channel 0–7; signal ≥ 1 takes up leaked exudate",
   },
   hue: {
     min: 0,

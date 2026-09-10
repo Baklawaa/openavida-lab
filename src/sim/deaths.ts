@@ -13,6 +13,7 @@ export const CAUSE_LABEL: Record<DeathCause, string> = {
   crash: "random die-off event",
   wipe: "wiped by the brush",
   bottleneck: "removed in a bottleneck",
+  washout: "washed out of the chemostat",
 };
 
 export const CAUSE_SHORT: Record<DeathCause, string> = {
@@ -25,6 +26,7 @@ export const CAUSE_SHORT: Record<DeathCause, string> = {
   crash: "crash",
   wipe: "wiped",
   bottleneck: "bottleneck",
+  washout: "washout",
 };
 
 export const CAUSE_COLOR: Record<DeathCause, string> = {
@@ -37,6 +39,7 @@ export const CAUSE_COLOR: Record<DeathCause, string> = {
   crash: "#ff6b8a",
   wipe: "#7d92a3",
   bottleneck: "#b08cff",
+  washout: "#57c7ff",
 };
 
 export function dnaSnippet(seq: string, n = 28): string {

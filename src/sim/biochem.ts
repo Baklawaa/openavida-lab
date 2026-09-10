@@ -5,6 +5,7 @@
  */
 import { TRAIT_COLOR, TRAIT_NAMES, type Phenotype, type TraitName } from "./mapping";
 import { metabolicDelta } from "./fitness";
+import { EXUDATE_YIELD, PHOTO_GAIN, UPTAKE_GAIN } from "./chemistry";
 import type { DecodedGenome } from "./genome";
 import type { EnvSample, Organism } from "./types";
 
@@ -15,7 +16,8 @@ export type MoleculeId =
   | "heat"
   | "atp"
   | "biomass"
-  | "autoinducer";
+  | "autoinducer"
+  | "exudate";
 
 export interface MoleculeSpec {
   id: MoleculeId;
@@ -78,7 +80,15 @@ export const MOLECULES: readonly MoleculeSpec[] = [
     name: "autoinducer (signal)",
     color: TRAIT_COLOR.signal,
     source: "organism",
-    description: "Quorum channel 0–7; matching neighbors share ATP",
+    description: "Receptor channel 0–7; signal ≥ 1 takes up exudate at a rate scaled by the channel",
+  },
+  {
+    id: "exudate",
+    name: "exudate (cross-feeding)",
+    color: TRAIT_COLOR.signal,
+    source: "field",
+    field: "exudate",
+    description: "Overflow photosynthesis leaked by rich phototrophs; consumed with an 0.8 yield",
   },
 ] as const;
 
@@ -97,7 +107,7 @@ export const ENZYMES: readonly EnzymeSpec[] = [
   { id: "thermoregulin", name: "Thermoregulin", trait: "tpref", color: TRAIT_COLOR.tpref, description: "Sets preferred temperature" },
   { id: "motor", name: "Flagellar motor", trait: "motility", color: TRAIT_COLOR.motility, description: "Spends ATP to move" },
   { id: "protease", name: "Hunt protease", trait: "aggression", color: TRAIT_COLOR.aggression, description: "Converts prey biomass into ATP" },
-  { id: "synthase", name: "Autoinducer synthase", trait: "signal", color: TRAIT_COLOR.signal, description: "Mutualism channel" },
+  { id: "synthase", name: "Autoinducer synthase", trait: "signal", color: TRAIT_COLOR.signal, description: "Exudate receptor; gates cross-feeding uptake" },
   { id: "pigment", name: "Pigment", trait: "hue", color: TRAIT_COLOR.hue, description: "Display only — not a fitness input" },
   { id: "replicase", name: "Replicase", trait: "fecundity", color: TRAIT_COLOR.fecundity, description: "Lowers energy threshold to divide" },
   { id: "structin", name: "Structural protein", trait: "size", color: TRAIT_COLOR.size, description: "Body size; raises maintenance" },
@@ -111,7 +121,7 @@ export type PathwayId =
   | "maintenance"
   | "motility"
   | "predation"
-  | "mutualism"
+  | "exudation"
   | "replication";
 
 export interface PathwaySpec {
@@ -181,12 +191,12 @@ export const PATHWAYS: readonly PathwaySpec[] = [
     description: "Neighbor predationGain when aggression exceeds threshold",
   },
   {
-    id: "mutualism",
-    name: "Quorum sharing",
+    id: "exudation",
+    name: "Exudate overflow",
     enzymeId: "synthase",
-    reactants: ["autoinducer", "atp"],
-    products: ["atp"],
-    description: "mutualismGain when signal channels match",
+    reactants: ["atp"],
+    products: ["exudate"],
+    description: "producer leaks a share of its photosynthetic surplus; signal ≥ 1 consumers take it up at an 0.8 yield",
   },
   {
     id: "replication",
@@ -296,13 +306,17 @@ export function moleculeAmounts(env: EnvSample, org: { energy: number; ph: Pheno
 export function pathwayFluxes(
   ph: Phenotype,
   env: EnvSample,
-  neighbors: { predationGain: number; mutualismGain: number } = { predationGain: 0, mutualismGain: 0 },
+  neighbors: { predationGain: number } = { predationGain: 0 },
 ): PathwayFlux[] {
-  const carbon = ph.uptake * env.nutrient * 0.21;
-  const photo = ph.photo * env.light * 0.14;
+  const carbon = ph.uptake * env.nutrient * UPTAKE_GAIN;
+  const photo = ph.photo * env.light * PHOTO_GAIN;
   const detox = env.toxin * (1 - ph.resist) * 0.3;
   const therm = Math.abs(env.temperature - ph.tpref) * 0.12;
   const maintain = 0.04 + 0.028 * ph.size;
+  // Potential overflow out of the organism plus the uptake a receptor enables.
+  const exudation =
+    ph.photo * env.light * PHOTO_GAIN +
+    (ph.signal >= 1 ? ph.uptake * env.exudate * EXUDATE_YIELD : 0);
   const fluxes: Record<PathwayId, number> = {
     "carbon-uptake": carbon,
     photosynthesis: photo,
@@ -311,7 +325,7 @@ export function pathwayFluxes(
     maintenance: maintain,
     motility: ph.motility,
     predation: neighbors.predationGain,
-    mutualism: neighbors.mutualismGain,
+    exudation,
     replication: ph.fecundity,
   };
   return PATHWAYS.map((p) => ({
@@ -329,7 +343,7 @@ export function inspectBiochem(
   decoded: DecodedGenome,
   env: EnvSample,
   org: Pick<Organism, "energy" | "ph">,
-  neighbors?: { predationGain: number; mutualismGain: number },
+  neighbors?: { predationGain: number },
 ): BiochemInspect {
   const pathways = pathwayFluxes(org.ph, env, neighbors);
   return {

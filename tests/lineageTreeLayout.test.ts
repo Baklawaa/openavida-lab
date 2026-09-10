@@ -20,7 +20,7 @@ describe("lineage tree layout", () => {
       node(7, 2, 15, 20, 0, 1),
     ]) L.set(n.id, n);
     const innovations = [
-      { id: 1, strainId: 1, tick: 20, orgId: 0, parentOrgId: 0, lineageId: 3, kind: "point" as const, changes: [{ trait: "resist" as const, from: 0.1, to: 0.4 }, { trait: "uptake" as const, from: 0.5, to: 0.55 }], env: { nutrient: 0, toxin: 0, temperature: 0, light: 0 } },
+      { id: 1, strainId: 1, tick: 20, orgId: 0, parentOrgId: 0, lineageId: 3, kind: "point" as const, changes: [{ trait: "resist" as const, from: 0.1, to: 0.4 }, { trait: "uptake" as const, from: 0.5, to: 0.55 }], env: { nutrient: 0, toxin: 0, temperature: 0, light: 0, exudate: 0 } },
     ];
     const t = layoutLineageTree(L, innovations, 3, { now: 100 });
     expect(t.path).toEqual([1, 3]);

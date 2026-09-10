@@ -176,7 +176,7 @@ export class SpeciesPanel {
       stats.push({
         key: String(s.id), label: s.name, color: s.color, count: 0, share: 0, meanFitness: 0, meanEnergy: 0, meanAge: 0,
         traits: { ...s.founderPhenotype }, centroid: { x: 0, y: 0 }, spread: 0,
-        env: { nutrient: 0, toxin: 0, temperature: 0, light: 0 }, deaths: {}, deathTotal: 0,
+        env: { nutrient: 0, toxin: 0, temperature: 0, light: 0, exudate: 0 }, deaths: {}, deathTotal: 0,
       });
     }
     const series = stats.map((s) => ({ key: s.key, label: s.label, color: s.color }));

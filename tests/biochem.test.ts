@@ -34,7 +34,7 @@ describe("genome → enzyme → pathway inspect", () => {
 
   it("pathway fluxes are the same coefficients metabolicDelta uses", () => {
     const decoded = decodeGenome(genomeForKit("phototroph"));
-    const env = { nutrient: 0.2, toxin: 0.4, temperature: 0.5, light: 0.9 };
+    const env = { nutrient: 0.2, toxin: 0.4, temperature: 0.5, light: 0.9, exudate: 0 };
     const fluxes = pathwayFluxes(decoded.phenotype, env);
     const carbon = fluxes.find((p) => p.id === "carbon-uptake")!.flux;
     const photo = fluxes.find((p) => p.id === "photosynthesis")!.flux;

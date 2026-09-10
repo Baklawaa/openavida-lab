@@ -60,7 +60,7 @@ describe("SimHost: shared op application and frames", () => {
     stepSides(dual, "A", 40);
     const src = dual.a;
     const { frame, transfer } = frameFromWorld(src, "A", { historySince: -1, lineages: true, innovations: true });
-    expect(transfer.length).toBe(6);
+    expect(transfer.length).toBe(7);
     const mirror = new World({ ...params, startPopulation: 0 });
     expect(applyFrame(mirror, frame)).toBe(true);
     expect(mirror.hashState()).toBe(src.hashState());

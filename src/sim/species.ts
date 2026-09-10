@@ -8,7 +8,7 @@
  *   is tagged with the strain whose signature matches its genome; children,
  *   mutants included, inherit the tag. Strains can be pre-defined by name.
  * - Strategy: a deterministic classification of the current phenotype
- *   (predator / mutualist / phototroph / heterotroph / mixotroph).
+ *   (predator / mutualist = exudate consumer / phototroph / heterotroph / mixotroph).
  *
  * Innovations are births whose phenotype differs from the parent's by more
  * than a per-trait threshold; their spread is the number of living
@@ -181,7 +181,7 @@ export function groupStats(
     const k = keyOf(o);
     let a = acc.get(k);
     if (!a) {
-      a = { orgs: [], fit: 0, energy: 0, age: 0, traits: zeroPhenotype(), sx: 0, sy: 0, env: { nutrient: 0, toxin: 0, temperature: 0, light: 0 } };
+      a = { orgs: [], fit: 0, energy: 0, age: 0, traits: zeroPhenotype(), sx: 0, sy: 0, env: { nutrient: 0, toxin: 0, temperature: 0, light: 0, exudate: 0 } };
       acc.set(k, a);
     }
     a.orgs.push(o);
@@ -196,6 +196,7 @@ export function groupStats(
     a.env.toxin += e.toxin;
     a.env.temperature += e.temperature;
     a.env.light += e.light;
+    a.env.exudate += e.exudate;
   }
   const deathAcc = new Map<string, Partial<Record<DeathCause, number>>>();
   for (const d of deaths) {
@@ -226,7 +227,7 @@ export function groupStats(
       traits,
       centroid: { x: cx, y: cy },
       spread,
-      env: { nutrient: a.env.nutrient / n, toxin: a.env.toxin / n, temperature: a.env.temperature / n, light: a.env.light / n },
+      env: { nutrient: a.env.nutrient / n, toxin: a.env.toxin / n, temperature: a.env.temperature / n, light: a.env.light / n, exudate: a.env.exudate / n },
       deaths: dm,
       deathTotal: Object.values(dm).reduce((s, v) => s + (v ?? 0), 0),
     });

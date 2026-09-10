@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { metabolize } from "../src/sim/ecology";
 import {
   TERRAIN,
   World,
@@ -92,35 +93,45 @@ describe("ecology", () => {
     expect(w.organisms.find((o) => o.id === preyId)).toBeUndefined();
   });
 
-  it("matching mutualism raises the shipped fitness score via neighbor terms", () => {
+  it("exudation is a transfer: the producer pays exactly what the field receives", () => {
     const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 4 });
-    w.terrain.fill(TERRAIN.empty);
-    const a = w.birth(2, 2, founderPhototroph(), null, false, 1);
-    expect(a).toBeTruthy();
-    a!.ph.signal = 2;
-    a!.ph.aggression = 0;
-    w.refreshFitness(a!);
-    const solo = a!.fitness;
-    const b = w.birth(3, 2, founderPhototroph(), null, false, 1);
-    expect(b).toBeTruthy();
-    b!.ph.signal = 2;
-    b!.ph.aggression = 0;
-    w.refreshFitness(a!);
-    expect(a!.fitness).toBeGreaterThan(solo);
+    w.fields.light.fill(1);
+    w.fields.nutrient.fill(0);
+    const producer = w.birth(2, 2, founderPhototroph(), null, false, 3)!;
+    producer.ph.signal = 0; // produces but cannot take up
+    producer.ph.aggression = 0;
+    const before = producer.energy;
+    const met = metabolize(producer, w.fields, w.params);
+    const cell = w.fields.exudate[w.fields.idx(2, 2)]!;
+    expect(met.leaked).toBeGreaterThan(0);
+    expect(cell).toBeCloseTo(met.leaked, 6);
+    expect(producer.energy).toBeCloseTo(before + met.delta - met.leaked, 6);
+    expect(met.taken).toBe(0);
   });
 
-  it("matching mutualism signals register on adjacent organisms", () => {
+  it("a receptor takes up exudate and a non-receptor cannot", () => {
     const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 4 });
-    w.terrain.fill(TERRAIN.empty);
-    const a = w.birth(2, 2, founderPhototroph(), null, false, 1);
-    const b = w.birth(3, 2, founderPhototroph(), null, false, 1);
-    expect(a && b).toBeTruthy();
-    a!.ph.signal = 2;
-    b!.ph.signal = 2;
-    a!.ph.aggression = 0;
-    b!.ph.aggression = 0;
-    w.step();
-    expect(w.lastMutualism).toBeGreaterThan(0);
+    w.fields.light.fill(0);
+    w.fields.nutrient.fill(0);
+    const consumer = w.birth(3, 2, founderPhototroph(), null, false, 3)!;
+    consumer.ph.photo = 0; // no producer role, receptor only
+    consumer.ph.signal = 7;
+    consumer.ph.aggression = 0;
+    w.fields.exudate[w.fields.idx(3, 2)] = 0.5;
+    const before = consumer.energy;
+    const met = metabolize(consumer, w.fields, w.params);
+    expect(met.taken).toBeGreaterThan(0);
+    expect(consumer.energy).toBeGreaterThan(before + met.delta);
+    expect(w.fields.exudate[w.fields.idx(3, 2)]!).toBeLessThan(0.5);
+    // Without a receptor the same field is untouched.
+    const blind = w.birth(4, 2, founderPhototroph(), null, false, 3)!;
+    blind.ph.photo = 0;
+    blind.ph.signal = 0;
+    blind.ph.aggression = 0;
+    w.fields.exudate[w.fields.idx(4, 2)] = 0.5;
+    const blindMet = metabolize(blind, w.fields, w.params);
+    expect(blindMet.taken).toBe(0);
+    expect(w.fields.exudate[w.fields.idx(4, 2)]!).toBeCloseTo(0.5, 6);
   });
 
   it("competition / occupancy changes on a crowded grid", () => {

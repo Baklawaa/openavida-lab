@@ -1,4 +1,4 @@
-import { CRASH_EVERY, DROUGHT_EVERY, TOXIN_PULSE_EVERY, seasonLight } from "./climate";
+import { seasonLight } from "./climate";
 import { engineInfo, paramsDigest } from "./engine";
 import { centroidSpread } from "./geometry";
 import { migrateSnapshot } from "./migrate";
@@ -84,7 +84,10 @@ export class World {
   deaths: DeathRecord[] = [];
   nextDeathSeq = 1;
   lastPredation = 0;
-  lastMutualism = 0;
+  /** Organisms that leaked exudate this tick. */
+  lastExudate = 0;
+  /** Organisms washed out by the chemostat this tick. */
+  lastWashout = 0;
   lastDisplacements = 0;
   lastStepMs = 0;
   randomTerrain: boolean;
@@ -422,7 +425,8 @@ export class World {
       this.h,
       this.params,
     );
-    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org));
+    const upkeep = this.params.genomeUpkeep * org.genome.length;
+    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org), upkeep);
   }
 
   rebuildOccupancy(): void {
@@ -439,21 +443,26 @@ export class World {
     this.tick++;
     this.fields.advance(this.terrain, this.params, seasonLight(this.tick));
     shadeOccupied(this.fields.light, this.organisms, this.occupancy, this.w, this.h);
+    this.applyDilution();
     this.applyDisturbances();
     this.applySchedule();
     const orgs = this.organisms;
+    let exudateEvents = 0;
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
       o.age++;
       decayMass(o);
-      metabolize(o, this.fields, this.params);
+      const met = metabolize(o, this.fields, this.params);
+      if (met.leaked > 0) exudateEvents++;
       if (o.energy <= 0 && !o.pendingDeath) {
         o.pendingDeath = classifyEnergyDeath(o.ph, this.fields.sample(o.x, o.y));
       }
       o.energy -= crowdingPenalty(o.x, o.y, this.occupancy, this.w, this.h);
       if (o.energy <= 0 && !o.pendingDeath) o.pendingDeath = "crowding";
+      this.applySenescence(o);
       this.refreshFitness(o);
     }
+    this.lastExudate = exudateEvents;
     const inter = interactNeighbors(
       orgs,
       this.occupancy,
@@ -463,7 +472,6 @@ export class World {
       this.params,
     );
     this.lastPredation = inter.predationEvents;
-    this.lastMutualism = inter.mutualismEvents;
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
       const cap = energyCap(o);
@@ -491,6 +499,7 @@ export class World {
             this.h,
             this.rng,
             this.params,
+            inter.meals,
           );
     this.lastDisplacements = mv.displacements;
     this.reproduceAll();
@@ -522,17 +531,44 @@ export class World {
     }
   }
 
+  /**
+   * Chemostat mode. When dilutionRate > 0 the medium is refreshed towards
+   * inflowNutrient and organisms are washed out at the same rate, so the
+   * population size becomes an emergent ecological quantity instead of a
+   * parameter. dilutionRate = 0 leaves the batch world untouched.
+   */
+  private applyDilution(): void {
+    const rate = this.params.dilutionRate;
+    if (rate <= 0) return;
+    const inflow = this.params.inflowNutrient;
+    const nut = this.fields.nutrient;
+    for (let i = 0; i < nut.length; i++) nut[i] = nut[i]! + rate * (inflow - nut[i]!);
+    let washed = 0;
+    for (const o of this.organisms) {
+      if (this.rng.chance(rate)) {
+        o.energy = 0;
+        o.pendingDeath = "washout";
+        washed++;
+      }
+    }
+    this.lastWashout = washed;
+  }
+
+  /**
+   * Stochastic disturbances. Each kind is a per-tick hazard, so events are not
+   * locked to a fixed period. Rates of 0 disable a kind entirely.
+   */
   private applyDisturbances(): void {
     if (!this.disturbances) return;
-    const { w, h, rng, tick } = this;
-    if (tick >= TOXIN_PULSE_EVERY && tick % TOXIN_PULSE_EVERY === 0) {
+    const { w, h, rng, params } = this;
+    if (rng.chance(params.toxinPulseRate)) {
       this.fields.addBlob("toxin", rng.int(w), rng.int(h), 5 + rng.int(4), 0.55);
     }
-    if (tick >= DROUGHT_EVERY && tick % DROUGHT_EVERY === 0) {
+    if (rng.chance(params.droughtRate)) {
       const nut = this.fields.nutrient;
       for (let i = 0; i < nut.length; i++) nut[i] = nut[i]! * 0.78;
     }
-    if (tick >= CRASH_EVERY && tick % CRASH_EVERY === 0 && this.organisms.length > 280) {
+    if (rng.chance(params.crashRate) && this.organisms.length > 280) {
       for (const o of this.organisms) {
         if (rng.chance(0.07)) {
           o.energy = 0;
@@ -542,10 +578,23 @@ export class World {
     }
   }
 
+  /** Age-dependent mortality hazard; senescenceRate = 0 keeps the hard cutoff only. */
+  private applySenescence(o: Organism): void {
+    const rate = this.params.senescenceRate;
+    if (rate <= 0 || o.pendingDeath) return;
+    const frac = Math.min(1, o.age / Math.max(1, this.params.maxAge));
+    const p = 1 - Math.exp(-rate * frac * frac);
+    if (this.rng.chance(p)) o.pendingDeath = "old-age";
+  }
+
   private reproduceAll(): void {
     const snapshot = this.organisms;
     const n = snapshot.length;
-    const pressure = n / Math.max(1, this.params.maxPopulation);
+    const density = n / Math.max(1, this.params.maxPopulation);
+    // Deterministic logistic fecundity gate: full speed well below the cap,
+    // smoothly suppressed as the plate fills (replaces an undocumented
+    // discontinuous RNG skip that biased selection near the cap).
+    const pRepro = 1 / (1 + density * density * density * density);
     for (let i = 0; i < n; i++) {
       const parent = snapshot[i]!;
       if (parent.energy <= 0) continue;
@@ -553,7 +602,11 @@ export class World {
       if (parent.energy < need) continue;
       if (!canBreed(parent, this.params.predationThreshold)) continue;
       if (this.organisms.length >= this.params.maxPopulation) break;
-      if (pressure > 0.52 && !this.rng.chance(Math.max(0.08, 1 - pressure))) continue;
+      if (pRepro < 1 && !this.rng.chance(pRepro)) continue;
+      // Replication is charged per genome base before the daughter's share.
+      const cost = this.params.replicationCost * parent.genome.length;
+      if (parent.energy <= cost) continue;
+      parent.energy -= cost;
       if (neighborOccupancyCount(parent.x, parent.y, this.occupancy, this.w, this.h) >= 4) continue;
       const spot = emptyNeighbor(
         parent.x,

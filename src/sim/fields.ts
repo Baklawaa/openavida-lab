@@ -1,7 +1,7 @@
 import { clamp } from "./mapping";
 import { TERRAIN, type EnvSample, type SimParams } from "./types";
 
-export const FIELD_NAMES = ["nutrient", "toxin", "temperature", "light"] as const;
+export const FIELD_NAMES = ["nutrient", "toxin", "temperature", "light", "exudate"] as const;
 export type FieldName = (typeof FIELD_NAMES)[number];
 
 /**
@@ -16,6 +16,7 @@ export class Fields {
   toxin: Float32Array;
   temperature: Float32Array;
   light: Float32Array;
+  exudate: Float32Array;
   solar: Float32Array;
   private scratch: Float32Array;
 
@@ -27,6 +28,7 @@ export class Fields {
     this.toxin = new Float32Array(n);
     this.temperature = new Float32Array(n);
     this.light = new Float32Array(n);
+    this.exudate = new Float32Array(n);
     this.solar = new Float32Array(n);
     this.scratch = new Float32Array(n);
   }
@@ -46,7 +48,17 @@ export class Fields {
       toxin: this.toxin[i]!,
       temperature: this.temperature[i]!,
       light: this.light[i]!,
+      exudate: this.exudate[i]!,
     };
+  }
+
+  /** Take up to `amount` exudate from a cell; returns what was actually taken. */
+  takeExudate(x: number, y: number, amount: number): number {
+    const i = this.idx(x, y);
+    const have = this.exudate[i]!;
+    const take = have < amount ? have : amount;
+    this.exudate[i] = have - take;
+    return take;
   }
 
   get(name: FieldName): Float32Array {
@@ -110,8 +122,12 @@ export class Fields {
     }
   }
 
-  /** Diffuse all four fields from a local impulse — used by tests and step. */
-  diffuseAll(rate: number, terrain: Uint8Array): void {
+  /**
+   * Diffuse the fields from a local impulse. Light and exudate have their own
+   * rates: light is recharged from the solar field rather than mixed, and
+   * exudate spreads through the medium.
+   */
+  diffuseAll(rate: number, terrain: Uint8Array, exudateRate = rate, lightRate = rate): void {
     const s = this.scratch;
     this.diffuse(this.nutrient, s, rate, terrain);
     this.nutrient.set(s);
@@ -119,8 +135,14 @@ export class Fields {
     this.toxin.set(s);
     this.diffuse(this.temperature, s, rate, terrain);
     this.temperature.set(s);
-    this.diffuse(this.light, s, rate, terrain);
-    this.light.set(s);
+    if (lightRate > 0) {
+      this.diffuse(this.light, s, lightRate, terrain);
+      this.light.set(s);
+    }
+    if (exudateRate > 0) {
+      this.diffuse(this.exudate, s, exudateRate, terrain);
+      this.exudate.set(s);
+    }
   }
 
   applyVentsAndDecay(terrain: Uint8Array, params: SimParams, lightScale = 1): void {
@@ -134,6 +156,7 @@ export class Fields {
       this.nutrient[i] = clamp(this.nutrient[i]! * (1 - params.nutrientDecay), 0, 4);
       this.toxin[i] = clamp(this.toxin[i]! * (1 - params.toxinDecay), 0, 4);
       this.temperature[i] = clamp(this.temperature[i]! * (1 - params.temperatureDecay), 0, 1.5);
+      this.exudate[i] = clamp(this.exudate[i]! * (1 - params.exudateDecay), 0, 4);
       const shade = t === TERRAIN.shade ? 0.35 : 1;
       this.light[i] = clamp(
         this.light[i]! * (1 - params.lightDecay) + this.solar[i]! * 0.08 * shade * sun,
@@ -144,7 +167,7 @@ export class Fields {
   }
 
   advance(terrain: Uint8Array, params: SimParams, lightScale = 1): void {
-    this.diffuseAll(params.diffusionRate, terrain);
+    this.diffuseAll(params.diffusionRate, terrain, params.exudateDiffusion, params.lightDiffusion);
     this.applyVentsAndDecay(terrain, params, lightScale);
   }
 
@@ -168,6 +191,7 @@ export class Fields {
     mix(this.toxin);
     mix(this.temperature);
     mix(this.light);
+    mix(this.exudate);
     return h >>> 0;
   }
 
@@ -176,6 +200,7 @@ export class Fields {
     this.toxin.set(other.toxin);
     this.temperature.set(other.temperature);
     this.light.set(other.light);
+    this.exudate.set(other.exudate);
     this.solar.set(other.solar);
   }
 
@@ -184,6 +209,7 @@ export class Fields {
     toxin: number[];
     temperature: number[];
     light: number[];
+    exudate: number[];
     solar: number[];
   } {
     return {
@@ -191,6 +217,7 @@ export class Fields {
       toxin: Array.from(this.toxin),
       temperature: Array.from(this.temperature),
       light: Array.from(this.light),
+      exudate: Array.from(this.exudate),
       solar: Array.from(this.solar),
     };
   }
@@ -200,12 +227,16 @@ export class Fields {
     toxin: number[];
     temperature: number[];
     light: number[];
+    exudate?: number[];
     solar: number[];
   }): void {
     this.nutrient.set(data.nutrient);
     this.toxin.set(data.toxin);
     this.temperature.set(data.temperature);
     this.light.set(data.light);
+    // Absent on v1 payloads; migration fills zeros, this keeps restore defensive.
+    if (data.exudate) this.exudate.set(data.exudate);
+    else this.exudate.fill(0);
     this.solar.set(data.solar);
   }
 
@@ -217,6 +248,15 @@ export class Fields {
       out[i * 4 + 2] = toByte(this.temperature[i]!);
       out[i * 4 + 3] = toByte(this.light[i]!);
     }
+  }
+}
+
+/** One byte per cell for a single field, for the R8 overlay texture. */
+export function packFieldGray(field: Float32Array, out: Uint8Array, scale = 256): void {
+  const n = Math.min(field.length, out.length);
+  for (let i = 0; i < n; i++) {
+    const v = field[i]! * scale;
+    out[i] = v <= 0 ? 0 : v >= 255 ? 255 : v | 0;
   }
 }
 

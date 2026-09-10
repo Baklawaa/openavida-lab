@@ -1,5 +1,13 @@
-import { feed, maintenanceScale, preyGap, PREY_ATTRACTION, PREY_SENSE_RADIUS } from "./body";
-import { metabolicDelta } from "./fitness";
+import { feed, KIN_THRESHOLD, maintenanceScale, preyGap, PREY_ATTRACTION, PREY_SENSE_RADIUS } from "./body";
+import {
+  EXUDATE_MAX,
+  EXUDATE_UPTAKE_PER_UPTAKE,
+  EXUDATE_YIELD,
+  NUTRIENT_UPTAKE_CAP,
+  PHOTO_GAIN,
+  photosyntheticSurplus,
+} from "./chemistry";
+import { maintenanceCost, metabolicDelta } from "./fitness";
 import type { Fields } from "./fields";
 import type { Organism, SimParams } from "./types";
 import type { Rng } from "./rng";
@@ -68,26 +76,71 @@ export function shadeOccupied(
   }
 }
 
-export function metabolize(org: Organism, fields: Fields, params: SimParams): number {
-  void params;
+export interface MetabolismResult {
+  /** Energy delta of the harvest/cost ledger (excludes the exudate transfer). */
+  delta: number;
+  /** Energy this organism leaked into the exudate field. */
+  leaked: number;
+  /** Exudate taken up from the field, before the yield conversion. */
+  taken: number;
+}
+
+/**
+ * Harvest, pay costs, and run the exudate transfer.
+ *
+ * A phototroph whose gross photosynthesis exceeds its maintenance leaks the
+ * surplus into the exudate field; any organism carrying a receptor
+ * (signal >= 1) takes up what its cell holds and converts it with
+ * EXUDATE_YIELD. The producer pays exactly what it leaks, so the link is a
+ * transfer, not a source — and a signal-positive / low-photo mutant is a
+ * free-rider on its neighbours' overflow.
+ */
+export function metabolize(org: Organism, fields: Fields, params: SimParams): MetabolismResult {
   const env = fields.sample(org.x, org.y);
-  const take = fields.consumeNutrient(org.x, org.y, org.ph.uptake * 0.16);
-  const envPaid = { ...env, nutrient: take > 0 ? take / 0.16 : env.nutrient };
-  const d = metabolicDelta(org.ph, envPaid, maintenanceScale(org));
-  org.energy += d;
-  return d;
+  const take = fields.consumeNutrient(org.x, org.y, org.ph.uptake * NUTRIENT_UPTAKE_CAP);
+  const envPaid = { ...env, nutrient: take > 0 ? take / NUTRIENT_UPTAKE_CAP : env.nutrient };
+  const upkeep = params.genomeUpkeep * org.genome.length;
+  const delta = metabolicDelta(org.ph, envPaid, maintenanceScale(org), upkeep);
+  org.energy += delta;
+
+  let leaked = 0;
+  if (params.exudateLeak > 0 && org.energy > 0 && org.ph.photo > 0 && env.light > 0) {
+    const gross = org.ph.photo * env.light * PHOTO_GAIN;
+    const surplus = photosyntheticSurplus(gross, maintenanceCost(org.ph, maintenanceScale(org), upkeep));
+    if (surplus > 0) {
+      // Never leak past the field clamp: what does not fit stays in the cell,
+      // so the transfer can never destroy energy silently.
+      const i = fields.idx(org.x, org.y);
+      const headroom = EXUDATE_MAX - fields.exudate[i]!;
+      leaked = Math.min(params.exudateLeak * surplus, Math.max(0, headroom));
+      if (leaked > 0) {
+        org.energy -= leaked;
+        fields.exudate[i] = fields.exudate[i]! + leaked;
+      }
+    }
+  }
+
+  let taken = 0;
+  if (org.ph.signal >= 1) {
+    const capacity = EXUDATE_UPTAKE_PER_UPTAKE * org.ph.uptake * (org.ph.signal / 7);
+    taken = fields.takeExudate(org.x, org.y, capacity);
+    if (taken > 0) org.energy += taken * EXUDATE_YIELD;
+  }
+  return { delta, leaked, taken };
 }
 
 export interface InteractResult {
   predationEvents: number;
-  mutualismEvents: number;
   kills: number;
+  /** Meals taken per organism index this tick; the movement phase honours the same budget. */
+  meals: Int32Array;
 }
 
 /**
- * Adjacent predation and matching-signal mutualism. Predation is certain
- * when aggression gap ≥ 0.5; otherwise it rolls against the gap. Mutualism
- * is certain for matching channels ≥ 1.
+ * Adjacent predation. Predation is certain when the aggression gap ≥ 0.5;
+ * otherwise it rolls against the gap. An organism may take at most
+ * `params.maxMealsPerTick` prey per tick, so trophic transfer is bounded by
+ * attack rate rather than by local density.
  */
 export function interactNeighbors(
   organisms: Organism[],
@@ -98,37 +151,32 @@ export function interactNeighbors(
   params: SimParams,
 ): InteractResult {
   let predationEvents = 0;
-  let mutualismEvents = 0;
   let kills = 0;
+  const meals = new Int32Array(organisms.length);
+  const cap = Math.max(1, params.maxMealsPerTick | 0);
   const n = organisms.length;
   for (let i = 0; i < n; i++) {
     const pred = organisms[i]!;
     if (pred.energy <= 0) continue;
     for (let d = 0; d < 8; d++) {
+      if (meals[i]! >= cap) break;
       const ni = neighborIndex(pred.x, pred.y, d, w, h);
       if (ni === null) continue;
       const j = occupancy[ni]!;
       if (j < 0 || j === i) continue;
       const other = organisms[j]!;
       if (other.energy <= 0) continue;
-
-      if (pred.ph.signal >= 1 && pred.ph.signal === other.ph.signal) {
-        const share = params.mutualismShare;
-        pred.energy += share;
-        other.energy += share * 0.5;
-        mutualismEvents++;
-      }
-
-      const gap = preyGap(pred, other, params.predationThreshold);
+      const gap = preyGap(pred, other, params.predationThreshold, params.kinThreshold);
       if (gap === null) continue;
       const certain = gap >= 0.5;
       if (!certain && !rng.chance(gap)) continue;
       feed(pred, other);
+      meals[i] = meals[i]! + 1;
       predationEvents++;
       kills++;
     }
   }
-  return { predationEvents, mutualismEvents, kills };
+  return { predationEvents, kills, meals };
 }
 
 /** Nearest edible prey within PREY_SENSE_RADIUS (Chebyshev window, Euclidean pick), or null. */
@@ -139,6 +187,7 @@ export function nearestPrey(
   w: number,
   h: number,
   predationThreshold: number,
+  kinThreshold: number = KIN_THRESHOLD,
   radius = PREY_SENSE_RADIUS,
 ): Organism | null {
   if (org.ph.aggression < predationThreshold) return null;
@@ -154,7 +203,7 @@ export function nearestPrey(
       if (j < 0) continue;
       const other = organisms[j]!;
       if (other === org || other.energy <= 0) continue;
-      if (preyGap(org, other, predationThreshold) === null) continue;
+      if (preyGap(org, other, predationThreshold, kinThreshold) === null) continue;
       const d = (x - org.x) ** 2 + (y - org.y) ** 2;
       if (d < bestD) {
         bestD = d;
@@ -180,10 +229,13 @@ export function chemotaxisDir(
   rng: Rng,
   organisms: readonly Organism[] | null = null,
   predationThreshold = 0.26,
+  kinThreshold = KIN_THRESHOLD,
 ): number {
   let best = rng.int(8);
   let bestScore = -1e9;
-  const prey = organisms ? nearestPrey(org, occupancy, organisms, w, h, predationThreshold) : null;
+  const prey = organisms
+    ? nearestPrey(org, occupancy, organisms, w, h, predationThreshold, kinThreshold)
+    : null;
   const pull = PREY_ATTRACTION * (0.5 + org.ph.aggression);
   const here = prey ? Math.hypot(prey.x - org.x, prey.y - org.y) : 0;
   for (let d = 0; d < 8; d++) {
@@ -198,7 +250,7 @@ export function chemotaxisDir(
     s -= Math.abs(env.temperature - org.ph.tpref) * 0.5;
     if (occupancy[ni]! >= 0) {
       const other = organisms ? organisms[occupancy[ni]!] : undefined;
-      if (other && other.energy > 0 && preyGap(org, other, predationThreshold) !== null) s += pull;
+      if (other && other.energy > 0 && preyGap(org, other, predationThreshold, kinThreshold) !== null) s += pull;
       else s -= 0.15;
     } else if (prey) {
       // Closing the distance to the sensed prey scores like moving up a gradient.
@@ -230,9 +282,14 @@ export function moveOrganisms(
   w: number,
   h: number,
   rng: Rng,
-  params?: Pick<SimParams, "predationThreshold">,
+  params?: Pick<SimParams, "predationThreshold" | "maxMealsPerTick" | "kinThreshold">,
+  meals: Int32Array | null = null,
 ): MoveResult {
   const threshold = params?.predationThreshold ?? 0.26;
+  const kin = params?.kinThreshold ?? KIN_THRESHOLD;
+  const cap = Math.max(1, params?.maxMealsPerTick ?? 1);
+  /** A predator that already reached its meal budget cannot start another kill. */
+  const hasBudget = (i: number): boolean => meals === null || meals[i]! < cap;
   let moved = 0;
   let displacements = 0;
   const n = organisms.length;
@@ -241,7 +298,7 @@ export function moveOrganisms(
     if (org.energy <= 0) continue;
     if (!rng.chance(org.ph.motility)) continue;
     const dir = rng.chance(0.72)
-      ? chemotaxisDir(org, fields, terrain, occupancy, w, h, rng, organisms, threshold)
+      ? chemotaxisDir(org, fields, terrain, occupancy, w, h, rng, organisms, threshold, kin)
       : rng.int(8);
     const ni = neighborIndex(org.x, org.y, dir, w, h);
     if (ni === null) continue;
@@ -259,9 +316,12 @@ export function moveOrganisms(
     }
     if (occ === i) continue;
     const other = organisms[occ]!;
-    if (preyGap(org, other, threshold) !== null) {
-      // Moving onto prey is a hunt: the prey is eaten, the predator takes its cell.
+    if (preyGap(org, other, threshold, kin) !== null) {
+      // Moving onto prey is a hunt: the predator eats and takes the cell.
+      // A predator at its meal budget is simply blocked by the prey.
+      if (!hasBudget(i)) continue;
       feed(org, other);
+      if (meals) meals[i] = meals[i]! + 1;
       occupancy[other.y * w + other.x] = -1;
       occupancy[org.y * w + org.x] = -1;
       org.x = nx;
@@ -270,9 +330,12 @@ export function moveOrganisms(
       moved++;
       continue;
     }
-    if (preyGap(other, org, threshold) !== null) {
-      // Walking into a predator: the mover is eaten where it stands.
+    if (preyGap(other, org, threshold, kin) !== null) {
+      // Walking into a predator: the mover is eaten where it stands, unless
+      // the predator has already eaten its fill this tick.
+      if (!hasBudget(occ)) continue;
       feed(other, org);
+      if (meals) meals[occ] = meals[occ]! + 1;
       occupancy[org.y * w + org.x] = -1;
       continue;
     }
@@ -306,9 +369,8 @@ export function sampleNeighborEffects(
   w: number,
   h: number,
   params: SimParams,
-): { predationGain: number; mutualismGain: number } {
+): { predationGain: number } {
   let predationGain = 0;
-  let mutualismGain = 0;
   for (let d = 0; d < 8; d++) {
     const ni = neighborIndex(org.x, org.y, d, w, h);
     if (ni === null) continue;
@@ -316,15 +378,12 @@ export function sampleNeighborEffects(
     if (j < 0) continue;
     const other = organisms[j]!;
     if (!other || other.energy <= 0) continue;
-    if (org.ph.signal >= 1 && org.ph.signal === other.ph.signal) {
-      mutualismGain += params.mutualismShare;
-    }
     if (org.ph.aggression >= params.predationThreshold) {
       const gap = org.ph.aggression - other.ph.aggression;
-      if (gap > 0.1) predationGain += gap * 0.35;
+      if (gap >= params.kinThreshold) predationGain += gap * 0.35;
     }
   }
-  return { predationGain, mutualismGain };
+  return { predationGain };
 }
 
 export function emptyNeighbor(

@@ -35,7 +35,7 @@ export interface StoredInstant {
 export function estimateSnapshotBytes(organismCount: number, fieldLength: number): number {
   const n = Math.max(0, organismCount | 0);
   const cells = Math.max(0, fieldLength | 0);
-  const fieldBytes = cells * (4 * 5 + 1);
+  const fieldBytes = cells * (4 * 6 + 1);
   const orgBytes = n * 192;
   const meta = 4096 + n * 64;
   return fieldBytes + orgBytes + meta;

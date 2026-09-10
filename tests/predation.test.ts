@@ -104,6 +104,35 @@ describe("predators feed, grow and hunt", () => {
     expect(pred.y).toBe(8);
   });
 
+  it("caps meals per predator per tick and honours a raised budget", () => {
+    const ring = () => {
+      const w = arena();
+      const pred = w.birth(8, 8, founderPredator(), null, false, 3)!;
+      pred.ph.aggression = 1;
+      const preyIds: number[] = [];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
+        const prey = w.birth(8 + dx, 8 + dy, founderHeterotroph(), null, false, 1)!;
+        prey.ph.aggression = 0;
+        preyIds.push(prey.id);
+      }
+      return { w, preyIds };
+    };
+    // Default budget: one meal, however many edible neighbours there are.
+    const one = ring();
+    const r1 = interactNeighbors(one.w.organisms, one.w.occupancy, one.w.w, one.w.h, one.w.rng, one.w.params);
+    expect(r1.kills).toBe(1);
+    expect(r1.meals[0]).toBe(1);
+    const dead = one.preyIds.filter((id) => one.w.organisms.find((o) => o.id === id)!.pendingDeath === "predation");
+    expect(dead.length).toBe(1);
+
+    // A researcher can raise the attack-rate limit.
+    const three = ring();
+    Object.assign(three.w.params, { maxMealsPerTick: 3 });
+    const r3 = interactNeighbors(three.w.organisms, three.w.occupancy, three.w.w, three.w.h, three.w.rng, three.w.params);
+    expect(r3.kills).toBe(3);
+    expect(r3.meals[0]).toBe(3);
+  });
+
   it("mass survives snapshots and defaults to zero on legacy snapshots", () => {
     const w = arena();
     const pred = w.birth(5, 5, founderPredator(), null, false, 1)!;
@@ -121,18 +150,22 @@ describe("predators feed, grow and hunt", () => {
     w.injectStrain(founderHeterotroph(), 60);
     w.injectStrain(founderPredator(), 6);
     let fedPredators = 0;
-    let aliveAt60 = 0;
+    let peakPredators = 0;
     let predatorChildren = 0;
     for (let i = 1; i <= 120; i++) {
       w.step();
       const preds = w.organisms.filter((o) => o.ph.aggression > 0.5);
       fedPredators = Math.max(fedPredators, preds.filter((o) => o.mass > 0).length);
-      if (i === 60) aliveAt60 = preds.length;
+      peakPredators = Math.max(peakPredators, preds.length);
       predatorChildren += preds.filter((o) => o.parentId >= 0 && o.age === 0).length;
     }
     expect(w.deaths.filter((d) => d.cause === "predation").length).toBeGreaterThan(5);
     expect(fedPredators).toBeGreaterThan(0);
-    expect(aliveAt60).toBeGreaterThan(0);
+    // Predation supported growth above the six founders before the boom-bust.
+    // The meal budget bounds the attack rate, so the peak arrives later than in
+    // the pre-upgrade engine; the community still overexploits and collapses.
+    expect(peakPredators).toBeGreaterThan(6);
+    expect(predatorChildren).toBeGreaterThan(0);
     // Breeding is gated on body condition.
     const lean = w.birth(1, 1, founderPredator(), null, false, 3)!;
     expect(canBreed(lean, DEFAULT_PARAMS.predationThreshold)).toBe(false);

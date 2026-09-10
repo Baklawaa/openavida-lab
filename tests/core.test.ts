@@ -17,8 +17,8 @@ import {
 } from "../src/sim/index";
 import { Rng } from "../src/sim/rng";
 
-const ENV = { nutrient: 0.8, toxin: 0.1, temperature: 0.5, light: 0.9 };
-const NONE = { predationGain: 0, mutualismGain: 0 };
+const ENV = { nutrient: 0.8, toxin: 0.1, temperature: 0.5, light: 0.9, exudate: 0 };
+const NONE = { predationGain: 0 };
 
 describe("genome → phenotype mapping", () => {
   it("decodes a representative genome to documented codon deltas", () => {

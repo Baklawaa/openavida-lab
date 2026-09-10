@@ -103,6 +103,16 @@ const PARAM_SPEC_LIST = [
     description: "Minimum aggression for an organism to be a predator at all.",
   },
   {
+    key: "maxMealsPerTick", label: "Repas par pas", unit: "proies", group: "metabolism", kind: "number",
+    min: 1, max: 8, step: 1, integer: true, default: 1,
+    description: "Maximum prey a predator can eat in one tick across all phases; density-independent attack limit.",
+  },
+  {
+    key: "kinThreshold", label: "Seuil de parenté", unit: "agression", group: "ecology", kind: "number",
+    min: 0, max: 1, step: 0.01, default: 0.1,
+    description: "Minimum aggression gap required for a kill. 0 allows cannibalism of identical phenotypes.",
+  },
+  {
     key: "mutationRate", label: "Taux de mutation", unit: "par naissance", group: "evolution", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.12,
     description: "Probability that a birth draws a mutation; scaled per organism by the mutator trait.",
@@ -123,9 +133,64 @@ const PARAM_SPEC_LIST = [
     description: "Relative weight of tandem duplications among mutations.",
   },
   {
-    key: "mutualismShare", label: "Partage mutualiste", unit: "énergie", group: "ecology", kind: "number",
-    min: 0, max: 1, step: 0.005, default: 0.04,
-    description: "Legacy pairwise energy share for matching signal channels.",
+    key: "lightDiffusion", label: "Diffusion lumière", unit: "par pas", group: "metabolism", kind: "number",
+    min: 0, max: 1, step: 0.01, default: 0,
+    description: "Diffusion of the light field. 0 keeps light where the solar recharge and shade put it.",
+  },
+  {
+    key: "senescenceRate", label: "Sénescence", unit: "risque", group: "metabolism", kind: "number",
+    min: 0, max: 1, step: 0.005, default: 0.02,
+    description: "Scale of the age-dependent mortality hazard (1 - exp(-rate (age/maxAge)^2)). 0 = hard maxAge cutoff only.",
+  },
+  {
+    key: "exudateLeak", label: "Fuite d’exsudat", unit: "fraction", group: "chemistry", kind: "number",
+    min: 0, max: 1, step: 0.01, default: 0.15,
+    description: "Share of the photosynthetic surplus a phototroph leaks into the exudate field.",
+  },
+  {
+    key: "exudateDecay", label: "Décroissance exsudat", unit: "par pas", group: "chemistry", kind: "number",
+    min: 0, max: 1, step: 0.001, default: 0.03,
+    description: "Fractional loss of the exudate field per tick.",
+  },
+  {
+    key: "exudateDiffusion", label: "Diffusion exsudat", unit: "par pas", group: "chemistry", kind: "number",
+    min: 0, max: 1, step: 0.01, default: 0.5,
+    description: "Diffusion of the exudate field; how far a leak travels from its producer.",
+  },
+  {
+    key: "genomeUpkeep", label: "Coût du génome", unit: "énergie/base/pas", group: "evolution", kind: "number",
+    min: 0, max: 0.01, step: 0.00001, default: 0.00002,
+    description: "Maintenance cost per genome base per tick, so longer genomes are not free.",
+  },
+  {
+    key: "replicationCost", label: "Coût de réplication", unit: "énergie/base", group: "evolution", kind: "number",
+    min: 0, max: 0.05, step: 0.0001, default: 0.001,
+    description: "Energy charged per genome base at division, on top of the daughter's share.",
+  },
+  {
+    key: "toxinPulseRate", label: "Risque de pic toxique", unit: "par pas", group: "world", kind: "number",
+    min: 0, max: 1, step: 0.0005, default: 0.015625,
+    description: "Per-tick hazard of a random toxin pulse when disturbances are enabled (default 1/64).",
+  },
+  {
+    key: "droughtRate", label: "Risque de sécheresse", unit: "par pas", group: "world", kind: "number",
+    min: 0, max: 1, step: 0.0005, default: 0.011363636363636364,
+    description: "Per-tick hazard of a nutrient drought when disturbances are enabled (default 1/88).",
+  },
+  {
+    key: "crashRate", label: "Risque de crise", unit: "par pas", group: "world", kind: "number",
+    min: 0, max: 1, step: 0.0005, default: 0.008333333333333333,
+    description: "Per-tick hazard of a population crash when disturbances are enabled (default 1/120).",
+  },
+  {
+    key: "dilutionRate", label: "Taux de dilution", unit: "par pas", group: "world", kind: "number",
+    min: 0, max: 1, step: 0.001, default: 0,
+    description: "Chemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. 0 = closed batch world.",
+  },
+  {
+    key: "inflowNutrient", label: "Nutriment d’entrée", unit: "concentration", group: "world", kind: "number",
+    min: 0, max: 4, step: 0.01, default: 0.12,
+    description: "Nutrient concentration the inflow restores when dilutionRate > 0.",
   },
 ] as const satisfies readonly ParamSpec[];
 

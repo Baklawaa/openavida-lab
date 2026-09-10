@@ -328,3 +328,28 @@ Research-grade upgrade, stage 0 of the approved plan. **No behaviour change: the
 - `tools/gates.mjs` + `.github/workflows/ci.yml`: build, serve `dist/`, run verify-interface, verify-worker, verify-determinism and launch. `npm run gates`.
 - Cleanup: deleted the dead visual block builder (`src/sim/builder.ts` + its test; `geneColor` moved to `mapping.ts`), the dead branch in `World.paint`, the duplicated field/brush/schedule label maps (now `src/ui/labels.ts`), the O(n²) strain-track second pass (now `src/sim/geometry.ts`) and the stale `diffuseFrom` comment. The rAF loop reports a thrown frame instead of dying silently.
 - GATES: tsc ok; vitest 150/150, perf hash `c2c03a81`; build ok; `node tools/gates.mjs` → verify-interface, verify-worker, verify-determinism, launch all OK.
+
+## Upgrade Stage 1 — model correctness (2026-09-10)
+
+Research-grade upgrade, stage 1. **Behaviour change: `ENGINE_VERSION` 2.0.0, `MODEL_REVISION` 2, baseline regenerated (perf hash `c2c03a81` → `9df52ec5`).** Pre-upgrade results reproduce from tag `engine-v1`.
+
+### The two measured artifacts are fixed
+- **Meal budget.** A predator could eat every edible neighbour in one tick (8 in the probe) and hunt again while moving. `interactNeighbors` now returns a per-organism meal ledger, both movement paths honour `maxMealsPerTick` (default 1), and a predator at its budget is blocked rather than fed. Probe before/after: 8 kills → 1 (3 with the budget raised). Tests: `tests/predation.test.ts` (default and raised budget, ring of eight prey).
+- **Mutualism is replaced, not tuned.** The old rule added energy from nothing (probe: +2.4/tick for nine organisms, every pair counted twice). It is now **overflow cross-feeding**: a phototroph whose gross photosynthesis exceeds its maintenance leaks `exudateLeak` of the surplus into a fifth field (`exudate`), and any organism with a receptor (`signal ≥ 1`, capacity scaled by channel) takes it up at `EXUDATE_YIELD = 0.8`; the rest dissipates. The producer pays exactly what the field gains, and the leak is capped by the cell's headroom so the field clamp can never destroy energy silently (a bug found by the probe and fixed). A signal-positive / low-photo mutant is now a genuine free-rider. Tests: `tests/exudate.test.ts` (transfer bookkeeping, conservation with the documented yield loss, receptor vs blind, channel scaling, outliving a blind neighbour), `tests/ecology.test.ts` (rewritten).
+
+### Calibration evidence (why the defaults are what they are)
+- First attempt keyed overflow to the energy cap (60 % of capacity). Probe: **zero exudation ever** — the default world's phototrophs never get near the cap. Replaced with the surplus rule.
+- Leak 0.4 of the surplus crippled a phototroph monoculture (24 injected phototrophs, mutationRate 1, 90 steps: **10 survivors / 2 innovations / 0 with living descendants**, versus 21/12/9 on v1), which broke the interface gate. A bisect (leak 0.05…0.4 × scenario + pair probe) picked **0.15**: scenario 17/6/5, and a receptor now survives 30 ticks where an identical blind neighbour dies at 25. `EXUDATE_UPTAKE_PER_UPTAKE = 0.5`, `exudateDiffusion = 0.5`, `exudateDecay = 0.03`.
+
+### Other model fixes
+- **Genome economics**: `genomeUpkeep` (default 0.00002/base/tick) and `replicationCost` (0.001/base/birth, charged before the daughter's share) so sequence length is not free. Tests: `tests/evolution.test.ts`.
+- **Senescence**: an age-dependent hazard `1 − exp(−senescenceRate·(age/maxAge)²)` (default 0.02) on top of the hard `maxAge` ceiling; `senescenceRate = 0` restores the cutoff. Tests: `tests/mortality.test.ts`.
+- **Disturbances are hazards**, not fixed periods: `toxinPulseRate` (1/64), `droughtRate` (1/88), `crashRate` (1/120), rolled per tick; rate 0 disables a kind. `seasonLight` stays the deterministic seasonal signal.
+- **Light is no longer a solute**: `lightDiffusion` (default 0) separates it from `diffusionRate`; exudate has `exudateDiffusion`.
+- **Kin recognition is a parameter**: `kinThreshold` (default 0.1); 0 allows cannibalism of identical phenotypes.
+- **Density-dependent fecundity** replaces the undocumented `pressure > 0.52` RNG skip: `p = 1/(1 + (N/K)⁴)`, smooth and documented.
+- **Chemostat mode**: `dilutionRate` + `inflowNutrient` refresh the medium and wash organisms out, making population size emergent; new `washout` death cause. Test: `tests/environment.test.ts` (population stays alive, off the cap, across five seeds).
+- `EnvSample.exudate`, `FIELD_NAMES` + `exudate`, migration fills v1 payloads with zeros, worker frames transfer the new field, biochem shows an exudate molecule and an exudation pathway, `mutualismShare` is gone from the parameter table (dropped by `normalizeParams`).
+
+### GATES
+tsc ok; vitest **165/165**; build ok; `node tools/gates.mjs` → verify-interface, verify-worker, verify-determinism, launch all OK; baseline `9df52ec5` at engine 2.0.0 / revision 2.

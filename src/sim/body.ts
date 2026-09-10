@@ -25,6 +25,11 @@ export const PREY_SENSE_RADIUS = 6;
 export const MASS_MAINTENANCE = 0.2;
 /** Predators (aggression ≥ threshold) reproduce only once this fed: breeding follows growth. */
 export const MASS_TO_BREED = 0.25;
+/**
+ * Default minimum aggression gap for a kill. The shipped rule keeps predators
+ * from eating identical kin; params.kinThreshold = 0 enables cannibalism.
+ */
+export const KIN_THRESHOLD = 0.1;
 /** Extra energy from a prey's body, per unit of its effective size. */
 export const MEAL_BODY_BONUS = 0.45;
 
@@ -49,9 +54,14 @@ export function huntingPower(o: Body): number {
  * start eating identical kin); body mass then widens the gap, i.e. the
  * chance that an uncertain attack succeeds.
  */
-export function preyGap(pred: Body, other: Body, predationThreshold: number): number | null {
+export function preyGap(
+  pred: Body,
+  other: Body,
+  predationThreshold: number,
+  kinThreshold: number = KIN_THRESHOLD,
+): number | null {
   if (pred.ph.aggression < predationThreshold) return null;
-  if (pred.ph.aggression - other.ph.aggression < 0.1) return null;
+  if (pred.ph.aggression - other.ph.aggression < kinThreshold) return null;
   return huntingPower(pred) - other.ph.aggression;
 }
 

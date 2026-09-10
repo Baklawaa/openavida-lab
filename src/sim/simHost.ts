@@ -204,6 +204,7 @@ export interface WorldFrame {
   toxin: Float32Array;
   temperature: Float32Array;
   light: Float32Array;
+  exudate: Float32Array;
   solar: Float32Array;
   terrain: Uint8Array;
   organisms: Organism[];
@@ -219,7 +220,8 @@ export interface WorldFrame {
   lineages?: LineageNode[];
   lastStepMs: number;
   lastPredation: number;
-  lastMutualism: number;
+  lastExudate: number;
+  lastWashout: number;
   lastDisplacements: number;
   randomTerrain: boolean;
   disturbances: boolean;
@@ -250,6 +252,7 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
   const toxin = new Float32Array(w.fields.toxin);
   const temperature = new Float32Array(w.fields.temperature);
   const light = new Float32Array(w.fields.light);
+  const exudate = new Float32Array(w.fields.exudate);
   const solar = new Float32Array(w.fields.solar);
   const terrain = new Uint8Array(w.terrain);
   const frame: WorldFrame = {
@@ -265,6 +268,7 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     toxin,
     temperature,
     light,
+    exudate,
     solar,
     terrain,
     organisms: w.organisms.map((o) => ({ ...o, ph: copyPhenotype(o.ph) })),
@@ -277,7 +281,8 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     historyFull: opts.historySince < 0,
     lastStepMs: w.lastStepMs,
     lastPredation: w.lastPredation,
-    lastMutualism: w.lastMutualism,
+    lastExudate: w.lastExudate,
+    lastWashout: w.lastWashout,
     lastDisplacements: w.lastDisplacements,
     randomTerrain: w.randomTerrain,
     disturbances: w.disturbances,
@@ -291,7 +296,15 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     heatStrainId: w.heatStrainId,
     schedule: copySchedule(w.schedule),
   };
-  const transfer: ArrayBuffer[] = [nutrient.buffer, toxin.buffer, temperature.buffer, light.buffer, solar.buffer, terrain.buffer];
+  const transfer: ArrayBuffer[] = [
+    nutrient.buffer,
+    toxin.buffer,
+    temperature.buffer,
+    light.buffer,
+    exudate.buffer,
+    solar.buffer,
+    terrain.buffer,
+  ];
   if (w.heatStrainId !== null) {
     const heat = w.heat.normalized(w.heatStrainId);
     if (heat) {
@@ -313,6 +326,7 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
   w.fields.toxin.set(f.toxin);
   w.fields.temperature.set(f.temperature);
   w.fields.light.set(f.light);
+  w.fields.exudate.set(f.exudate);
   w.fields.solar.set(f.solar);
   w.terrain.set(f.terrain);
   w.organisms = f.organisms;
@@ -344,7 +358,8 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
   if (f.lineages) w.lineages = new Map(f.lineages.map((l) => [l.id, l]));
   w.lastStepMs = f.lastStepMs;
   w.lastPredation = f.lastPredation;
-  w.lastMutualism = f.lastMutualism;
+  w.lastExudate = f.lastExudate;
+  w.lastWashout = f.lastWashout;
   w.lastDisplacements = f.lastDisplacements;
   w.randomTerrain = f.randomTerrain;
   w.disturbances = f.disturbances;
