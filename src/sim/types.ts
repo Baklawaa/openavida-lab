@@ -205,6 +205,14 @@ export interface MetricsSample {
   strategies?: Record<string, number>;
   /** Per strain: [cx, cy, spread, temperature, nutrient], 2-decimal. */
   strainTracks?: Record<string, [number, number, number, number, number]>;
+  /** Hill numbers over living lineages (q = 1 and 2), sample-size aware. */
+  hill1?: number;
+  hill2?: number;
+  /** Living lineage count and Pielou evenness. */
+  richness?: number;
+  evenness?: number;
+  /** Mean offspring of adults that died recently (rolling over the death log). */
+  meanOffspringPerAdult?: number;
 }
 
 export interface MutationRates {

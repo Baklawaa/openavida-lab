@@ -1,6 +1,8 @@
 import { seasonLight } from "./climate";
 import { engineInfo, paramsDigest } from "./engine";
+import { hillNumbers, shannonEvenness } from "./diversity";
 import { centroidSpread } from "./geometry";
+import { neutralOnly, type NeutralSubstitution } from "./selection";
 import { migrateSnapshot } from "./migrate";
 import {
   crowdingPenalty,
@@ -57,6 +59,9 @@ import {
   type WorldSnapshot,
 } from "./types";
 
+/** Hue-only substitutions kept for the molecular clock. */
+export const NEUTRAL_LOG_MAX = 2000;
+
 const BRUSH_TERRAIN: Partial<Record<BrushKind, TerrainKind>> = {
   barrier: TERRAIN.barrier,
   erase: TERRAIN.empty,
@@ -108,6 +113,12 @@ export class World {
   heatStrainId: number | null = null;
   /** Future environment changes. Empty = identical to a world with no programme. */
   schedule: ScheduledOp[] = [];
+  /**
+   * Hue-only substitutions (the trait is fitness-free by design), bounded like
+   * the death log. Not snapshotted; restore resets it, so it measures the
+   * current run only.
+   */
+  neutralLog: NeutralSubstitution[] = [];
   private muteRecipe = false;
 
   constructor(partial: Partial<SimParams> = {}) {
@@ -327,6 +338,17 @@ export class World {
           ...(origin?.donorOrgId !== undefined ? { donorOrgId: origin.donorOrgId } : {}),
         });
         if (this.innovations.length > 900) this.pruneInnovations();
+      } else if (neutralOnly(parent.ph, org.ph)) {
+        this.neutralLog.push({
+          tick: this.tick,
+          orgId: org.id,
+          lineageId: org.lineageId,
+          from: parent.ph.hue,
+          to: org.ph.hue,
+        });
+        if (this.neutralLog.length > NEUTRAL_LOG_MAX) {
+          this.neutralLog.splice(0, this.neutralLog.length - NEUTRAL_LOG_MAX);
+        }
       }
     } else {
       org.lineageId = parent.lineageId;
@@ -530,6 +552,23 @@ export class World {
       typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     this.lastStepMs = t1 - t0;
     return m;
+  }
+
+  /**
+   * Mean offspring of adults that died recently. The death log is bounded, so
+   * this is a rolling realised-fitness statistic over the recent past rather
+   * than a whole-run average.
+   */
+  private meanOffspringPerAdult(): number {
+    const maturity = this.params.maxAge * 0.25;
+    let n = 0;
+    let sum = 0;
+    for (const d of this.deaths) {
+      if ((d.age ?? 0) < maturity) continue;
+      n++;
+      sum += d.births ?? 0;
+    }
+    return n === 0 ? 0 : sum / n;
   }
 
   private applySchedule(): void {
@@ -750,6 +789,13 @@ export class World {
       tracks[k] = [r2(cx), r2(cy), r2(spread), r2(a.t / a.xs.length), r2(a.nu / a.xs.length)];
     }
     m.strainTracks = tracks;
+    const livingCounts = [...this.lineages.values()].filter((l) => l.count > 0).map((l) => l.count);
+    const [rich, hill1, hill2] = hillNumbers(livingCounts, [0, 1, 2]);
+    m.richness = rich;
+    m.hill1 = hill1;
+    m.hill2 = hill2;
+    m.evenness = shannonEvenness(livingCounts);
+    m.meanOffspringPerAdult = this.meanOffspringPerAdult();
     this.history.push(m);
     if (this.history.length > 4000) this.history.splice(0, this.history.length - 3000);
     return m;

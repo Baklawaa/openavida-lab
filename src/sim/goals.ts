@@ -10,6 +10,7 @@ import type { RecipeOp } from "./recipe";
 import { applyRecipeOp } from "./recipe";
 import { copySchedule, type ScheduledOp } from "./schedule";
 import { Rng } from "./rng";
+import { bootstrapCI, quantileSorted, wilsonInterval } from "./stats";
 import type { SimParams, WorldSnapshot } from "./types";
 import { World, worldFromSnapshot } from "./world";
 
@@ -119,6 +120,10 @@ export interface TrialSummary {
   meanFinalValue: number;
   extinctions: number;
   unreachable: number;
+  /** Wilson 95 % interval on the success rate. */
+  successRateCI: [number, number];
+  /** Percentile bootstrap 95 % interval on the median ticks-to-goal. */
+  medianTicksCI: [number, number] | null;
   /** One summary per goal (length 1 when the trial used a single goal). */
   perGoal: GoalHitSummary[];
 }
@@ -364,6 +369,10 @@ export function summarizeTrials(results: readonly TrialResult[]): TrialSummary {
     meanFinalValue: n ? results.reduce((s, r) => s + r.finalValue, 0) / n : 0,
     extinctions: results.filter((r) => r.extinct).length,
     unreachable: results.filter((r) => r.unreachable).length,
+    successRateCI: wilsonInterval(successes, n),
+    medianTicksCI: bootstrapCI(hits, (s) => quantileSorted([...s].sort((a, b) => a - b), 0.5), {
+      seed: 0x5eed,
+    }),
     perGoal,
   };
 }

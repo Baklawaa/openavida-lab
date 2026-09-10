@@ -365,3 +365,18 @@ Research-grade upgrade, stage 2. **Behaviour change: `ENGINE_VERSION` 2.1.0, `MO
 
 ### GATES
 tsc ok; vitest **174/174**; build ok; `node tools/gates.mjs` → verify-interface, verify-worker, verify-determinism, launch all OK; baseline `185d6460` at engine 2.1.0 / revision 3.
+
+## Upgrade Stage 3 — measurement and inference (2026-09-10)
+
+Analysis layer. **No behaviour change: the perf hash stays `185d6460`** (the new metrics are derived, draw no RNG).
+
+- `src/sim/stats.ts`: mean/sd/quantile, Wilson interval, seeded percentile bootstrap, Cliff's delta, Hedges' g, paired differences, exact binomial test. `summarizeTrials` now reports `successRateCI` (Wilson) and `medianTicksCI` (bootstrap, fixed seed) alongside the existing quantiles.
+- `src/sim/diversity.ts`: Hill numbers (q = 0, 1, 2), Pielou evenness, Chao1, seeded rarefaction. `shannonFromCounts` is in bits, so Hill 1 converts through nats — caught by the tests.
+- `src/sim/selection.ts`: per-tick selection coefficient from the least-squares slope of logit(frequency) (recovers a known `s` to 3 decimals), fixation-versus-drift test, trait distributions (mean/sd/q05/q50/q95), neutral-only classification and a molecular clock.
+- `MetricsSample` gains `hill1`, `hill2`, `richness`, `evenness` and `meanOffspringPerAdult` (rolling over the bounded death log); the metrics CSV appends those columns after the existing ones, so older parsers keep working.
+- `World.neutralLog` records hue-only substitutions (the one fitness-free trait, by design) with a bound of 2000 entries; it is not snapshotted, so it measures the current run.
+- `tests/validation.test.ts` is the model-validation suite cited by the docs: field mass conservation below the clamp, a barrier blocking flux, the documented biomass-bonus bound on a kill, and neutral drift across 16 replicates landing near the founder frequency with real variance.
+- Tests: `tests/stats.test.ts`, `tests/diversity.test.ts`, `tests/selection.test.ts`, `tests/validation.test.ts`.
+
+### GATES
+tsc ok; vitest **191/191**; build ok; `node tools/gates.mjs` → all four browser checks OK; baseline unchanged `185d6460`.

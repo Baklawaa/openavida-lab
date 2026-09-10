@@ -90,7 +90,7 @@ function provenanceLine(p: ExportProvenance): string {
 
 export function exportMetricsCSV(history: MetricsSample[], provenance?: ExportProvenance): string {
   const header =
-    "tick,population,meanFitness,maxFitness,shannon,shannonGenotype,lineageCount,extinctTotal,fixationFraction,fixationLineageId";
+    "tick,population,meanFitness,maxFitness,shannon,shannonGenotype,lineageCount,extinctTotal,fixationFraction,fixationLineageId,hill1,hill2,richness,evenness,meanOffspringPerAdult";
   const rows = history.map((m) =>
     [
       m.tick,
@@ -103,6 +103,11 @@ export function exportMetricsCSV(history: MetricsSample[], provenance?: ExportPr
       m.extinctTotal,
       m.fixationFraction,
       m.fixationLineageId,
+      m.hill1 ?? "",
+      m.hill2 ?? "",
+      m.richness ?? "",
+      m.evenness ?? "",
+      m.meanOffspringPerAdult ?? "",
     ].join(","),
   );
   const head = provenance ? [provenanceLine(provenance), header] : [header];

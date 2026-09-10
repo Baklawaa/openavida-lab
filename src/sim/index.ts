@@ -307,6 +307,29 @@ export {
   type WorldFrame,
 } from "./simHost";
 export {
+  mean,
+  sd,
+  quantile,
+  quantileSorted,
+  wilsonInterval,
+  bootstrapCI,
+  cliffsDelta,
+  hedgesG,
+  pairedDifferences,
+  binomialTest,
+} from "./stats";
+export { hillNumbers, shannonEvenness, richness, chao1, rarefy } from "./diversity";
+export {
+  fixationVsDrift,
+  molecularClock,
+  neutralOnly,
+  selectionCoefficient,
+  traitDistribution,
+  type FrequencyPoint,
+  type NeutralSubstitution,
+  type TraitDistribution,
+} from "./selection";
+export {
   DEFAULT_FLAGS,
   flagsEqual,
   flagsFromQuery,
