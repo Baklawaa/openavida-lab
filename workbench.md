@@ -425,3 +425,11 @@ This is the one remaining Stage 5 item: a multi-run store in `PresetStore`, a ru
 
 ### GATES (partial stage)
 tsc ok; vitest **221/221**; build ok; `node tools/gates.mjs` → all four browser checks OK (which also covers the model panel and research card mounting without page errors); baseline unchanged `185d6460`.
+
+### 5.3 Experiment journal and comparison — mostly done
+- `src/ui/experimentHistory.ts` (pure): `ExperimentRecord` (id, name, notes, createdAt, engine, paramsDigest, manifest, summary, results capped at 200, curves sampled to 100), `recordFromRun`, `sampleCurves`, `engineDrift` and `historyRows`, which reuses `compareConditions` for the success rate ± Wilson interval, the median ticks ± bootstrap interval and the effect (median shift, Cliff's delta, Hedges' g) against the reference run.
+- `PresetStore` v3 adds an `experiments` object store (`saveExperiment`, `listExperiments` newest first, `getExperiment`, `removeExperiment`) with the same memory fallback as the other stores.
+- Expérience gains a **Historique des courses** step: stored runs with a 2–4 run selection (first picked = reference), success and median intervals, effect columns, a per-run note field, an engine-mismatch badge, a per-run manifest export and **B** to open a stored run's final state (when snapshots were kept) in world B. `#btn-goal-keep` stores the last finished run, and `btn-goal-keep` is in the control-help catalog.
+- Tests: `tests/experimentHistory.test.ts` (records, caps, comparison rows and effects, engine drift, store round trip through the memory fallback).
+- **Still missing from 5.3:** the overlaid curve chart (the sampled `curves` are stored but not drawn) and replaying a stored run from its own manifest (only its final state can be opened today).
+- GATES: tsc ok; vitest 227/227; build ok; browser gates all OK; baseline unchanged 185d6460.

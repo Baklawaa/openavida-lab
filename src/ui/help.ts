@@ -149,6 +149,7 @@ export const CONTROL_HELP: Record<string, string> = {
   "btn-csv": "Télécharge l’historique des indicateurs au format CSV.",
   "btn-phylo": "Télécharge les lignées, leurs parents, dates d’apparition et d’extinction au format CSV.",
   "btn-events": "Télécharge le journal d’événements par organisme (JSON Lines : naissances, morts, repas, exsudat). Activez d’abord le journal dans Expérience.",
+  "btn-goal-keep": "Conserve la dernière course (résultats, résumé, manifeste) dans l’historique du navigateur pour la comparer aux suivantes.",
   "model-target": "Choisit le ou les mondes auxquels appliquer les paramètres du modèle.",
   "model-apply": "Applique au monde choisi les paramètres qui diffèrent de l’état courant. Les valeurs sont bornées par la spécification du modèle.",
   "model-reset": "Rétablit les valeurs par défaut publiées de tous les paramètres du modèle.",

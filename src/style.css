@@ -215,6 +215,12 @@ textarea#genome-edit { width: 100%; min-height: 90px; resize: vertical; color: v
 .research-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; font-size: 11px; }
 .research-row b { flex: 1 1 40%; }
 .research-traits { display: flex; flex-wrap: wrap; gap: 10px; font: 600 10px var(--mono); }
+.history-body { overflow-x: auto; }
+.history-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.history-table th, .history-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.history-table tr.picked { background: rgba(62, 224, 192, .07); }
+.history-table .warn { color: var(--amber); }
+.history-note { width: 100%; font-size: 11px; margin-top: 3px; }
 .codon.role-start { border-top-left-radius: 6px; }
 .codon.role-stop { border-top-right-radius: 6px; }
 .nt { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 20px; border-radius: 3px; font: 600 10px var(--mono); color: #08121a; cursor: text; }

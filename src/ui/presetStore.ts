@@ -5,6 +5,8 @@
  */
 import type { AncestryStep, CatalogEntry, Goal, TrialConfig, TrialResult, WorldSnapshot } from "../sim/index";
 
+import type { ExperimentRecord } from "./experimentHistory";
+
 export interface PresetMeta {
   id: string;
   name: string;
@@ -51,9 +53,10 @@ export type SavedOrganismMeta = Omit<SavedOrganism, "snapshot" | "ancestry"> & {
 const LAST_RUN_ID = "__last-run__";
 
 const DB_NAME = "openavida-lab";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = "presets";
 const ORG_STORE = "organisms";
+const EXP_STORE = "experiments";
 
 function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
@@ -69,6 +72,7 @@ function openDb(): Promise<IDBDatabase | null> {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(ORG_STORE)) db.createObjectStore(ORG_STORE, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(EXP_STORE)) db.createObjectStore(EXP_STORE, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => resolve(null);
@@ -92,6 +96,7 @@ export class PresetStore {
   private db: Promise<IDBDatabase | null> | null = null;
   private readonly memory = new Map<string, PresetRecord>();
   private readonly memoryOrganisms = new Map<string, SavedOrganism>();
+  private readonly memoryExperiments = new Map<string, ExperimentRecord>();
 
   private open(): Promise<IDBDatabase | null> {
     if (!this.db) this.db = openDb();
@@ -161,6 +166,59 @@ export class PresetStore {
     if (!db) return;
     try {
       await request(db.transaction(ORG_STORE, "readwrite").objectStore(ORG_STORE).delete(id));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /* ---------- experiment journal ---------- */
+
+  async saveExperiment(record: ExperimentRecord): Promise<void> {
+    const db = await this.open();
+    if (db) {
+      try {
+        await request(db.transaction(EXP_STORE, "readwrite").objectStore(EXP_STORE).put(record));
+        return;
+      } catch {
+        /* fall through to memory */
+      }
+    }
+    this.memoryExperiments.set(record.id, record);
+  }
+
+  /** Stored runs, newest first. */
+  async listExperiments(): Promise<ExperimentRecord[]> {
+    const db = await this.open();
+    let records: ExperimentRecord[] = [...this.memoryExperiments.values()];
+    if (db) {
+      try {
+        records = await request(db.transaction(EXP_STORE, "readonly").objectStore(EXP_STORE).getAll() as IDBRequest<ExperimentRecord[]>);
+      } catch {
+        /* keep memory */
+      }
+    }
+    return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async getExperiment(id: string): Promise<ExperimentRecord | null> {
+    const db = await this.open();
+    if (db) {
+      try {
+        const rec = (await request(db.transaction(EXP_STORE, "readonly").objectStore(EXP_STORE).get(id) as IDBRequest<ExperimentRecord | undefined>)) ?? null;
+        if (rec) return rec;
+      } catch {
+        /* fall through */
+      }
+    }
+    return this.memoryExperiments.get(id) ?? null;
+  }
+
+  async removeExperiment(id: string): Promise<void> {
+    this.memoryExperiments.delete(id);
+    const db = await this.open();
+    if (!db) return;
+    try {
+      await request(db.transaction(EXP_STORE, "readwrite").objectStore(EXP_STORE).delete(id));
     } catch {
       /* ignore */
     }

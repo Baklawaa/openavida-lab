@@ -23,6 +23,7 @@ import {
   summarizeTournament,
   worldForTrial,
   asGoals,
+  engineInfo,
   makeManifest,
   worldFromSnapshot,
   type FieldName,
@@ -41,6 +42,7 @@ import {
   type WorldSnapshot,
 } from "../sim/index";
 import { runReplicates, type RunHandle } from "./goalRunner";
+import { recordFromRun, historyRows, type ExperimentRecord } from "./experimentHistory";
 import { FIELD_LABEL } from "./labels";
 import { buildReportHtml } from "./report";
 import { TRAIT_LABEL } from "./labels";
@@ -258,11 +260,17 @@ function template(): string {
 
       <div class="goal-step">
         <span class="eyebrow">4 · RÉSULTATS</span>
-        <div class="row"><button type="button" id="btn-goal-report" class="quiet" disabled>${icon("save")}Rapport HTML</button></div>
+        <div class="row"><button type="button" id="btn-goal-report" class="quiet" disabled>${icon("save")}Rapport HTML</button><button type="button" id="btn-goal-keep" class="quiet" disabled>${icon("save")}Conserver la course</button></div>
         <div id="goal-summary" class="goal-summary"></div>
         <div class="chart-card goal-chart"><div class="chart-heading"><h3>Mesure par réplicat</h3><span id="goal-chart-note"></span></div><canvas id="chart-goal" role="img" aria-label="Évolution de la mesure pour chaque réplicat"></canvas></div>
         <div class="goal-table-head"><label class="tiny" for="goal-sort">Trier</label><select id="goal-sort">${RESULT_SORTS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}</select><span id="goal-table-note" class="tiny"></span></div>
         <div id="goal-results" class="goal-results"></div>
+      </div>
+
+      <div class="goal-step" id="history-step">
+        <span class="eyebrow">HISTORIQUE DES COURSES</span>
+        <p class="micro">Les courses conservées restent dans le navigateur. Cochez-en deux à quatre pour comparer taux de réussite, médiane et effet contre la référence (la première cochée). « Manifeste » exporte la course pour le lanceur sans interface.</p>
+        <div id="history-body" class="history-body"></div>
       </div>
 
       <div class="goal-step" id="replay-step">
@@ -298,6 +306,12 @@ function template(): string {
       <div id="tournament-progress" class="goal-progress"></div>
       <div id="tournament-matrix"></div>
     </section>`;
+}
+
+function escapeGoalHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) =>
+    c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
+  );
 }
 
 export class GoalPanel {
@@ -376,6 +390,7 @@ export class GoalPanel {
     this.renderResults();
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-report").disabled = false;
+    this.q<HTMLButtonElement>("#btn-goal-keep").disabled = false;
     const when = new Date(rec.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
     this.q("#goal-table-note").textContent = `${rec.results.length} réplicats · course du ${when} restaurée · depuis ${rec.label}`;
     this.opts.status(`Dernière course restaurée (${rec.results.length} réplicats depuis ${rec.label}, ${when}) : tableau, tri et rejeu disponibles.`);
@@ -585,6 +600,7 @@ export class GoalPanel {
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = false;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-report").disabled = true;
+    this.q<HTMLButtonElement>("#btn-goal-keep").disabled = true;
     this.q("#goal-summary").innerHTML = "";
     this.q("#goal-results").innerHTML = "";
     this.renderProgress(maxTicks);
@@ -1131,6 +1147,101 @@ export class GoalPanel {
     });
   }
 
+  /* ---------- experiment journal ---------- */
+
+  private historyRecords: ExperimentRecord[] = [];
+  private historySelected: string[] = [];
+
+  /** Store the last finished run, then refresh the list. */
+  private async keepLastRun(): Promise<void> {
+    const results = this.results.filter(Boolean) as TrialResult[];
+    const manifest = this.manifest();
+    if (!this.lastRun || results.length === 0 || !manifest) {
+      this.opts.status("Aucune course à conserver : lancez une expérience ciblée.");
+      return;
+    }
+    const record = recordFromRun({ manifest, results, summary: summarizeTrials(results) });
+    await this.store.saveExperiment(record);
+    this.historySelected = [record.id];
+    this.opts.status(`Course conservée : ${record.name} · ${record.results.length} réplicats.`);
+    await this.refreshHistory();
+  }
+
+  private async refreshHistory(): Promise<void> {
+    try {
+      this.historyRecords = await this.store.listExperiments();
+    } catch {
+      this.historyRecords = [];
+    }
+    this.historySelected = this.historySelected.filter((id) => this.historyRecords.some((r) => r.id === id));
+    this.renderHistory();
+  }
+
+  private download(name: string, text: string): void {
+    const blob = new Blob([text], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  private renderHistory(): void {
+    const body = this.q("#history-body");
+    if (this.historyRecords.length === 0) {
+      body.innerHTML = '<p class="muted">Aucune course conservée. Lancez une expérience ciblée, puis « Conserver la course ».</p>';
+      return;
+    }
+    const rows = historyRows(this.historyRecords, {
+      ...(this.historySelected[0] ? { referenceId: this.historySelected[0] } : {}),
+      current: engineInfo(),
+    });
+    const pct = (v: number) => `${(v * 100).toFixed(0)} %`;
+    const span = (ci: [number, number] | null) => (ci ? `[${ci[0].toFixed(2)} – ${ci[1].toFixed(2)}]` : "—");
+    const header = "<tr><th></th><th>Course</th><th>n</th><th>Réussite</th><th>Médiane (pas)</th><th>Effet / référence</th><th></th></tr>";
+    const bodyRows = rows
+      .map((row) => {
+        const picked = this.historySelected.includes(row.id);
+        const finalSnap = this.historyRecords.find((r) => r.id === row.id)?.results[0]?.snapshot;
+        const effect = row.effect
+          ? `Δ ${row.effect.medianShift === null ? "—" : row.effect.medianShift.toFixed(1)} · δ ${row.effect.cliffsDelta.toFixed(2)} · g ${row.effect.hedgesG.toFixed(2)}`
+          : "référence";
+        return `<tr class="${picked ? "picked" : ""}">
+          <td><input type="checkbox" data-history-pick="${row.id}" ${picked ? "checked" : ""} aria-label="Comparer cette course"></td>
+          <td><b>${escapeGoalHtml(row.name)}</b><div class="micro">${row.createdAt.slice(0, 16).replace("T", " ")}${row.engineMismatch ? ` · <span class="warn">${row.engineMismatch}</span>` : ""}</div>
+            <input type="text" class="history-note" data-history-note="${row.id}" placeholder="Note" value="${escapeGoalHtml(this.historyRecords.find((r) => r.id === row.id)?.notes ?? "")}"></td>
+          <td>${row.n}</td>
+          <td>${row.successes}/${row.n} · ${pct(row.successRate)}<div class="micro">IC ${pct(row.successRateCI[0])} – ${pct(row.successRateCI[1])}</div></td>
+          <td>${row.medianTicks === null ? "—" : row.medianTicks.toFixed(1)}<div class="micro">IC ${span(row.medianTicksCI)}</div></td>
+          <td class="micro">${effect}</td>
+          <td>${finalSnap ? `<button type="button" class="quiet" data-history-open="${row.id}" title="Ouvrir l’état final dans le monde B">B</button>` : ""}<button type="button" class="quiet" data-history-manifest="${row.id}" title="Exporter le manifeste">Manifeste</button>
+            <button type="button" class="quiet" data-history-remove="${row.id}" title="Retirer">×</button></td>
+        </tr>`;
+      })
+      .join("");
+    body.innerHTML = `<table class="history-table">${header}${bodyRows}</table>`;
+  }
+
+  private async exportHistoryManifest(id: string): Promise<void> {
+    const record = this.historyRecords.find((r) => r.id === id);
+    if (!record) return;
+    this.download(`openavida-${record.id}.json`, JSON.stringify(record.manifest, null, 2));
+    this.opts.status(`Manifeste de « ${record.name} » exporté.`);
+  }
+
+  private async updateHistoryNote(id: string, notes: string): Promise<void> {
+    const record = this.historyRecords.find((r) => r.id === id);
+    if (!record) return;
+    record.notes = notes;
+    await this.store.saveExperiment(record);
+  }
+
+  private async removeHistory(id: string): Promise<void> {
+    await this.store.removeExperiment(id);
+    this.historySelected = this.historySelected.filter((x) => x !== id);
+    await this.refreshHistory();
+  }
+
   private async exportReport(): Promise<void> {
     if (!this.lastRun || !this.lastGoal) {
       this.opts.status("Aucune course à rapporter.");
@@ -1329,6 +1440,45 @@ export class GoalPanel {
     });
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
     this.q("#btn-goal-report").addEventListener("click", () => void this.exportReport());
+    this.q("#btn-goal-keep").addEventListener("click", () => void this.keepLastRun());
+    const historyBody = this.q("#history-body");
+    historyBody.addEventListener("click", (ev) => {
+      const target = ev.target as HTMLElement;
+      const manifestBtn = target.closest<HTMLElement>("[data-history-manifest]");
+      if (manifestBtn?.dataset.historyManifest) {
+        void this.exportHistoryManifest(manifestBtn.dataset.historyManifest);
+        return;
+      }
+      const removeBtn = target.closest<HTMLElement>("[data-history-remove]");
+      if (removeBtn?.dataset.historyRemove) {
+        void this.removeHistory(removeBtn.dataset.historyRemove);
+        return;
+      }
+      const openBtn = target.closest<HTMLElement>("[data-history-open]");
+      if (openBtn?.dataset.historyOpen) {
+        const record = this.historyRecords.find((r) => r.id === openBtn.dataset.historyOpen);
+        const snapshot = record?.results[0]?.snapshot;
+        if (record && snapshot) {
+          this.opts.restoreInto("B", snapshot);
+          this.opts.status(`État final de « ${record.name} » ouvert dans le monde B.`);
+        } else {
+          this.opts.status("Cette course n’a pas conservé d’état final.");
+        }
+      }
+    });
+    historyBody.addEventListener("change", (ev) => {
+      const target = ev.target as HTMLInputElement;
+      if (target.dataset.historyPick) {
+        const id = target.dataset.historyPick;
+        this.historySelected = target.checked
+          ? [...this.historySelected.filter((x) => x !== id), id].slice(-4)
+          : this.historySelected.filter((x) => x !== id);
+        this.renderHistory();
+        return;
+      }
+      if (target.dataset.historyNote) void this.updateHistoryNote(target.dataset.historyNote, target.value);
+    });
+    void this.refreshHistory();
     this.q("#btn-goal-det").addEventListener("click", () => void this.checkDeterminism());
     this.q("#btn-sweep-csv").addEventListener("click", () => this.exportSweepCsv());
     this.q("#tournament-picks").addEventListener("change", () => this.limitTournamentPicks());
