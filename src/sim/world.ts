@@ -2,7 +2,7 @@ import { seasonLight } from "./climate";
 import { engineInfo, paramsDigest } from "./engine";
 import { hillNumbers, shannonEvenness } from "./diversity";
 import { centroidSpread } from "./geometry";
-import { neutralOnly, type NeutralSubstitution } from "./selection";
+import { neutralOnly, traitDistribution, type NeutralSubstitution } from "./selection";
 import { migrateSnapshot } from "./migrate";
 import {
   crowdingPenalty,
@@ -865,6 +865,7 @@ export class World {
     m.hill2 = hill2;
     m.evenness = shannonEvenness(livingCounts);
     m.meanOffspringPerAdult = this.meanOffspringPerAdult();
+    if (this.params.recordTraitDistribution) m.traitDist = traitDistribution(this.organisms);
     this.history.push(m);
     if (this.history.length > 4000) this.history.splice(0, this.history.length - 3000);
     return m;

@@ -198,6 +198,11 @@ const PARAM_SPEC_LIST = [
     description: "Per-tick hazard of a population crash when disturbances are enabled (default 1/120).",
   },
   {
+    key: "recordTraitDistribution", label: "Distributions de traits", unit: "", group: "world", kind: "boolean",
+    min: 0, max: 1, step: 1, default: true,
+    description: "Store mean, sd and quantiles of every trait on each history sample (analysis without re-simulation).",
+  },
+  {
     key: "recordEvents", label: "Journal d’événements", unit: "", group: "world", kind: "boolean",
     min: 0, max: 1, step: 1, default: false,
     description: "Record every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring).",

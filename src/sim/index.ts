@@ -323,6 +323,13 @@ export {
 } from "./stats";
 export { hillNumbers, shannonEvenness, richness, chao1, rarefy } from "./diversity";
 export {
+  compareConditions,
+  summarizeCondition,
+  type ConditionComparison,
+  type ConditionEffect,
+  type ConditionSummary,
+} from "./compare";
+export {
   fixationVsDrift,
   molecularClock,
   neutralOnly,
@@ -330,8 +337,8 @@ export {
   traitDistribution,
   type FrequencyPoint,
   type NeutralSubstitution,
-  type TraitDistribution,
 } from "./selection";
+export type { TraitDistribution } from "./types";
 export {
   DEFAULT_FLAGS,
   flagsEqual,

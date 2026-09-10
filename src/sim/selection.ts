@@ -4,7 +4,9 @@
  */
 import { TRAIT_NAMES, type Phenotype, type TraitName } from "./mapping";
 import { binomialTest } from "./stats";
-import type { Organism } from "./types";
+import type { Organism, TraitDistribution } from "./types";
+
+export type { TraitDistribution };
 
 export interface FrequencyPoint {
   tick: number;
@@ -51,14 +53,6 @@ export function fixationVsDrift(
     expected: p * replicates,
     pValue: binomialTest(observedFixations, replicates, p),
   };
-}
-
-export interface TraitDistribution {
-  mean: number;
-  sd: number;
-  q05: number;
-  q50: number;
-  q95: number;
 }
 
 export function traitDistribution(organisms: readonly Organism[]): Partial<Record<TraitName, TraitDistribution>> {

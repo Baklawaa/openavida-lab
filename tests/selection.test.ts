@@ -39,6 +39,18 @@ describe("selection and drift", () => {
     expect(neutralOnly(org.ph, { ...variant, uptake: variant.uptake + 0.1 })).toBe(false);
   });
 
+  it("stores a per-tick trait distribution only when asked", () => {
+    const on = new World({ width: 12, height: 12, startPopulation: 12, seed: 3, recordTraitDistribution: true });
+    for (let i = 0; i < 5; i++) on.step();
+    const sample = on.history.at(-1)!;
+    expect(sample.traitDist?.uptake?.mean).toBeGreaterThan(0);
+    expect(sample.traitDist?.uptake?.q05).toBeLessThanOrEqual(sample.traitDist!.uptake!.q50);
+
+    const off = new World({ width: 12, height: 12, startPopulation: 12, seed: 3, recordTraitDistribution: false });
+    for (let i = 0; i < 5; i++) off.step();
+    expect(off.history.at(-1)!.traitDist).toBeUndefined();
+  });
+
   it("summarises a trait distribution and a molecular clock", () => {
     const w = new World({ width: 12, height: 12, startPopulation: 12, seed: 5 });
     for (let i = 0; i < 20; i++) w.step();

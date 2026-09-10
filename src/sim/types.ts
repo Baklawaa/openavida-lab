@@ -110,6 +110,8 @@ export interface SimParams {
   crashRate: number;
   /** Record the per-organism research event stream (off by default: it costs memory). */
   recordEvents: boolean;
+  /** Store a per-trait distribution on every history sample (analysis layer). */
+  recordTraitDistribution: boolean;
   /** Chemostat washout fraction per tick; 0 keeps the closed batch world. */
   dilutionRate: number;
   /** Nutrient concentration the inflow restores when dilutionRate > 0. */
@@ -215,6 +217,17 @@ export interface MetricsSample {
   evenness?: number;
   /** Mean offspring of adults that died recently (rolling over the death log). */
   meanOffspringPerAdult?: number;
+  /** Per-trait distribution at this tick, when params.recordTraitDistribution is on. */
+  traitDist?: Partial<Record<import("./mapping").TraitName, TraitDistribution>>;
+}
+
+/** Summary of one trait's distribution across the living population. */
+export interface TraitDistribution {
+  mean: number;
+  sd: number;
+  q05: number;
+  q50: number;
+  q95: number;
 }
 
 export interface MutationRates {
