@@ -314,3 +314,17 @@ npm run build && npm run preview
 ```
 
 Do not open `index.html` via `file://` (ES modules). The page explains how to serve if you do.
+
+## Upgrade Stage 0 — engine identity, parameter spec, migration, gates (2026-09-10)
+
+Research-grade upgrade, stage 0 of the approved plan. **No behaviour change: the perf hash stays `c2c03a81`.**
+
+- `tests/fixtures/snapshot-v1.json` captured from the pre-upgrade engine (32×32, random terrain, disturbances, two manual strains, a two-entry programme, 70 steps) and verified to restore to the same `hashState`; annotated tag **`engine-v1`** marks the last pre-upgrade revision so old results stay reproducible by checkout.
+- `src/sim/engine.ts`: `ENGINE_VERSION` 1.0.0, `MODEL_REVISION` 1, `engineInfo()`, `paramsDigest()`. Snapshots carry `engine` + `paramsDigest`; metrics and phylogeny CSVs prepend a `# openavida engine=… params=… seed=… tick=…` line and `parseCSV` skips comments. `provenanceOf(world)` feeds the exports.
+- `tests/baselines/engine.json` + `tests/engine.test.ts` pin the canonical 128×128 perf hash and the engine version, so a silent behaviour change fails the suite. `npm run baseline` regenerates it deliberately.
+- `src/sim/params.ts`: `PARAM_SPEC` is the single source for defaults, bounds, labels, query keys and docs; `normalizeParams` is spec-driven, clamps everything and drops unknown keys; `PARAMS_EXHAUSTIVE` is a compile-time proof that every `SimParams` key has a spec entry. `tests/params.test.ts` covers exhaustiveness, clamping and URL round-trips.
+- `src/sim/migrate.ts` + snapshot `version: 2`: v1 → v2 adds provenance, normalizes params against the current spec and recomputes phenotypes from genomes (the hook future traits need). `parseJSONSnapshot` and `worldFromSnapshot` migrate; a payload newer than the engine is refused. `tests/migrate.test.ts` replays the frozen v1 fixture deterministically.
+- `tests/invariants.test.ts`: 200 seeded random ops (paint, place, inject, bottleneck, restore, schedule, step) on 24×24 worlds assert energy/field finiteness, occupancy bijection, lineage integrity, snapshot round-trip stability and op-sequence determinism, plus "no `Math.random` in `src/sim`".
+- `tools/gates.mjs` + `.github/workflows/ci.yml`: build, serve `dist/`, run verify-interface, verify-worker, verify-determinism and launch. `npm run gates`.
+- Cleanup: deleted the dead visual block builder (`src/sim/builder.ts` + its test; `geneColor` moved to `mapping.ts`), the dead branch in `World.paint`, the duplicated field/brush/schedule label maps (now `src/ui/labels.ts`), the O(n²) strain-track second pass (now `src/sim/geometry.ts`) and the stale `diffuseFrom` comment. The rAF loop reports a thrown frame instead of dying silently.
+- GATES: tsc ok; vitest 150/150, perf hash `c2c03a81`; build ok; `node tools/gates.mjs` → verify-interface, verify-worker, verify-determinism, launch all OK.

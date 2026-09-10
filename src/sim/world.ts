@@ -1,4 +1,7 @@
 import { CRASH_EVERY, DROUGHT_EVERY, TOXIN_PULSE_EVERY, seasonLight } from "./climate";
+import { engineInfo, paramsDigest } from "./engine";
+import { centroidSpread } from "./geometry";
+import { migrateSnapshot } from "./migrate";
 import {
   crowdingPenalty,
   emptyNeighbor,
@@ -38,6 +41,7 @@ import {
   DEATH_LOG_KEEP,
   DEATH_LOG_MAX,
   DEFAULT_PARAMS,
+  SNAPSHOT_VERSION,
   TERRAIN,
   normalizeParams,
   type BrushKind,
@@ -611,31 +615,24 @@ export class World {
     m.strains = strains;
     m.strategies = strategies;
     const tracks: Record<string, [number, number, number, number, number]> = {};
-    const acc = new Map<string, { n: number; sx: number; sy: number; st: number; sn: number }>();
+    const acc = new Map<string, { xs: number[]; ys: number[]; t: number; nu: number }>();
     for (const o of this.organisms) {
       const k = String(o.strainId);
       let a = acc.get(k);
       if (!a) {
-        a = { n: 0, sx: 0, sy: 0, st: 0, sn: 0 };
+        a = { xs: [], ys: [], t: 0, nu: 0 };
         acc.set(k, a);
       }
       const env = this.fields.sample(o.x, o.y);
-      a.n++;
-      a.sx += o.x;
-      a.sy += o.y;
-      a.st += env.temperature;
-      a.sn += env.nutrient;
+      a.xs.push(o.x);
+      a.ys.push(o.y);
+      a.t += env.temperature;
+      a.nu += env.nutrient;
     }
     const r2 = (v: number) => Math.round(v * 100) / 100;
     for (const [k, a] of acc) {
-      const cx = a.sx / a.n;
-      const cy = a.sy / a.n;
-      let d2 = 0;
-      for (const o of this.organisms) {
-        if (String(o.strainId) !== k) continue;
-        d2 += (o.x - cx) ** 2 + (o.y - cy) ** 2;
-      }
-      tracks[k] = [r2(cx), r2(cy), r2(Math.sqrt(d2 / a.n)), r2(a.st / a.n), r2(a.sn / a.n)];
+      const { cx, cy, spread } = centroidSpread(a.xs, a.ys);
+      tracks[k] = [r2(cx), r2(cy), r2(spread), r2(a.t / a.xs.length), r2(a.nu / a.xs.length)];
     }
     m.strainTracks = tracks;
     this.history.push(m);
@@ -667,9 +664,6 @@ export class World {
             this.organisms[oi]!.energy = 0;
             this.organisms[oi]!.pendingDeath = "wipe";
           }
-        }
-        if (brush === "erase" || (terrainKind === TERRAIN.barrier && brush === "barrier")) {
-          // barrier paint already set; erase also clears occupancy optionally
         }
         if (brush === "barrier") {
           const oi = this.occupancy[i]!;
@@ -773,9 +767,12 @@ export class World {
   }
 
   snapshot(): WorldSnapshot {
+    const params = { ...this.params, randomTerrain: this.randomTerrain, disturbances: this.disturbances };
     return {
-      version: 1,
-      params: { ...this.params, randomTerrain: this.randomTerrain, disturbances: this.disturbances },
+      version: SNAPSHOT_VERSION,
+      engine: engineInfo(),
+      paramsDigest: paramsDigest(params),
+      params,
       rngState: this.rng.state(),
       tick: this.tick,
       ...this.fields.toArrays(),
@@ -889,7 +886,8 @@ export class World {
   }
 }
 
-export function worldFromSnapshot(snap: WorldSnapshot): World {
+export function worldFromSnapshot(snapshot: WorldSnapshot): World {
+  const snap = migrateSnapshot(snapshot);
   const w = new World({ ...snap.params, startPopulation: 0, seed: snap.params.seed });
   w.restore(snap);
   w.recording = null;

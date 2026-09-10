@@ -1,32 +1,12 @@
+import { engineInfo, paramsDigest, type EngineInfo } from "./engine";
+import { migrateSnapshot } from "./migrate";
+import { PARAM_SPEC, QUERY_KEYS } from "./params";
 import { DEFAULT_PARAMS, normalizeParams, type MetricsSample, type SimParams, type WorldSnapshot } from "./types";
 import type { World } from "./world";
 
-const PARAM_KEYS: (keyof SimParams)[] = [
-  "width",
-  "height",
-  "seed",
-  "mutationRate",
-  "pointWeight",
-  "indelWeight",
-  "duplicationWeight",
-  "diffusionRate",
-  "nutrientDecay",
-  "toxinDecay",
-  "temperatureDecay",
-  "lightDecay",
-  "maxPopulation",
-  "startPopulation",
-  "reproduceEnergy",
-  "maxAge",
-  "predationThreshold",
-  "mutualismShare",
-  "randomTerrain",
-  "disturbances",
-];
-
 export function paramsToQuery(p: SimParams): string {
   const usp = new URLSearchParams();
-  for (const k of PARAM_KEYS) {
+  for (const k of QUERY_KEYS) {
     const v = p[k];
     const def = DEFAULT_PARAMS[k];
     if (v !== def) usp.set(k, String(v));
@@ -39,15 +19,15 @@ export function paramsFromQuery(qs: string): SimParams {
   const raw = qs.startsWith("?") ? qs.slice(1) : qs;
   const usp = new URLSearchParams(raw);
   const partial: Partial<SimParams> = {};
-  for (const k of PARAM_KEYS) {
-    const s = usp.get(k);
+  for (const spec of PARAM_SPEC) {
+    const s = usp.get(spec.key);
     if (s === null || s === "") continue;
-    if (k === "randomTerrain" || k === "disturbances") {
-      (partial as Record<string, boolean>)[k] = s === "1" || s === "true";
+    if (spec.kind === "boolean") {
+      (partial as Record<string, boolean>)[spec.key] = s === "1" || s === "true";
       continue;
     }
     const n = Number(s);
-    if (Number.isFinite(n)) (partial as Record<string, number>)[k] = n;
+    if (Number.isFinite(n)) (partial as Record<string, number>)[spec.key] = n;
   }
   return normalizeParams(partial);
 }
@@ -76,14 +56,39 @@ export function exportJSON(world: World): string {
 }
 
 export function parseJSONSnapshot(text: string): WorldSnapshot {
-  const data = JSON.parse(text) as WorldSnapshot;
-  if (!data || data.version !== 1 || !data.params || !Array.isArray(data.organisms)) {
+  const snap = migrateSnapshot(JSON.parse(text) as unknown);
+  if (!snap.params || !Array.isArray(snap.organisms)) {
     throw new Error("invalid OpenAvida snapshot");
   }
-  return data;
+  return snap;
 }
 
-export function exportMetricsCSV(history: MetricsSample[]): string {
+/** Provenance record embedded in every export so a result can be tied to an engine and a run. */
+export interface ExportProvenance {
+  engine: EngineInfo;
+  paramsDigest: string;
+  seed: number;
+  tick: number;
+}
+
+export function provenanceOf(world: World): ExportProvenance {
+  return {
+    engine: engineInfo(),
+    paramsDigest: paramsDigest({
+      ...world.params,
+      randomTerrain: world.randomTerrain,
+      disturbances: world.disturbances,
+    }),
+    seed: world.params.seed,
+    tick: world.tick,
+  };
+}
+
+function provenanceLine(p: ExportProvenance): string {
+  return `# openavida engine=${p.engine.version} revision=${p.engine.revision} algo=${p.engine.hashAlgo} params=${p.paramsDigest} seed=${p.seed} tick=${p.tick}`;
+}
+
+export function exportMetricsCSV(history: MetricsSample[], provenance?: ExportProvenance): string {
   const header =
     "tick,population,meanFitness,maxFitness,shannon,shannonGenotype,lineageCount,extinctTotal,fixationFraction,fixationLineageId";
   const rows = history.map((m) =>
@@ -100,7 +105,8 @@ export function exportMetricsCSV(history: MetricsSample[]): string {
       m.fixationLineageId,
     ].join(","),
   );
-  return [header, ...rows].join("\n");
+  const head = provenance ? [provenanceLine(provenance), header] : [header];
+  return [...head, ...rows].join("\n");
 }
 
 export function exportPhylogenyCSV(world: World): string {
@@ -117,11 +123,15 @@ export function exportPhylogenyCSV(world: World): string {
       l.signature,
     ].join(","),
   );
-  return [header, ...rows].join("\n");
+  return [provenanceLine(provenanceOf(world)), header, ...rows].join("\n");
 }
 
 export function parseCSV(text: string): { header: string[]; rows: string[][] } {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter((l) => l.length);
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((l) => l.length && !l.startsWith("#"));
   if (lines.length === 0) return { header: [], rows: [] };
   const header = lines[0]!.split(",");
   const rows = lines.slice(1).map((l) => l.split(","));

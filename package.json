@@ -9,8 +9,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4174 --strictPort --host 127.0.0.1",
     "test": "vitest run",
+    "baseline": "OPENAVIDA_UPDATE_BASELINE=1 vitest run tests/engine.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "gates": "node tools/gates.mjs",
     "launch": "node tools/launch.mjs"
   },
   "devDependencies": {

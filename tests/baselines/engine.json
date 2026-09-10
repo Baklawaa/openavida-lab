@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "revision": 1,
+  "hashAlgo": "fnv1a-32",
+  "seed": "0xa7f31ab",
+  "steps": 48,
+  "perfHash": "c2c03a81"
+}

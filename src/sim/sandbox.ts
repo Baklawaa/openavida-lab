@@ -8,6 +8,8 @@ import {
   parseCSV,
   parseJSONSnapshot,
   parseShareURL,
+  provenanceOf,
+  type ExportProvenance,
 } from "./serialize";
 import { Timeline } from "./timeline";
 import type { BrushKind, SimParams, WorldSnapshot } from "./types";
@@ -110,5 +112,7 @@ export {
   parseCSV,
   parseJSONSnapshot,
   parseShareURL,
+  provenanceOf,
   worldFromSnapshot,
+  type ExportProvenance,
 };

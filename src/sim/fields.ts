@@ -6,8 +6,8 @@ export type FieldName = (typeof FIELD_NAMES)[number];
 
 /**
  * Four scalar fields on a dense grid. Diffusion is a 4-neighbor Jacobi step
- * that does not cross barriers. World.step calls advance() — tests can also
- * call diffuseFrom() to drive the same kernel.
+ * that does not cross barriers. World.step calls advance(); tests can also
+ * call diffuse() / diffuseAll() to drive the same kernel.
  */
 export class Fields {
   readonly w: number;

@@ -1,5 +1,6 @@
 import type { TraitName } from "../sim/mapping";
-import type { DeathCause } from "../sim/types";
+import type { FieldName } from "../sim/fields";
+import type { BrushKind, DeathCause } from "../sim/types";
 
 export const DEATH_LABEL: Record<DeathCause, string> = {
   starvation: "Manque de nourriture ou de lumière", toxin: "Intoxication", crowding: "Surpopulation",
@@ -24,4 +25,38 @@ export const TRAIT_HINT: Record<TraitName, string> = {
   hue: "Modifie la couleur, sans effet sur la fitness.",
   fecundity: "Modifie la capacité à se reproduire.",
   size: "Modifie la taille et le coût énergétique d’entretien.",
+};
+
+/** Every brush, in the order the Milieu palette shows them. */
+export const BRUSH_ORDER: readonly BrushKind[] = [
+  "nutrientBlob", "toxinBlob", "heatBlob", "lightBlob", "barrier", "erase",
+  "nutrientVent", "toxinVent", "thermalVent", "shade", "wipeOrgs",
+];
+
+export const BRUSH_LABEL: Record<BrushKind, string> = {
+  barrier: "Obstacle",
+  erase: "Gomme",
+  nutrientVent: "Source nutritive",
+  toxinVent: "Source toxique",
+  thermalVent: "Source de chaleur",
+  shade: "Ombre",
+  nutrientBlob: "Nutriments",
+  toxinBlob: "Toxines",
+  heatBlob: "Chaleur",
+  lightBlob: "Lumière",
+  wipeOrgs: "Retirer la vie",
+};
+
+export const FIELD_LABEL: Record<FieldName, string> = {
+  nutrient: "nutriments",
+  toxin: "toxines",
+  temperature: "température",
+  light: "lumière",
+};
+
+/** Parameters a scheduled programme can write. */
+export const SCHED_PARAM_LABEL: Record<string, string> = {
+  mutationRate: "taux de mutation",
+  maxPopulation: "population max",
+  reproduceEnergy: "seuil de reproduction",
 };

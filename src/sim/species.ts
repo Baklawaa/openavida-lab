@@ -14,6 +14,7 @@
  * than a per-trait threshold; their spread is the number of living
  * descendants of the lineage that mutation created.
  */
+import { centroidSpread } from "./geometry";
 import { TRAIT_NAMES, type Phenotype, type TraitName } from "./mapping";
 import type { DeathCause, DeathRecord, EnvSample, LineageNode, MetricsSample, MutationKind, Organism } from "./types";
 
@@ -208,10 +209,7 @@ export function groupStats(
   const out: GroupStats[] = [];
   for (const [key, a] of acc) {
     const n = a.orgs.length;
-    const cx = a.sx / n;
-    const cy = a.sy / n;
-    let d2 = 0;
-    for (const o of a.orgs) d2 += (o.x - cx) ** 2 + (o.y - cy) ** 2;
+    const { cx, cy, spread } = centroidSpread(a.orgs.map((o) => o.x), a.orgs.map((o) => o.y));
     const traits = zeroPhenotype();
     for (const t of TRAIT_NAMES) traits[t] = a.traits[t] / n;
     const m = meta(key);
@@ -227,7 +225,7 @@ export function groupStats(
       meanAge: a.age / n,
       traits,
       centroid: { x: cx, y: cy },
-      spread: Math.sqrt(d2 / n),
+      spread,
       env: { nutrient: a.env.nutrient / n, toxin: a.env.toxin / n, temperature: a.env.temperature / n, light: a.env.light / n },
       deaths: dm,
       deathTotal: Object.values(dm).reduce((s, v) => s + (v ?? 0), 0),

@@ -6,7 +6,7 @@ import { TRAIT_NAMES } from "../src/sim/index";
 import { CONTROL_HELP, LAB_CONTROL_IDS, attachControlHelp } from "../src/ui/help";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const appSrc = ["src/app.ts", "src/ui/layout.ts", "src/ui/dnaEditor.ts", "src/ui/speciesPanel.ts", "src/ui/goalPanel.ts", "src/ui/explorer.ts"].map(path => readFileSync(resolve(root, path), "utf8")).join("\n");
+const appSrc = ["src/app.ts", "src/ui/layout.ts", "src/ui/dnaEditor.ts", "src/ui/speciesPanel.ts", "src/ui/goalPanel.ts", "src/ui/explorer.ts", "src/ui/labels.ts"].map(path => readFileSync(resolve(root, path), "utf8")).join("\n");
 
 describe("control help catalog", () => {
   it("covers every labeled lab control with a non-empty explanation", () => {

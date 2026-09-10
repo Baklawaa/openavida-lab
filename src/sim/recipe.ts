@@ -7,7 +7,7 @@
  */
 import { buildShareURL } from "./serialize";
 import { copySchedule, isScheduledOp, type ScheduledOp } from "./schedule";
-import { normalizeParams, type BrushKind, type SimParams } from "./types";
+import { BRUSH_KINDS, normalizeParams, type BrushKind, type SimParams } from "./types";
 import { World } from "./world";
 
 export const RECIPE_VERSION = 1;
@@ -26,11 +26,6 @@ export interface Recipe {
   ops: RecipeOp[];
   schedule?: ScheduledOp[];
 }
-
-const BRUSHES: readonly BrushKind[] = [
-  "barrier", "erase", "nutrientVent", "toxinVent", "thermalVent", "shade",
-  "nutrientBlob", "toxinBlob", "heatBlob", "lightBlob", "wipeOrgs",
-];
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -80,7 +75,7 @@ function decodeBase64Url(s: string): string {
 }
 
 function isBrush(v: unknown): v is BrushKind {
-  return typeof v === "string" && (BRUSHES as readonly string[]).includes(v);
+  return typeof v === "string" && (BRUSH_KINDS as readonly string[]).includes(v);
 }
 
 export function isRecipeOp(v: unknown): v is RecipeOp {

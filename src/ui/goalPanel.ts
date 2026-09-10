@@ -38,6 +38,7 @@ import {
   type WorldSnapshot,
 } from "../sim/index";
 import { runReplicates, type RunHandle } from "./goalRunner";
+import { FIELD_LABEL } from "./labels";
 import { buildReportHtml } from "./report";
 import { TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
@@ -107,7 +108,7 @@ export function compareResults(sort: ResultSort): (a: [number, TrialResult], b: 
   };
 }
 
-const FIELD_LABEL: Record<FieldName, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
+
 
 const SWEEP_LABEL: Record<SweepVariable, string> = {
   mutationRate: "Taux de mutation",

@@ -1,5 +1,13 @@
 export { Rng, mixSeed } from "./rng";
 export {
+  ENGINE_VERSION,
+  HASH_ALGO,
+  MODEL_REVISION,
+  engineInfo,
+  paramsDigest,
+  type EngineInfo,
+} from "./engine";
+export {
   ALPHABET,
   BASES,
   BASAL,
@@ -12,6 +20,7 @@ export {
   TRAIT_COLOR,
   TRAIT_NAMES,
   TRAIT_SPEC,
+  geneColor,
   mappingLegend,
   phenotypeFromRaw,
   squashTrait,
@@ -84,9 +93,11 @@ export {
   parseCSV,
   parseJSONSnapshot,
   parseShareURL,
+  provenanceOf,
   restoreSnapshot,
   takeSnapshot,
   worldFromSnapshot,
+  type ExportProvenance,
 } from "./sandbox";
 export {
   genotypeShannon,
@@ -96,7 +107,17 @@ export {
   shannonFromCounts,
 } from "./metrics";
 export { DEFAULT_PARAMS, World } from "./world";
-export { DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type EnvSample, type NeighborEffects, type SimParams, type WorldSnapshot } from "./types";
+export { BRUSH_KINDS, DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type EnvSample, type NeighborEffects, type SimParams, type WorldSnapshot } from "./types";
+export { SNAPSHOT_VERSION } from "./types";
+export { migrateSnapshot, snapshotVersion } from "./migrate";
+export {
+  PARAMS_EXHAUSTIVE,
+  PARAM_SPEC,
+  QUERY_KEYS,
+  paramSpec,
+  type ParamGroup,
+  type ParamSpec,
+} from "./params";
 export {
   CAUSE_COLOR,
   CAUSE_LABEL,
@@ -106,18 +127,6 @@ export {
   strongestLiving,
   tallyDeaths,
 } from "./deaths";
-export {
-  GENE_LABEL,
-  addBlock,
-  blocksFromGenome,
-  genomeFromBlocks,
-  geneColor,
-  geneHint,
-  moveBlock,
-  removeBlock,
-  setBlockStrength,
-  type GeneBlock,
-} from "./builder";
 export {
   ALIGN_BAND,
   EditHistory,

@@ -41,6 +41,7 @@ import {
   parseShareURL,
   recipeFromQuery,
   peerColor,
+  provenanceOf,
   takeSnapshot,
   toGenomeTrack,
   worldFromSnapshot,
@@ -64,21 +65,12 @@ import { CONTROL_HELP, attachControlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
-import { DEATH_LABEL } from "./ui/labels";
+import { BRUSH_LABEL, BRUSH_ORDER, DEATH_LABEL, FIELD_LABEL, SCHED_PARAM_LABEL } from "./ui/labels";
 
-const BRUSHES: { id: BrushKind; label: string }[] = [
-  { id: "nutrientBlob", label: "Nutriments" },
-  { id: "toxinBlob", label: "Toxines" },
-  { id: "heatBlob", label: "Chaleur" },
-  { id: "lightBlob", label: "Lumière" },
-  { id: "barrier", label: "Obstacle" },
-  { id: "erase", label: "Gomme" },
-  { id: "nutrientVent", label: "Source nutritive" },
-  { id: "toxinVent", label: "Source toxique" },
-  { id: "thermalVent", label: "Source de chaleur" },
-  { id: "shade", label: "Ombre" },
-  { id: "wipeOrgs", label: "Retirer la vie" },
-];
+const BRUSHES: { id: BrushKind; label: string }[] = BRUSH_ORDER.map((id) => ({
+  id,
+  label: BRUSH_LABEL[id],
+}));
 
 
 
@@ -1066,14 +1058,12 @@ export function mount(root: HTMLElement): void {
   const schedAction = root.querySelector<HTMLSelectElement>("#sched-action")!;
   const schedArg = root.querySelector<HTMLInputElement>("#sched-arg")!;
   const schedList = root.querySelector<HTMLElement>("#sched-list")!;
-  const SCHED_FIELD: Record<string, string> = { nutrient: "nutriments", toxin: "toxines", temperature: "température", light: "lumière" };
-  const SCHED_PARAM: Record<string, string> = { mutationRate: "taux de mutation", maxPopulation: "population max", reproduceEnergy: "seuil de reproduction" };
   function describeSched(item: ScheduledOp): string {
     const op = item.op;
-    if (op.type === "scale") return `× ${op.k} sur ${SCHED_FIELD[op.field] ?? op.field}`;
+    if (op.type === "scale") return `× ${op.k} sur ${FIELD_LABEL[op.field] ?? op.field}`;
     if (op.type === "params") {
       const e = Object.entries(op.params)[0];
-      return e ? `${SCHED_PARAM[e[0]] ?? e[0]} → ${e[1]}` : "paramètres";
+      return e ? `${SCHED_PARAM_LABEL[e[0]] ?? e[0]} → ${e[1]}` : "paramètres";
     }
     if (op.type === "paint") return `touche ${op.brush} r=${op.radius}`;
     if (op.type === "inject") return `injecter ${op.count}`;
@@ -1288,7 +1278,7 @@ export function mount(root: HTMLElement): void {
     download(`openavida-t${current().tick}.json`, exportJSON(current()), "application/json");
   });
   root.querySelector("#btn-csv")!.addEventListener("click", () => {
-    download(`openavida-metrics-t${current().tick}.csv`, exportMetricsCSV(current().history), "text/csv");
+    download(`openavida-metrics-t${current().tick}.csv`, exportMetricsCSV(current().history, provenanceOf(current())), "text/csv");
   });
   root.querySelector("#btn-phylo")!.addEventListener("click", () => {
     download(`openavida-phylo-t${current().tick}.csv`, exportPhylogenyCSV(current()), "text/csv");
@@ -1472,7 +1462,16 @@ export function mount(root: HTMLElement): void {
 
   let lastFrame = performance.now();
   let tickAccum = 0;
-  const loop = (now: number) => {
+  let lastLoopError = 0;
+  /** Keep the rAF loop alive when a frame throws; report at most once per second. */
+  const reportLoopError = (err: unknown): void => {
+    const t = performance.now();
+    if (t - lastLoopError < 1000) return;
+    lastLoopError = t;
+    status(`Erreur d’exécution : ${err instanceof Error ? err.message : String(err)}`);
+    console.error(err);
+  };
+  const frameBody = (now: number): void => {
     const dt = Math.min(100, now - lastFrame);
     lastFrame = now;
     if (!state.paused && state.speed > 0 && canDriveClock(state.room)) {
@@ -1505,6 +1504,13 @@ export function mount(root: HTMLElement): void {
       state.roomPost?.({ kind: "snapshot", snap: current().snapshot() });
     }
     refreshMetrics();
+  };
+  const loop = (now: number): void => {
+    try {
+      frameBody(now);
+    } catch (err) {
+      reportLoopError(err);
+    }
     requestAnimationFrame(loop);
   };
 

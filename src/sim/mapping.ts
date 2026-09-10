@@ -277,6 +277,11 @@ export function copyPhenotype(p: Phenotype): Phenotype {
   };
 }
 
+/** Display colour of a trait, shared by the DNA editor, genome browser and legends. */
+export function geneColor(trait: TraitName): string {
+  return TRAIT_COLOR[trait];
+}
+
 export function codonsForTrait(trait: TraitName): string[] {
   return CODON_TABLE.filter((r) => r.trait === trait && r.delta > 0).map((r) => r.codon);
 }

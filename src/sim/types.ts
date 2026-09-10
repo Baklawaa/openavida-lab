@@ -1,4 +1,5 @@
 import type { Phenotype } from "./mapping";
+import type { EngineInfo } from "./engine";
 import type { EventFlags, WorldEvent } from "./events";
 import type { Innovation, Strain } from "./species";
 import type { ScheduledOp } from "./schedule";
@@ -47,18 +48,20 @@ export const TERRAIN = {
 } as const;
 export type TerrainKind = (typeof TERRAIN)[keyof typeof TERRAIN];
 
-export type BrushKind =
-  | "barrier"
-  | "erase"
-  | "nutrientVent"
-  | "toxinVent"
-  | "thermalVent"
-  | "shade"
-  | "nutrientBlob"
-  | "toxinBlob"
-  | "heatBlob"
-  | "lightBlob"
-  | "wipeOrgs";
+export const BRUSH_KINDS = [
+  "barrier",
+  "erase",
+  "nutrientVent",
+  "toxinVent",
+  "thermalVent",
+  "shade",
+  "nutrientBlob",
+  "toxinBlob",
+  "heatBlob",
+  "lightBlob",
+  "wipeOrgs",
+] as const;
+export type BrushKind = (typeof BRUSH_KINDS)[number];
 
 export interface SimParams {
   width: number;
@@ -85,28 +88,12 @@ export interface SimParams {
   disturbances: boolean;
 }
 
-export const DEFAULT_PARAMS: SimParams = {
-  width: 128,
-  height: 128,
-  seed: 0xa7f31ab,
-  mutationRate: 0.12,
-  pointWeight: 0.7,
-  indelWeight: 0.2,
-  duplicationWeight: 0.1,
-  diffusionRate: 0.22,
-  nutrientDecay: 0.007,
-  toxinDecay: 0.006,
-  temperatureDecay: 0.002,
-  lightDecay: 0.03,
-  maxPopulation: 1100,
-  startPopulation: 0,
-  reproduceEnergy: 1.55,
-  maxAge: 260,
-  predationThreshold: 0.26,
-  mutualismShare: 0.04,
-  randomTerrain: false,
-  disturbances: false,
-};
+/**
+ * Defaults, bounds and normalization live in ./params (the single source of
+ * truth shared by the UI model panel, the query string and the docs).
+ * Re-exported here so every existing `from "./types"` import keeps working.
+ */
+export { DEFAULT_PARAMS, PARAM_SPEC, QUERY_KEYS, normalizeParams, paramSpec, type ParamGroup, type ParamSpec } from "./params";
 
 export interface EnvSample {
   nutrient: number;
@@ -198,8 +185,15 @@ export interface MutationRates {
 
 export type MutationKind = "point" | "indel" | "duplication";
 
+/** Current snapshot schema version. The upgrade path lives in src/sim/migrate.ts. */
+export const SNAPSHOT_VERSION = 2;
+
 export interface WorldSnapshot {
-  version: 1;
+  version: typeof SNAPSHOT_VERSION;
+  /** Engine that produced this snapshot. Optional on payloads written before provenance existed. */
+  engine?: EngineInfo;
+  /** Digest of the snapshot's params, for provenance lines and reports. */
+  paramsDigest?: string;
   params: SimParams;
   rngState: number;
   tick: number;
@@ -227,20 +221,4 @@ export interface WorldSnapshot {
   schedule?: ScheduledOp[];
 }
 
-export function normalizeParams(partial: Partial<SimParams> = {}): SimParams {
-  const p = { ...DEFAULT_PARAMS, ...partial };
-  p.width = Math.max(8, Math.min(256, p.width | 0));
-  p.height = Math.max(8, Math.min(256, p.height | 0));
-  p.seed = p.seed >>> 0 || 1;
-  p.mutationRate = clamp01(p.mutationRate);
-  p.maxPopulation = Math.max(16, p.maxPopulation | 0);
-  p.startPopulation = Math.max(0, Math.min(p.maxPopulation, p.startPopulation | 0));
-  p.randomTerrain = Boolean(p.randomTerrain);
-  p.disturbances = Boolean(p.disturbances);
-  return p;
-}
 
-function clamp01(v: number): number {
-  if (!Number.isFinite(v)) return 0;
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
