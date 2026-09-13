@@ -139,7 +139,7 @@ export class WorkerHost implements SimHost {
     const w = side === "B" ? this.dual.b : this.dual.a;
     if (!applyFrame(w, f)) {
       const fresh = new World({ ...f.params, startPopulation: 0 });
-      applyFrame(fresh, { ...f, historyFull: true });
+      applyFrame(fresh, { ...f, historyFull: true, neutralFull: true });
       if (side === "B") this.dual.b = fresh;
       else this.dual.a = fresh;
     }

@@ -198,7 +198,7 @@ export function researchHtml(world: World): string {
 
   return `<div class="research-grid">
     <div><span class="eyebrow">${selectionHeading}</span>${selectionHtml}</div>
-    <div><span class="eyebrow">DÉRIVE NEUTRE</span><p><b>${world.neutralLog.length}</b> substitution(s) neutre(s) (couleur) · horloge <b>${clock.toFixed(2)}</b> / 100 pas / lignée</p></div>
+    <div><span class="eyebrow">DÉRIVE NEUTRE</span><p><b>${world.neutralLog.length}</b> substitution(s) neutre(s) · horloge <b>${clock.toFixed(2)}</b> / 100 pas / lignée</p></div>
     <div><span class="eyebrow">FITNESS RÉALISÉE</span><p><b>${latest?.meanOffspringPerAdult !== undefined ? latest.meanOffspringPerAdult.toFixed(2) : "—"}</b> descendants par adulte décédé · fixation <b>${latest ? (latest.fixationFraction * 100).toFixed(0) : 0} %</b></p></div>
     <div><span class="eyebrow">DISTRIBUTION DES TRAITS</span><p class="research-traits">${traits || "—"}</p></div>
   </div>`;

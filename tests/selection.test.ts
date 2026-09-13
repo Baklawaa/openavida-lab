@@ -3,6 +3,7 @@ import {
   LINEAGE_TOP_N,
   World,
   fixationVsDrift,
+  founderPhototroph,
   molecularClock,
   neutralOnly,
   selectionCoefficient,
@@ -33,12 +34,30 @@ describe("selection and drift", () => {
     expect(biased.pValue).toBeLessThan(0.01);
   });
 
-  it("classifies hue-only changes as neutral and nothing else", () => {
+  it("classifies fitness-neutral changes as neutral and nothing else", () => {
     const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 1 });
     const org = w.birth(4, 4, "ATGAAATAAGGGCCCTAA", null, false, 1)!;
+    // Silent: the phenotype did not move at all (synonymous codon, non-coding base).
+    expect(neutralOnly(org.ph, { ...org.ph })).toBe(true);
+    // Hue may move, and it is the only trait that may.
     const variant = { ...org.ph, hue: org.ph.hue + 0.2 };
     expect(neutralOnly(org.ph, variant)).toBe(true);
     expect(neutralOnly(org.ph, { ...variant, uptake: variant.uptake + 0.1 })).toBe(false);
+  });
+
+  it("records a molecular clock of silent substitutions on a mutating run", () => {
+    const w = new World({ width: 32, height: 32, seed: 5, startPopulation: 0, mutationRate: 1, maxPopulation: 400 });
+    w.injectStrain(founderPhototroph(), 24, 16, 16);
+    for (let i = 0; i < 120; i++) w.step();
+    expect(w.neutralLog.length).toBeGreaterThan(0);
+    for (const entry of w.neutralLog.slice(0, 20)) {
+      expect(entry.tick).toBeGreaterThan(0);
+      expect(entry.orgId).toBeGreaterThan(0);
+    }
+    const clock = molecularClock(w.neutralLog, w.tick, Math.max(1, w.lineages.size));
+    expect(clock).toBeGreaterThan(0);
+    w.restore(w.snapshot());
+    expect(w.neutralLog).toHaveLength(0);
   });
 
   it("stores a per-tick trait distribution only when asked", () => {

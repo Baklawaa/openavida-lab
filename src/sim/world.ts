@@ -120,9 +120,10 @@ export class World {
   /** Future environment changes. Empty = identical to a world with no programme. */
   schedule: ScheduledOp[] = [];
   /**
-   * Hue-only substitutions (the trait is fitness-free by design), bounded like
-   * the death log. Not snapshotted; restore resets it, so it measures the
-   * current run only.
+   * Neutral substitutions: births whose phenotype is unchanged in every trait
+   * except the display-only hue (synonymous codon swaps, changes outside ORFs,
+   * pure hue moves). Bounded like the death log and not snapshotted; restore
+   * resets it, so it measures the current run only.
    */
   neutralLog: NeutralSubstitution[] = [];
   /**

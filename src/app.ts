@@ -748,8 +748,15 @@ export function mount(root: HTMLElement): void {
       roomPeers: state.room?.metrics.peers ?? 0,
       host: host.kind,
       explorerOpen: explorer.isOpen,
+      neutralSubstitutions: w.neutralLog.length,
+      historyRows: w.history.length,
     };
   }
+
+  /** Parameters of one world (or the active one), for the model-panel gate. */
+  window.__openavidaParams = (side?: "A" | "B") => ({
+    ...(side === "A" ? dual.a : side === "B" ? dual.b : current()).params,
+  });
 
   window.__openavidaSelectAt = (clientX: number, clientY: number) => {
     const sidePick = renderer.pickWorld(clientX);

@@ -23,6 +23,7 @@ import type { EventFlags, WorldEvent } from "./events";
 import { OccupancyHeat } from "./heat";
 import type { Innovation, Strain } from "./species";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX } from "./types";
+import { normalizeParams } from "./params";
 import type {
   BrushKind,
   DeathRecord,
@@ -33,7 +34,8 @@ import type {
   SimParams,
   WorldSnapshot,
 } from "./types";
-import { World, worldFromSnapshot } from "./world";
+import { NEUTRAL_LOG_MAX, World, worldFromSnapshot } from "./world";
+import type { NeutralSubstitution } from "./selection";
 
 export type Side = "A" | "B";
 export type StepSide = Side | "both";
@@ -158,9 +160,13 @@ function applySimOpCore(dual: DualWorld, op: SimOp): SimOpResult {
       w.recording = op.on ? (w.recording ?? []) : null;
       return {};
     }
-    case "setParams":
-      Object.assign(worldOf(dual, op.which).params, op.params);
+    case "setParams": {
+      // Normalized at the boundary: the op is shared by the inline host, the
+      // worker and the mirror, so a patch can never leave the spec behind.
+      const w = worldOf(dual, op.which);
+      Object.assign(w.params, normalizeParams({ ...w.params, ...op.params }));
       return {};
+    }
     case "timeline": {
       const tl = timelineOf(dual, op.which);
       if (op.every !== undefined) tl.every = Math.max(1, op.every | 0);
@@ -217,6 +223,9 @@ export interface WorldFrame {
   extinctions: ExtinctionRecord[];
   history: MetricsSample[];
   historyFull: boolean;
+  /** Neutral (fitness-free) substitutions with tick > neutralSince; all when neutralFull. */
+  neutralLog: NeutralSubstitution[];
+  neutralFull: boolean;
   lineages?: LineageNode[];
   lastStepMs: number;
   lastPredation: number;
@@ -243,6 +252,8 @@ export interface FrameOptions {
   historySince: number;
   /** Send death records with seq > deathsSince; -1 = everything. */
   deathsSince?: number;
+  /** Send neutral substitutions with tick > neutralSince; -1 = everything. */
+  neutralSince?: number;
   lineages: boolean;
   innovations: boolean;
 }
@@ -279,6 +290,11 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
     extinctions: w.extinctions.map((e) => ({ ...e })),
     history: opts.historySince < 0 ? w.history.map((h) => ({ ...h })) : w.history.filter((h) => h.tick > opts.historySince).map((h) => ({ ...h })),
     historyFull: opts.historySince < 0,
+    neutralLog:
+      opts.neutralSince === undefined || opts.neutralSince < 0
+        ? w.neutralLog.map((e) => ({ ...e }))
+        : w.neutralLog.filter((e) => e.tick > opts.neutralSince!).map((e) => ({ ...e })),
+    neutralFull: opts.neutralSince === undefined || opts.neutralSince < 0,
     lastStepMs: w.lastStepMs,
     lastPredation: w.lastPredation,
     lastExudate: w.lastExudate,
@@ -354,6 +370,17 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
     if (cut < w.history.length) w.history.splice(cut);
     w.history.push(...f.history);
     if (w.history.length > 4000) w.history.splice(0, w.history.length - 3000);
+  }
+  if (f.neutralFull) w.neutralLog = f.neutralLog;
+  else if (f.neutralLog.length) {
+    // Same rule as history: drop the mirror's rows from the first resent tick
+    // on, so an overwritten or replayed segment cannot be counted twice.
+    const first = f.neutralLog[0]!.tick;
+    let cut = w.neutralLog.length;
+    while (cut > 0 && w.neutralLog[cut - 1]!.tick >= first) cut--;
+    if (cut < w.neutralLog.length) w.neutralLog.splice(cut);
+    w.neutralLog.push(...f.neutralLog);
+    if (w.neutralLog.length > NEUTRAL_LOG_MAX) w.neutralLog.splice(0, w.neutralLog.length - NEUTRAL_LOG_MAX);
   }
   if (f.lineages) w.lineages = new Map(f.lineages.map((l) => [l.id, l]));
   w.lastStepMs = f.lastStepMs;

@@ -24,6 +24,15 @@ describe("model panel data", () => {
     expect(paramsFromForm({ width: "abc" }, new Set()).width).toBeUndefined();
   });
 
+  it("bounds typed values by the specification instead of writing them through", () => {
+    const tooBig = paramsFromForm({ maxMealsPerTick: "99", nutrientInflow: "9" }, new Set());
+    expect(tooBig.maxMealsPerTick).toBe(8);
+    expect(tooBig.nutrientInflow).toBe(0.2);
+    const tooSmall = paramsFromForm({ senescenceRate: "-2", width: "3.7" }, new Set());
+    expect(tooSmall.senescenceRate).toBe(0);
+    expect(tooSmall.width).toBe(8);
+  });
+
   it("keeps the legacy profile inside the current spec", () => {
     const keys = new Set(PARAM_SPEC.map((s) => s.key));
     for (const key of Object.keys(LEGACY_V1_PROFILE)) {

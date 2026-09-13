@@ -34,6 +34,7 @@ let dual: DualWorld | null = null;
 const sentTick: Record<Side, number> = { A: -1, B: -1 };
 const sentDeath: Record<Side, number> = { A: -1, B: -1 };
 const sentInnovations: Record<Side, number> = { A: -1, B: -1 };
+const sentNeutral: Record<Side, number> = { A: -1, B: -1 };
 let frameCount = 0;
 
 function sendFrames(seq: number, sides: Side[], stepped: boolean, full: boolean): void {
@@ -47,11 +48,13 @@ function sendFrames(seq: number, sides: Side[], stepped: boolean, full: boolean)
     const { frame, transfer: t } = frameFromWorld(w, side, {
       historySince: full ? -1 : sentTick[side],
       deathsSince: full ? -1 : sentDeath[side],
+      neutralSince: full ? -1 : sentNeutral[side],
       lineages: full || !stepped || frameCount % 6 === 0,
       innovations,
     });
     sentTick[side] = w.tick;
     sentDeath[side] = w.nextDeathSeq - 1;
+    sentNeutral[side] = w.tick;
     if (innovations) sentInnovations[side] = w.innovations.length;
     frames.push(frame);
     transfer.push(...t);

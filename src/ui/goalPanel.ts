@@ -628,6 +628,8 @@ export class GoalPanel {
     this.q<HTMLButtonElement>("#btn-goal-stop").disabled = true;
     this.q<HTMLButtonElement>("#btn-goal-csv").disabled = all.length === 0;
     this.q<HTMLButtonElement>("#btn-goal-report").disabled = all.length === 0;
+    // A finished run can be kept in the journal without a reload.
+    this.q<HTMLButtonElement>("#btn-goal-keep").disabled = all.length === 0;
     this.renderProgress(maxTicks);
     this.lastTableRender = 0;
     this.renderResults();

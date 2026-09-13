@@ -43,6 +43,11 @@ describe("environment schedule", () => {
     params.step();
     expect(params.tick).toBe(2);
     expect(params.params.mutationRate).toBe(0.9);
+    // A scheduled value is bounded by the specification, like any other write.
+    const outOfRange = new World({ width: 16, height: 16, seed: 5, startPopulation: 0 });
+    outOfRange.schedule = [{ at: 1, op: { type: "params", params: { reproduceEnergy: 999 } } }];
+    outOfRange.step();
+    expect(outOfRange.params.reproduceEnergy).toBe(100);
     base.step();
     scaled.step();
     expect(scaled.tick).toBe(3);

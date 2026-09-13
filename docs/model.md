@@ -220,8 +220,11 @@ population, mean and max fitness, Shannon diversity of phenotypes and genotypes,
 lineage count, extinctions, fixation, per-strain and per-strategy counts, up to
 `LINEAGE_TOP_N` living lineages, Hill numbers, evenness, mean offspring per
 adult that died, and — when `recordTraitDistribution` is on — mean, sd and
-quantiles for every trait. `World.neutralLog` records hue-only substitutions for
-the molecular clock, and `World.eventLog` (off by default) records every birth,
+quantiles for every trait. `World.neutralLog` records neutral substitutions for
+the molecular clock — a birth whose phenotype is unchanged in every trait except
+the display-only hue, which covers synonymous codon swaps, substitutions outside
+ORFs and pure hue moves — and `World.eventLog` (off by default) records every
+birth,
 death, meal, exudation, recombination and neutral substitution as bounded
 research events.
 

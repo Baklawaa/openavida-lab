@@ -52,7 +52,12 @@ export function modelControls(params: SimParams): ModelControl[] {
   return PARAM_SPEC.map((spec) => ({ spec, value: params[spec.key] }));
 }
 
-/** Coerce raw form values back to a parameter patch; the spec clamps later. */
+/**
+ * Coerce raw form values back to a parameter patch. Values are bounded by the
+ * spec here, not written through, so the panel cannot put the world into a
+ * state the specification calls invalid (the host clamps again at the op
+ * boundary).
+ */
 export function paramsFromForm(
   raw: Readonly<Record<string, string>>,
   booleans: ReadonlySet<string>,
@@ -66,7 +71,9 @@ export function paramsFromForm(
     }
     if (value === undefined || value.trim() === "") continue;
     const n = Number(value);
-    if (Number.isFinite(n)) patch[spec.key] = n;
+    if (!Number.isFinite(n)) continue;
+    const clamped = Math.min(spec.max, Math.max(spec.min, spec.integer ? Math.round(n) : n));
+    patch[spec.key] = clamped;
   }
   return patch as Partial<SimParams>;
 }

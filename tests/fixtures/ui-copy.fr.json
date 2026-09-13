@@ -1,0 +1,904 @@
+{
+  "text": {
+    "header": "OpenAvidaLAB Évolution artificielle · génome explicite · plaque # × # Partager Exporter le monde",
+    "metrics": "Population#organismes Lignées#vivantes Diversité#Shannon H′ Fitness#moyenne",
+    "toolbar": "Monde A Monde B A / B # × # Ensemble Nutriments Toxines Température Lumière Exsudat En pause #D#D",
+    "stage": "MONDE AB · # organismes Monde videKit sélectionné + clic sur une cellule libre, ou injection aléatoire.Injecter # organismes InspecterI PlacerO PeindreP Nutriments Toxines Lumière",
+    "playback": "Reprendre PAS # Clic sur une cellule libre : place un organisme avec le génome de l’éditeur. Vitesse# /s×# Vue#% ⏮ ◀ ▶ Reprendre ici pas # (enregistré toutes les #) # instantanés · # Mo / # Mo",
+    "charts": "Séries temporellesMONDE A · HISTORIQUERéduire FitnessMoy. Max. DiversitéShannon H′ Arbre des lignéesAscendance",
+    "tabs": "Organismes Milieu Analyse Espèces Expérience",
+    "panel.organisms": "Kits de départ# GÉNOMESClic sur une cellule libre : place un organisme avec le génome de l’éditeur.Phototrophephoto ×# · size ×# · resist ×#✓Hétérotropheuptake ×# · motility ×# · fecundity ×#✓Résistantresist ×# · uptake ×# · tpref ×#✓Prédateuraggression ×# · motility ×# · uptake ×#✓Mutualistesignal ×# · uptake ×# · photo ×#✓ KIT SÉLECTIONNÉGain d’énergie proportionnel au champ lumineux local. Dépend de la lumière, pas des nutriments.Lumière # · Nutrition # · Résist. # Injecter # organismes Éditeur d’ADN# BASES · # GÈNES Séquence ACGT décodée en direct : ORF (ATG … stop) → codons → deltas de traits → phénotype. Annuler Rétablir Revenir Copier la sélection Vider Gènes VISUEL Photosynthèse #codons − + ↑ ↓ × Transforme la lumière locale en énergie. Photosynthèse +# bases #–# · DDYYDD Mutabilité #codons − + ↑ ↓ × Multiplie le taux de mutation des naissances de cet organisme (# à #). Mutabilité +#Taille +# bases #–# · PP Résistance #codon − + ↑ ↓ × Réduit les dommages causés par les toxines. Résistance +# bases #–# · S AJOUTER UN GÈNENutritionPhotosynthèseRésistanceTempératureMobilitéPrédationCoopérationCouleurReproductionTailleMutabilité Séquence base par base ACGT #ATGGACDGATDTACYTATYGACDGATDTAACC#ATGCCAPCCCPTAACC#ATGAGCSTAA Cliquez sur une base pour la sélectionner. Double-clic : le codon entier. Glissez ou Maj + clic : une plage. INSÉRER APRÈS LA SÉLECTIONDébut / finNutritionPhotosynthèseRésistanceTempératureMobilitéPrédationCoopérationCouleurReproductionTailleMutabilité ATGdébutTAAfinTAGfinTGAfin Paysage Ouvrez pour évaluer les substitutions d’un codon dans les gènes, à l’environnement local. Meilleures substitutions Pires substitutions PHÉNOTYPEidentique au génome chargé Nutrition # = Photosynthèse # = Résistance # = Température # = Mobilité # = Prédation # = Coopération # = Couleur # = Reproduction # = Taille # = Mutabilité # = Appliquer à la sélection Placer dans le monde Séquence brute et mutations AVANCÉ Séquence ACGT Mutation ponctuelleInsertion / délétionDuplication Génome de départ PhototropheHétérotropheRésistantPrédateurMutualisteCharger",
+    "panel.environment": "Champs et terrainPINCEAUCliquez ou glissez dans le monde. En #D, un clic par touche.NutrimentsToxinesChaleurLumièreObstacleGommeSource nutritiveSource toxiqueSource de chaleurOmbreRetirer la vieRayon du pinceau# cellules Dynamique du milieuRelief aléatoireSources, obstacles et zones d’ombreÉvénements aléatoiresPerturbations au cours de l’expérience ProgrammePAS Changement appliqué au pas indiqué, après les perturbations, avant le métabolisme. Liste vide : le monde est inchangé. Échelle nutriments Échelle toxines Échelle température Échelle lumière Taux de mutation Population max Seuil de reproduction Touche de toxines Touche de nutriments Ajouter ModèlePARAMÈTRESChaque paramètre est borné par sa spécification, appliqué au monde choisi et enregistré dans le manifeste. « Profil v# » restaure les réglages d’avant la mise à niveau.MondeLargeurPlate width in cells.cellulesHauteurPlate height in cells.cellulesGraineMaster seed of the mulberry# stream. All simulation randomness derives from it.Population initialeFounders placed at construction (kits first, then random genomes). Capped by maxPopulation.organismesPopulation maximaleHard ceiling on living organisms; a soft density-dependent fecundity gate applies below it.organismesRelief aléatoireSeed vents, walls and shade at construction.Événements aléatoiresEnable stochastic toxin pulses, droughts and crashes during the run.Risque de pic toxiquePer-tick hazard of a random toxin pulse when disturbances are enabled (default #/#).par pasRisque de sécheressePer-tick hazard of a nutrient drought when disturbances are enabled (default #/#).par pasRisque de crisePer-tick hazard of a population crash when disturbances are enabled (default #/#).par pasDistributions de traitsStore mean, sd and quantiles of every trait on each history sample (analysis without re-simulation).Journal d’événementsRecord every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring).Taux de dilutionChemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. # = closed batch world.par pasNutriment d’entréeNutrient concentration the inflow restores when dilutionRate > #.concentrationMétabolismeDiffusionJacobi diffusion coefficient for nutrient, toxin and temperature (# = no mixing).par pasRecyclage des nutrimentsUniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay.par pasDécroissance nutrimentsFractional loss of the nutrient field per tick.par pasDécroissance toxinesFractional loss of the toxin field per tick.par pasDécroissance thermiqueRelaxation of the temperature field towards # per tick.par pasDécroissance lumièreFractional loss of the light field per tick before solar recharge.par pasSeuil de reproductionBase energy a cell must hold to divide; scaled by the fecundity trait.énergieÂge maximalHard age ceiling. With senescenceRate > # most deaths happen well before it.pasSeuil de prédationMinimum aggression for an organism to be a predator at all.agressionRepas par pasMaximum prey a predator can eat in one tick across all phases; density-independent attack limit.proiesDiffusion lumièreDiffusion of the light field. # keeps light where the solar recharge and shade put it.par pasSénescenceScale of the age-dependent mortality hazard (# - exp(-rate (age/maxAge)^#)). # = hard maxAge cutoff only.risqueÉcologieSeuil de parentéMinimum aggression gap required for a kill. # allows cannibalism of identical phenotypes.agressionExsudat et chimieFuite d’exsudatShare of the photosynthetic surplus a phototroph leaks into the exudate field.fractionDécroissance exsudatFractional loss of the exudate field per tick.par pasDiffusion exsudatDiffusion of the exudate field; how far a leak travels from its producer.par pasÉvolutionTaux de mutationProbability that a birth draws a mutation; scaled per organism by the mutator trait.par naissancePoids ponctuelRelative weight of single-base substitutions among mutations.relatifPoids indelsRelative weight of insertions and deletions (# to # bases) among mutations.relatifPoids duplicationsRelative weight of tandem duplications among mutations.relatifRecombinaisonProbability that a birth takes a single-point crossover with a nearby neighbour (sex and horizontal transfer share this operator).par naissanceRayon de recombinaisonChebyshev radius within which a recombination partner is drawn.cellulesRégulation cisAmplify a gene by the codons upstream of its ATG (cis-regulatory layer). Off restores the purely additive decoder.Coût du génomeMaintenance cost per genome base per tick, so longer genomes are not free.énergie/base/pasCoût de réplicationEnergy charged per genome base at division, on top of the daughter's share.énergie/base A et B Monde A Monde B Appliquer Défauts Profil v# Diffusion à # voisins à chaque pas, bloquée par les obstacles. Une source émet en continu ; une touche de pinceau est ponctuelle.",
+    "panel.analysis": "Organisme sélectionnéAUCUNOutil Inspecter, puis clic sur un organisme.Modifier cet ADNÉvolutionGénome et gènesMétabolisme et comportement ExplorateurTOUS LES ORGANISMESVivants et morts, groupés par espèce, filtres et tris précis, branche d’évolution, enregistrement local.Ouvrir l’explorateur Événements# Lignée # dépasse # % de la population. Pas # RechercheMESURES SÉLECTION PAR LIGNÉE (souche unique)Lignée # % de la populations = -# / pasLignée # % de la populations = -# / pasSouche unique : la sélection est estimée entre lignées (les # plus peuplées sont conservées à chaque pas ; seules celles qui ont au moins deux mesures sont listées). Positif = lignée en progression. DÉRIVE NEUTRE# substitution(s) neutre(s) · horloge # / # pas / lignée FITNESS RÉALISÉE# descendants par adulte décédé · fixation # % DISTRIBUTION DES TRAITSuptake # ± #photo # ± #resist # ± #size # ± #mutator # ± # Classement par fitness ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGCCGATTACTATGACGATTAACCAT…# Modifier cet ADN ## Fitness # · Énergie # Lignée # · Lumière # · Nutrition # ATGGACGATTACTATGACGATTAACCAT…# Modifier cet ADN Journal des décèsManque de nourriture ou de lumière : # Manque de nourriture ou de lumière Pas # · N° # · Lignée # · Fitness # ATGGACGATTACTATGACGATTAACCAT…# Manque de nourriture ou de lumière Pas # · N° # · Lignée # · Fitness # ATGGACGATTACTATGACGATTAACCAT…# Manque de nourriture ou de lumière Pas # · N° # · Lignée # · Fitness # ATGGACGATTACTATGACGATTAACCAT…# Table codon → traitORF = ATG … TAA/TAG/TGA, lecture dans tous les cadres. phénotype[trait] = squash(basal + Σ deltas). La couleur n’entre pas dans la fitness.AAA K → aggression +#AAC N → uptake +#AAG K → aggression +#AAT N → uptake +#ACA T → tpref -#ACC T → tpref +#ACG T → tpref -#ACT T → tpref +#AGA R → aggression +#AGC S → resist +#AGG R → aggression +#AGT S → resist +#ATA I → uptake +#ATC I → uptake +#ATG M → uptake +#ATT I → uptake +#CAA Q → signal +#CAC H → signal +#CAG Q → signal +#CAT H → signal +#CCA P → size +#CCC P → size +#CCG P → size +#CCT P → size +#CGA R → aggression +#CGC R → aggression +#CGG R → aggression +#CGT R → aggression +#CTA L → size +#CTC L → size +#CTG L → size +#CTT L → size +#GAA E → uptake +#GAC D → photo +#GAG E → uptake +#GAT D → photo +#GCA A → fecundity +#GCC A → fecundity +#GCG A → fecundity +#GCT A → fecundity +#GGA G → motility +#GGC G → motility +#GGG G → motility +#GGT G → motility +#GTA V → motility +#GTC V → motility +#GTG V → motility +#GTT V → motility +#TAC Y → photo +#TAT Y → photo +#TCA S → resist +#TCC S → resist +#TCG S → resist +#TCT S → resist +#TGC C → resist +#TGG W → hue +#TGT C → resist +#TTA L → size +#TTC F → hue +#TTG L → size +#TTT F → hue +#",
+    "panel.species": "Groupes# GROUPES Souches Stratégies Colorer le monde par souche Souche = génome fondateur. Les descendants, mutants compris, gardent l’étiquette. Effectifs par groupe Trajectoires Carte · centre de masse Température locale moyenne Définir une souche Nomme le génome courant de l’éditeur. Tout organisme placé ou injecté avec ce génome porte l’étiquette ; comparez ainsi # ou # souches dans un même milieu. Créer depuis l’éditeur",
+    "panel.experiment": "PréréglagesLOCAL État complet du monde actif (champs, terrain, organismes, souches, historique), conservé dans ce navigateur. Sert de point de départ aux expériences ciblées. Enregistrer l’état actuel Aucun préréglage enregistré. Recette# ACTION Séquence rejouable : paramètres plus peindre, placer, injecter, définir une souche, avancer. Encodée en ?recipe= (base#url). Au-delà de # caractères, le lien ne conserve que les paramètres. Enregistrer les actions Copier le lien de la recette Exporter .json Importer .json Rejouer dans B Expérience cibléeMULTI-SIMULATION Depuis un état de départ, n réplicats à graines différentes courent en arrière-plan. Chacun s’arrête lorsque tous les objectifs sont atteints, à l’extinction, lorsque les objectifs restants sont impossibles, ou au bout du budget. # · ÉTAT DE DÉPART Monde actif # · OBJECTIF Choisir un objectif type…Adaptation aux toxines : # % des organismes en zone toxique (≥ #), # pasRésistance moyenne ≥ #Colonisation d’une zone chaude (T ≥ #) par # %Passage à la photosynthèse : photo moyenne ≥ #Population ≥ #Diversité H′ ≥ # Mesure PopulationLignées vivantesDiversité H′Fitness moyennePart des organismes où nutriments ≥ seuilPart des organismes où toxines ≥ seuilPart des organismes où température ≥ seuilPart des organismes où lumière ≥ seuilPart des organismes où exsudat ≥ seuilNutrition (moyenne)Nutrition (max)Photosynthèse (moyenne)Photosynthèse (max)Résistance (moyenne)Résistance (max)Température (moyenne)Température (max)Mobilité (moyenne)Mobilité (max)Prédation (moyenne)Prédation (max)Coopération (moyenne)Coopération (max)Reproduction (moyenne)Reproduction (max)Taille (moyenne)Taille (max)Mutabilité (moyenne)Mutabilité (max) Seuil du champ : un organisme compte si sa cellule atteint cette valeur Condition ≥≤ maintenupas Objectif : part des organismes où toxines ≥ # ≥ # pendant # pas. + Ajouter un objectif Jusqu’à # objectifs. La course s’arrête lorsque tous sont atteints, que le monde est vide, ou que les objectifs restants sont impossibles. Le graphique trace le premier. # · PARAMÈTRES DE LA COURSE Réplicats Pas max par réplicat Taux de mutation Population max Graine du #er réplicat Perturbations Les réplicats reçoivent les graines graine, graine + #, graine + #, … Elles figurent dans le tableau des résultats et dans la colonne seed du CSV. Lancer les réplicatsArrêterCSV Vérifier le déterminisme # · RÉSULTATS Rapport HTMLConserver la course Mesure par réplicat TrierRéussis, les plus rapides d’abordRéussis, les plus lents d’abordÉchoués, les plus rapides d’abord (extinction / impossible tôt)Échoués, les plus lents d’abordValeur finale décroissantePopulation finale décroissanteOrdre de lancement HISTORIQUE DES COURSES Les courses conservées restent dans le navigateur. Cochez-en deux à quatre pour comparer taux de réussite, médiane et effet contre la référence (la première cochée). « Manifeste » exporte la course pour le lanceur sans interface. Aucune course conservée. Lancez une expérience ciblée, puis « Conserver la course ». Courbes des courses conservées # · REJOUER UN RÉPLICAT DANS LE MONDE B Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, puis la lecture démarre : la simulation reproduit le réplicat pas pour pas. Un nouveau clic repart du début. « Catalogue à la fin » rejoue le réplicat sans l’afficher jusqu’à son dernier pas, puis ouvre l’explorateur des organismes sur cet état final. Rejouer dans BCatalogue à la fin BalayagePARAMÈTRE Répète l’objectif pour une grille linéaire d’une variable (ex. échelle des toxines). Les graines se suivent d’une valeur à l’autre. Variable Taux de mutationPopulation maximaleSeuil énergétique de reproductionÉchelle des toxinesÉchelle des nutrimentsÉchelle de températureÉchelle de lumière De À Points Réplicats / valeur Lancer le balayageCSV du balayage Pas jusqu’à l’objectif vs valeur TournoiSOUCHES Chaque paire de # à # contestataires (souches du monde actif ou organismes enregistrés) est injectée à effectifs égaux dans l’état de départ. Après le budget de pas, la plus grande part l’emporte ; écart ≤ # % = nul. Les auto-appariements sont exclus. Réplicats / paire Pas max Lancer le tournoiCSV Points de restaurationÉtat complet du monde actif : organismes, champs, lignées, historique.MémoriserRestaurerAucun état mémorisé dans cette session. Mondes A et BMêmes paramètres, graines différentes. Sélecteur A / B au-dessus du monde.+# pas A+# pas B+# pas A et B Nouvelle expérienceGraine aléatoireRéinitialiser A et BRemplace A et B par deux mondes vides.Goulot d’étranglement : garder # % Données de l’expérienceMétriques CSVLignées CSVÉvénements JSONLManifeste de la courseImporter un monde JSONJournal d’événementsNaissances, morts, repas, exsudat, recombinaisons — borné, pour l’analyse externe Fonctions expérimentalesVisualisation #DComportementsPolitique de décision intégréeAdaptateur LLMPolitique intégrée si aucun adaptateurSession partagéeEntre les onglets de ce navigateurSalonRôleHôteExpérimentateurObservateurCréer un salonRejoindreActivez la session partagée pour ouvrir un salon. Fixation #%Extinctions #Calcul / pas #ms",
+    "footer": "# organismes ajoutés au monde A.seed #hex · #×# · AEspace pause / lecture",
+    "help": "×GUIDEProtocole de basePopulation. Kit ou génome édité, placé cellule par cellule ou injecté (# organismes).Milieu. Champs de nutriments, toxines, température et lumière ; sources, obstacles, ombre.Mesures. Inspection d’un organisme (génome, phénotype, métabolisme), fitness, diversité de Shannon, lignées.Espace Pause / lectureI InspecterO PlacerP Peindre#–# Couches du milieuS Mémoriser#D : glisser pour tourner, molette pour zoomer. A / B affiche deux mondes en #D ; les indicateurs suivent le dernier monde cliqué."
+  },
+  "helps": {
+    "btn-share": {
+      "title": "Copie un lien de configuration : graine, paramètres et options. Pour conserver les organismes et l’état courant, exportez le monde en JSON.",
+      "help": "Copie un lien de configuration : graine, paramètres et options. Pour conserver les organismes et l’état courant, exportez le monde en JSON."
+    },
+    "btn-json": {
+      "title": "Télécharge un monde complet en JSON : organismes, champs, lignées et historique. Réimportable depuis Expérience.",
+      "help": "Télécharge un monde complet en JSON : organismes, champs, lignées et historique. Réimportable depuis Expérience."
+    },
+    "view-A": {
+      "title": "Affiche le monde A. Les indicateurs et les actions concernent ce monde.",
+      "help": "Affiche le monde A. Les indicateurs et les actions concernent ce monde."
+    },
+    "view-B": {
+      "title": "Affiche le monde B, une expérience indépendante avec une autre graine.",
+      "help": "Affiche le monde B, une expérience indépendante avec une autre graine."
+    },
+    "view-split": {
+      "title": "Compare les mondes A et B côte à côte en #D. Cliquez dans un monde pour en afficher les indicateurs et agir dessus.",
+      "help": "Compare les mondes A et B côte à côte en #D. Cliquez dans un monde pour en afficher les indicateurs et agir dessus."
+    },
+    "fm-0": {
+      "title": "Affiche les nutriments, les toxines, la température et la lumière ensemble. Raccourci : #.",
+      "help": "Affiche les nutriments, les toxines, la température et la lumière ensemble. Raccourci : #."
+    },
+    "fm-1": {
+      "title": "Affiche les nutriments en vert. Raccourci : #.",
+      "help": "Affiche les nutriments en vert. Raccourci : #."
+    },
+    "fm-2": {
+      "title": "Affiche les toxines en rose. Raccourci : #.",
+      "help": "Affiche les toxines en rose. Raccourci : #."
+    },
+    "fm-3": {
+      "title": "Affiche la température, du bleu froid à l’orange chaud. Raccourci : #.",
+      "help": "Affiche la température, du bleu froid à l’orange chaud. Raccourci : #."
+    },
+    "fm-4": {
+      "title": "Affiche la lumière en doré. Raccourci : #.",
+      "help": "Affiche la lumière en doré. Raccourci : #."
+    },
+    "view-2d": {
+      "title": "Vue du dessus : les couleurs du milieu indiquent les ressources, les points représentent les organismes.",
+      "help": "Vue du dessus : les couleurs du milieu indiquent les ressources, les points représentent les organismes."
+    },
+    "view-3d": {
+      "title": "Vue en relief du même monde. Hauteur = nutriments et lumière. Glissez pour tourner, molette pour zoomer, cliquez pour utiliser l’outil.",
+      "help": "Vue en relief du même monde. Hauteur = nutriments et lumière. Glissez pour tourner, molette pour zoomer, cliquez pour utiliser l’outil."
+    },
+    "tool-inspect": {
+      "title": "Cliquez sur un organisme pour examiner son énergie, ses traits et son ADN. Raccourci : I.",
+      "help": "Cliquez sur un organisme pour examiner son énergie, ses traits et son ADN. Raccourci : I."
+    },
+    "tool-place": {
+      "title": "Cliquez sur une cellule libre pour placer un organisme avec le génome de l’éditeur. Raccourci : O.",
+      "help": "Cliquez sur une cellule libre pour placer un organisme avec le génome de l’éditeur. Raccourci : O."
+    },
+    "tool-paint": {
+      "title": "Cliquez ou glissez pour peindre le milieu. En #D, peignez par clic. Raccourci : P.",
+      "help": "Cliquez ou glissez pour peindre le milieu. En #D, peignez par clic. Raccourci : P."
+    },
+    "btn-pause": {
+      "title": "Mettre en pause ou reprendre. La touche Espace fait la même chose. Vous pouvez toujours inspecter le monde en pause.",
+      "help": "Mettre en pause ou reprendre. La touche Espace fait la même chose. Vous pouvez toujours inspecter le monde en pause."
+    },
+    "btn-step-once": {
+      "title": "Avancer exactement d’un pas puis rester en pause. En A / B, avance les deux mondes.",
+      "help": "Avancer exactement d’un pas puis rester en pause. En A / B, avance les deux mondes."
+    },
+    "speed-top": {
+      "title": "Vitesse en pas de simulation par seconde. # met en pause ; # permet d’observer ; # accélère l’évolution.",
+      "help": "Vitesse en pas de simulation par seconde. # met en pause ; # permet d’observer ; # accélère l’évolution."
+    },
+    "btn-slow": {
+      "title": "Revenir à la vitesse d’observation : # pas par seconde.",
+      "help": "Revenir à la vitesse d’observation : # pas par seconde."
+    },
+    "zoom-top": {
+      "title": "Part du monde visible en #D : # % montre tout le monde. Réduisez pour examiner la zone centrale. En #D, utilisez la molette.",
+      "help": "Part du monde visible en #D : # % montre tout le monde. Réduisez pour examiner la zone centrale. En #D, utilisez la molette."
+    },
+    "timeline-row": {
+      "title": "Instantanés du monde actif, toutes les # pas, dans une mémoire bornée. Le curseur prévisualise ; Reprendre ici restaure cet état.",
+      "help": "Instantanés du monde actif, toutes les # pas, dans une mémoire bornée. Le curseur prévisualise ; Reprendre ici restaure cet état."
+    },
+    "btn-timeline-first": {
+      "title": "Va au premier instantané conservé (origine de l’enregistrement).",
+      "help": "Va au premier instantané conservé (origine de l’enregistrement)."
+    },
+    "btn-timeline-prev": {
+      "title": "Va à l’instantané enregistré immédiatement avant le curseur.",
+      "help": "Va à l’instantané enregistré immédiatement avant le curseur."
+    },
+    "timeline-range": {
+      "title": "Parcourt les instantanés enregistrés. La simulation se met en pause ; la plaque montre l’état choisi sans l’écrire tant que Reprendre ici n’est pas cliqué.",
+      "help": "Parcourt les instantanés enregistrés. La simulation se met en pause ; la plaque montre l’état choisi sans l’écrire tant que Reprendre ici n’est pas cliqué."
+    },
+    "btn-timeline-next": {
+      "title": "Va à l’instantané enregistré immédiatement après le curseur.",
+      "help": "Va à l’instantané enregistré immédiatement après le curseur."
+    },
+    "btn-timeline-resume": {
+      "title": "Écrit l’instantané affiché dans le monde actif et oublie les enregistrements plus tardifs. Les pas suivants partent de là.",
+      "help": "Écrit l’instantané affiché dans le monde actif et oublie les enregistrements plus tardifs. Les pas suivants partent de là."
+    },
+    "timeline-label": {
+      "title": "Pas de l’instantané affiché et cadence d’enregistrement.",
+      "help": "Pas de l’instantané affiché et cadence d’enregistrement."
+    },
+    "timeline-budget": {
+      "title": "Mémoire occupée par les instantanés, sur un plafond de # Mo. Les plus anciens après le premier sont évincés.",
+      "help": "Mémoire occupée par les instantanés, sur un plafond de # Mo. Les plus anciens après le premier sont évincés."
+    },
+    "btn-charts": {
+      "title": "Réduit ou affiche les séries temporelles pour donner plus de hauteur au monde. Le choix est mémorisé.",
+      "help": "Réduit ou affiche les séries temporelles pour donner plus de hauteur au monde. Le choix est mémorisé."
+    },
+    "chart-phy": {
+      "title": "Arbre des lignées : chaque trait est une lignée, tracée du pas de son apparition à son extinction, d’autant plus épaisse que son effectif maximal est grand. Cliquez une lignée pour l’explorer ; survolez pour son effectif.",
+      "help": "Arbre des lignées : chaque trait est une lignée, tracée du pas de son apparition à son extinction, d’autant plus épaisse que son effectif maximal est grand. Cliquez une lignée pour l’explorer ; survolez pour son effectif."
+    },
+    "kit-phototroph": {
+      "title": "Utilise la lumière comme source d’énergie. Sélectionne ce kit et active l’outil Placer.",
+      "help": "Utilise la lumière comme source d’énergie. Sélectionne ce kit et active l’outil Placer."
+    },
+    "kit-heterotroph": {
+      "title": "Se nourrit de nutriments. Ajoutez de la nourriture dans le milieu pour soutenir sa croissance.",
+      "help": "Se nourrit de nutriments. Ajoutez de la nourriture dans le milieu pour soutenir sa croissance."
+    },
+    "kit-resistant": {
+      "title": "Résiste mieux aux dommages causés par les toxines.",
+      "help": "Résiste mieux aux dommages causés par les toxines."
+    },
+    "kit-predator": {
+      "title": "Chasse les organismes voisins plus faibles et récupère leur énergie.",
+      "help": "Chasse les organismes voisins plus faibles et récupère leur énergie."
+    },
+    "kit-mutualist": {
+      "title": "Photosynthétise et porte un récepteur d’exsudat : il récupère une part du surplus relâché par les phototrophes voisins.",
+      "help": "Photosynthétise et porte un récepteur d’exsudat : il récupère une part du surplus relâché par les phototrophes voisins."
+    },
+    "btn-inject": {
+      "title": "Place jusqu’à # copies du génome de l’éditeur sur des cellules libres du monde actif.",
+      "help": "Place jusqu’à # copies du génome de l’éditeur sur des cellules libres du monde actif."
+    },
+    "dna-undo": {
+      "title": "Annule la dernière modification de l’éditeur. Raccourci dans la séquence : ⌘Z.",
+      "help": "Annule la dernière modification de l’éditeur. Raccourci dans la séquence : ⌘Z."
+    },
+    "dna-redo": {
+      "title": "Rétablit la modification annulée. Raccourci dans la séquence : ⌘⇧Z.",
+      "help": "Rétablit la modification annulée. Raccourci dans la séquence : ⌘⇧Z."
+    },
+    "dna-revert": {
+      "title": "Revient au dernier génome chargé : kit, organisme copié ou génome de départ.",
+      "help": "Revient au dernier génome chargé : kit, organisme copié ou génome de départ."
+    },
+    "btn-from-inspect": {
+      "title": "Copie le génome de l’organisme sélectionné dans l’éditeur. Il devient le génome de référence du phénotype.",
+      "help": "Copie le génome de l’organisme sélectionné dans l’éditeur. Il devient le génome de référence du phénotype."
+    },
+    "btn-clear-genes": {
+      "title": "Vide la séquence. Le phénotype devient basal jusqu’à l’ajout d’un gène ou au choix d’un kit. Annulable.",
+      "help": "Vide la séquence. Le phénotype devient basal jusqu’à l’ajout d’un gène ou au choix d’un kit. Annulable."
+    },
+    "dna-cassette": {
+      "title": "Carte du génome : un segment par gène, en gris les bases hors gène. Cliquez pour sélectionner la région.",
+      "help": "Carte du génome : un segment par gène, en gris les bases hors gène. Cliquez pour sélectionner la région."
+    },
+    "dna-builder": {
+      "title": "Chaque carte est un gène lu dans la séquence. La force est son nombre de codons ; réordonnez, renforcez ou retirez les gènes sans perdre vos autres modifications.",
+      "help": "Chaque carte est un gène lu dans la séquence. La force est son nombre de codons ; réordonnez, renforcez ou retirez les gènes sans perdre vos autres modifications."
+    },
+    "gene-add-uptake": {
+      "title": "Ajoute un gène de nutrition, pour absorber les nutriments.",
+      "help": "Ajoute un gène de nutrition, pour absorber les nutriments."
+    },
+    "gene-add-photo": {
+      "title": "Ajoute un gène de photosynthèse, pour utiliser la lumière.",
+      "help": "Ajoute un gène de photosynthèse, pour utiliser la lumière."
+    },
+    "gene-add-resist": {
+      "title": "Ajoute un gène de résistance aux toxines.",
+      "help": "Ajoute un gène de résistance aux toxines."
+    },
+    "gene-add-tpref": {
+      "title": "Ajoute un gène qui règle la température préférée.",
+      "help": "Ajoute un gène qui règle la température préférée."
+    },
+    "gene-add-motility": {
+      "title": "Ajoute un gène qui modifie la capacité à se déplacer.",
+      "help": "Ajoute un gène qui modifie la capacité à se déplacer."
+    },
+    "gene-add-aggression": {
+      "title": "Ajoute un gène de prédation pour chasser ses voisins.",
+      "help": "Ajoute un gène de prédation pour chasser ses voisins."
+    },
+    "gene-add-signal": {
+      "title": "Ajoute un gène de coopération et de signalisation.",
+      "help": "Ajoute un gène de coopération et de signalisation."
+    },
+    "gene-add-hue": {
+      "title": "Ajoute un gène de couleur. La couleur ne modifie pas la fitness.",
+      "help": "Ajoute un gène de couleur. La couleur ne modifie pas la fitness."
+    },
+    "gene-add-fecundity": {
+      "title": "Ajoute un gène qui modifie la reproduction.",
+      "help": "Ajoute un gène qui modifie la reproduction."
+    },
+    "gene-add-size": {
+      "title": "Ajoute un gène de taille, qui affecte aussi l’entretien énergétique.",
+      "help": "Ajoute un gène de taille, qui affecte aussi l’entretien énergétique."
+    },
+    "gene-add-mutator": {
+      "title": "Ajoute une cassette de mutabilité : elle multiplie le taux de mutation des naissances de cet organisme.",
+      "help": "Ajoute une cassette de mutabilité : elle multiplie le taux de mutation des naissances de cet organisme."
+    },
+    "dna-strip-section": {
+      "title": "La séquence base par base. Les rails colorés délimitent les gènes (ATG → TAA/TAG/TGA). Sélectionnez des bases pour les remplacer, les supprimer ou les dupliquer.",
+      "help": "La séquence base par base. Les rails colorés délimitent les gènes (ATG → TAA/TAG/TGA). Sélectionnez des bases pour les remplacer, les supprimer ou les dupliquer."
+    },
+    "dna-strip": {
+      "title": "Cliquez sur une base pour la sélectionner, glissez pour une plage, double-cliquez pour un codon. Tapez A, C, G ou T pour remplacer ; Retour arrière supprime ; ⌘Z annule.",
+      "help": "Cliquez sur une base pour la sélectionner, glissez pour une plage, double-cliquez pour un codon. Tapez A, C, G ou T pour remplacer ; Retour arrière supprime ; ⌘Z annule."
+    },
+    "codon role-start": {
+      "title": "",
+      "help": "ATG · début du gène # (Résistance)"
+    },
+    "codon role-coding": {
+      "title": "",
+      "help": "AGC → S · Résistance +#"
+    },
+    "codon role-stop": {
+      "title": "",
+      "help": "TAA · fin du gène # (Résistance)"
+    },
+    "codon role-junk": {
+      "title": "",
+      "help": "CC · hors gène : sans effet"
+    },
+    "dna-palette-trait": {
+      "title": "Choisissez le trait dont vous voulez insérer un codon, ou les codons de début et de fin de gène.",
+      "help": "Choisissez le trait dont vous voulez insérer un codon, ou les codons de début et de fin de gène."
+    },
+    "dna-palette-codons": {
+      "title": "Chaque codon indique son acide aminé et son effet sur le trait. Cliquez pour l’insérer juste après la sélection.",
+      "help": "Chaque codon indique son acide aminé et son effet sur le trait. Cliquez pour l’insérer juste après la sélection."
+    },
+    "dna-landscape": {
+      "title": "Substitutions d’un codon dans les régions codantes, classées par fitness dans l’environnement de l’organisme sélectionné (ou du centre de la plaque). Cliquez pour appliquer dans la séquence.",
+      "help": "Substitutions d’un codon dans les régions codantes, classées par fitness dans l’environnement de l’organisme sélectionné (ou du centre de la plaque). Cliquez pour appliquer dans la séquence."
+    },
+    "dna-landscape-best": {
+      "title": "Les # substitutions qui augmentent le plus la fitness. Cliquez pour remplacer le codon (l’historique de l’éditeur enregistre le geste).",
+      "help": "Les # substitutions qui augmentent le plus la fitness. Cliquez pour remplacer le codon (l’historique de l’éditeur enregistre le geste)."
+    },
+    "dna-landscape-worst": {
+      "title": "Les # substitutions qui diminuent le plus la fitness.",
+      "help": "Les # substitutions qui diminuent le plus la fitness."
+    },
+    "builder-pheno": {
+      "title": "Phénotype décodé du génome en cours d’édition, comparé au génome chargé. Le repère clair marque la valeur de référence.",
+      "help": "Phénotype décodé du génome en cours d’édition, comparé au génome chargé. Le repère clair marque la valeur de référence."
+    },
+    "btn-apply": {
+      "title": "Remplace le génome de l’organisme sélectionné par celui de l’éditeur et crée une nouvelle lignée.",
+      "help": "Remplace le génome de l’organisme sélectionné par celui de l’éditeur et crée une nouvelle lignée."
+    },
+    "btn-dna-place": {
+      "title": "Active l’outil Placer : cliquez ensuite dans le monde pour y déposer un organisme avec ce génome.",
+      "help": "Active l’outil Placer : cliquez ensuite dans le monde pour y déposer un organisme avec ce génome."
+    },
+    "btn-dna-copy": {
+      "title": "Copie la séquence ACGT dans le presse-papiers.",
+      "help": "Copie la séquence ACGT dans le presse-papiers."
+    },
+    "dna-advanced": {
+      "title": "Modifiez directement les bases ACGT ou appliquez une mutation aléatoire. La séquence reste synchronisée avec l’éditeur visuel.",
+      "help": "Modifiez directement les bases ACGT ou appliquez une mutation aléatoire. La séquence reste synchronisée avec l’éditeur visuel."
+    },
+    "genome-edit": {
+      "title": "Séquence ACGT éditable. Les segments ATG…TAA/TAG/TGA forment les gènes. Appliquez-la à la sélection ou ajoutez des organismes.",
+      "help": "Séquence ACGT éditable. Les segments ATG…TAA/TAG/TGA forment les gènes. Appliquez-la à la sélection ou ajoutez des organismes."
+    },
+    "btn-point": {
+      "title": "Modifie une base de la séquence dans l’éditeur.",
+      "help": "Modifie une base de la séquence dans l’éditeur."
+    },
+    "btn-indel": {
+      "title": "Insère ou supprime de # à # bases dans la séquence de l’éditeur.",
+      "help": "Insère ou supprime de # à # bases dans la séquence de l’éditeur."
+    },
+    "btn-dup": {
+      "title": "Copie un fragment de la séquence et le réinsère dans le génome.",
+      "help": "Copie un fragment de la séquence et le réinsère dans le génome."
+    },
+    "founder": {
+      "title": "Choisissez un génome de départ à charger dans l’éditeur.",
+      "help": "Choisissez un génome de départ à charger dans l’éditeur."
+    },
+    "btn-load-founder": {
+      "title": "Charge le génome de départ choisi dans l’éditeur.",
+      "help": "Charge le génome de départ choisi dans l’éditeur."
+    },
+    "brush-nutrientBlob": {
+      "title": "Dépose des nutriments. Cette réserve est ponctuelle, contrairement à une source.",
+      "help": "Dépose des nutriments. Cette réserve est ponctuelle, contrairement à une source."
+    },
+    "brush-toxinBlob": {
+      "title": "Dépose une quantité de toxines dans le milieu.",
+      "help": "Dépose une quantité de toxines dans le milieu."
+    },
+    "brush-heatBlob": {
+      "title": "Augmente localement la température.",
+      "help": "Augmente localement la température."
+    },
+    "brush-lightBlob": {
+      "title": "Augmente localement la lumière disponible.",
+      "help": "Augmente localement la lumière disponible."
+    },
+    "brush-barrier": {
+      "title": "Crée des obstacles aux organismes et à la diffusion des ressources.",
+      "help": "Crée des obstacles aux organismes et à la diffusion des ressources."
+    },
+    "brush-erase": {
+      "title": "Efface le terrain pour retrouver des cellules libres.",
+      "help": "Efface le terrain pour retrouver des cellules libres."
+    },
+    "brush-nutrientVent": {
+      "title": "Crée une source qui fournit des nutriments à chaque pas.",
+      "help": "Crée une source qui fournit des nutriments à chaque pas."
+    },
+    "brush-toxinVent": {
+      "title": "Crée une source permanente de toxines.",
+      "help": "Crée une source permanente de toxines."
+    },
+    "brush-thermalVent": {
+      "title": "Crée une source permanente de chaleur.",
+      "help": "Crée une source permanente de chaleur."
+    },
+    "brush-shade": {
+      "title": "Ajoute de l’ombre qui réduit la lumière reçue.",
+      "help": "Ajoute de l’ombre qui réduit la lumière reçue."
+    },
+    "brush-wipeOrgs": {
+      "title": "Retire les organismes sous le pinceau.",
+      "help": "Retire les organismes sous le pinceau."
+    },
+    "radius": {
+      "title": "Rayon du pinceau, en cellules du monde.",
+      "help": "Rayon du pinceau, en cellules du monde."
+    },
+    "opt-terrain": {
+      "title": "Génère des sources, des obstacles et de l’ombre. Désactiver retire le terrain prédéfini.",
+      "help": "Génère des sources, des obstacles et de l’ombre. Désactiver retire le terrain prédéfini."
+    },
+    "opt-disturb": {
+      "title": "Active les perturbations aléatoires : toxines, sécheresses et mortalité.",
+      "help": "Active les perturbations aléatoires : toxines, sécheresses et mortalité."
+    },
+    "sched-at": {
+      "title": "Pas auquel l’action est appliquée (après les perturbations, avant le métabolisme).",
+      "help": "Pas auquel l’action est appliquée (après les perturbations, avant le métabolisme)."
+    },
+    "sched-action": {
+      "title": "Type de changement : facteur d’échelle d’un champ, paramètre, ou touche de pinceau au centre de la plaque.",
+      "help": "Type de changement : facteur d’échelle d’un champ, paramètre, ou touche de pinceau au centre de la plaque."
+    },
+    "sched-arg": {
+      "title": "Facteur k, nouvelle valeur du paramètre, ou intensité de la touche.",
+      "help": "Facteur k, nouvelle valeur du paramètre, ou intensité de la touche."
+    },
+    "btn-sched-add": {
+      "title": "Ajoute la ligne au programme du monde actif. Les réplicats d’une expérience héritant de cet état reçoivent le même programme.",
+      "help": "Ajoute la ligne au programme du monde actif. Les réplicats d’une expérience héritant de cet état reçoivent le même programme."
+    },
+    "sched-list": {
+      "title": "Lignes du programme. × retire une entrée. Les traits verticaux sur le graphique de fitness marquent ces pas.",
+      "help": "Lignes du programme. × retire une entrée. Les traits verticaux sur le graphique de fitness marquent ces pas."
+    },
+    "model-target": {
+      "title": "Choisit le ou les mondes auxquels appliquer les paramètres du modèle.",
+      "help": "Choisit le ou les mondes auxquels appliquer les paramètres du modèle."
+    },
+    "model-apply": {
+      "title": "Applique au monde choisi les paramètres qui diffèrent de l’état courant. Les valeurs sont bornées par la spécification du modèle.",
+      "help": "Applique au monde choisi les paramètres qui diffèrent de l’état courant. Les valeurs sont bornées par la spécification du modèle."
+    },
+    "model-reset": {
+      "title": "Rétablit les valeurs par défaut publiées de tous les paramètres du modèle.",
+      "help": "Rétablit les valeurs par défaut publiées de tous les paramètres du modèle."
+    },
+    "model-legacy": {
+      "title": "Restaure les réglages d’avant la mise à niveau (prédation par voisinage, mutualisme d’origine, pas de régulation). Approche le moteur v# sans garantir un hash identique.",
+      "help": "Restaure les réglages d’avant la mise à niveau (prédation par voisinage, mutualisme d’origine, pas de régulation). Approche le moteur v# sans garantir un hash identique."
+    },
+    "btn-edit-selected": {
+      "title": "Ouvre l’éditeur d’ADN avec le génome de cet organisme. Modifiez-le puis appliquez-le ou placez un nouvel organisme.",
+      "help": "Ouvre l’éditeur d’ADN avec le génome de cet organisme. Modifiez-le puis appliquez-le ou placez un nouvel organisme."
+    },
+    "btn-ancestry": {
+      "title": "Ouvre la fiche de l’organisme sélectionné dans l’explorateur : phénotype, génome et suite des lignées depuis le fondateur.",
+      "help": "Ouvre la fiche de l’organisme sélectionné dans l’explorateur : phénotype, génome et suite des lignées depuis le fondateur."
+    },
+    "inspect-pathways": {
+      "title": "Molécules, enzymes et flux calculés à partir du génome et des ressources de l’organisme sélectionné.",
+      "help": "Molécules, enzymes et flux calculés à partir du génome et des ressources de l’organisme sélectionné."
+    },
+    "inspect-brain": {
+      "title": "Historique perception → action de cet organisme lorsque les comportements sont activés.",
+      "help": "Historique perception → action de cet organisme lorsque les comportements sont activés."
+    },
+    "btn-explorer": {
+      "title": "Ouvre l’explorateur : tous les organismes du monde actif, vivants et morts, avec filtres, tris, fiche détaillée et branche d’évolution.",
+      "help": "Ouvre l’explorateur : tous les organismes du monde actif, vivants et morts, avec filtres, tris, fiche détaillée et branche d’évolution."
+    },
+    "event-count": {
+      "title": "Nombre d’événements conservés (plafond #).",
+      "help": "Nombre d’événements conservés (plafond #)."
+    },
+    "event-log": {
+      "title": "Événements dérivés des mesures : dominance ou extinction d’une lignée, première prédation, essor d’une innovation, extinction de souche, chute ou essor de population. Un clic ouvre l’explorateur et l’instantané le plus proche.",
+      "help": "Événements dérivés des mesures : dominance ou extinction d’une lignée, première prédation, essor d’une innovation, extinction de souche, chute ou essor de population. Un clic ouvre l’explorateur et l’instantané le plus proche."
+    },
+    "leaderboard": {
+      "title": "Organismes vivants classés par fitness. Cliquez sur une ligne pour l’inspecter, ou sur Modifier cet ADN pour le réutiliser.",
+      "help": "Organismes vivants classés par fitness. Cliquez sur une ligne pour l’inspecter, ou sur Modifier cet ADN pour le réutiliser."
+    },
+    "death-tally": {
+      "title": "Nombre de décès par cause dans le journal de ce monde.",
+      "help": "Nombre de décès par cause dans le journal de ce monde."
+    },
+    "death-log": {
+      "title": "Décès récents et leurs causes. Cliquez sur une ligne pour charger le génome de l’organisme dans l’éditeur.",
+      "help": "Décès récents et leurs causes. Cliquez sur une ligne pour charger le génome de l’organisme dans l’éditeur."
+    },
+    "species-strains": {
+      "title": "Regroupe les organismes par génome fondateur. Les descendants gardent l’étiquette de leur souche, même après mutation.",
+      "help": "Regroupe les organismes par génome fondateur. Les descendants gardent l’étiquette de leur souche, même après mutation."
+    },
+    "species-strategies": {
+      "title": "Regroupe les organismes par stratégie actuelle, déduite du phénotype : prédateur, mutualiste, phototrophe, hétérotrophe ou mixotrophe.",
+      "help": "Regroupe les organismes par stratégie actuelle, déduite du phénotype : prédateur, mutualiste, phototrophe, hétérotrophe ou mixotrophe."
+    },
+    "opt-color-strain": {
+      "title": "Colore chaque organisme, en #D et en #D, avec la couleur de sa souche, pour suivre les groupes sur la plaque.",
+      "help": "Colore chaque organisme, en #D et en #D, avec la couleur de sa souche, pour suivre les groupes sur la plaque."
+    },
+    "chart-groups": {
+      "title": "Effectif vivant de chaque groupe au fil des pas. Une courbe qui monte pendant qu’une autre chute signale un remplacement.",
+      "help": "Effectif vivant de chaque groupe au fil des pas. Une courbe qui monte pendant qu’une autre chute signale un remplacement."
+    },
+    "chart-strain-map": {
+      "title": "Carte du monde : trajet du centre de masse de chaque souche, du plus ancien (fade) au plus récent. Le disque est la position actuelle ; les losanges sont les sources (nutriment, toxine, chaleur).",
+      "help": "Carte du monde : trajet du centre de masse de chaque souche, du plus ancien (fade) au plus récent. Le disque est la position actuelle ; les losanges sont les sources (nutriment, toxine, chaleur)."
+    },
+    "chart-strain-temp": {
+      "title": "Température locale moyenne au centre de chaque souche au fil des pas. Une baisse indique un éloignement des sources thermiques.",
+      "help": "Température locale moyenne au centre de chaque souche au fil des pas. Une baisse indique un éloignement des sources thermiques."
+    },
+    "species-list": {
+      "title": "Une carte par groupe : effectif, fitness, position moyenne, milieu local, phénotype moyen, dérive depuis le fondateur et mutations clés.",
+      "help": "Une carte par groupe : effectif, fitness, position moyenne, milieu local, phénotype moyen, dérive depuis le fondateur et mutations clés."
+    },
+    "strain-name": {
+      "title": "Nom de la souche à créer à partir du génome courant de l’éditeur d’ADN.",
+      "help": "Nom de la souche à créer à partir du génome courant de l’éditeur d’ADN."
+    },
+    "btn-strain-define": {
+      "title": "Crée une souche nommée avec le génome de l’éditeur. Placez-la ou injectez-la depuis sa carte pour la comparer aux autres.",
+      "help": "Crée une souche nommée avec le génome de l’éditeur. Placez-la ou injectez-la depuis sa carte pour la comparer aux autres."
+    },
+    "preset-name": {
+      "title": "Nom du préréglage à enregistrer.",
+      "help": "Nom du préréglage à enregistrer."
+    },
+    "btn-preset-save": {
+      "title": "Enregistre l’état complet du monde actif dans ce navigateur : champs, terrain, organismes, souches et historique.",
+      "help": "Enregistre l’état complet du monde actif dans ce navigateur : champs, terrain, organismes, souches et historique."
+    },
+    "preset-list": {
+      "title": "Préréglages enregistrés localement. Charger remplace le monde actif ; Point de départ le sélectionne pour l’expérience ciblée.",
+      "help": "Préréglages enregistrés localement. Charger remplace le monde actif ; Point de départ le sélectionne pour l’expérience ciblée."
+    },
+    "recipe-ops": {
+      "title": "Nombre d’actions enregistrées depuis le dernier démarrage ou la dernière remise à zéro. Les pas consécutifs sont fusionnés.",
+      "help": "Nombre d’actions enregistrées depuis le dernier démarrage ou la dernière remise à zéro. Les pas consécutifs sont fusionnés."
+    },
+    "opt-recipe-record": {
+      "title": "Enregistre peindre, placer, injecter, définir une souche et les pas. Désactiver arrête l’enregistrement ; réactiver recommence une liste vide.",
+      "help": "Enregistre peindre, placer, injecter, définir une souche et les pas. Désactiver arrête l’enregistrement ; réactiver recommence une liste vide."
+    },
+    "btn-recipe-copy": {
+      "title": "Copie un lien ?recipe= (JSON en base#url). Au-delà de # caractères, seuls les paramètres sont copiés.",
+      "help": "Copie un lien ?recipe= (JSON en base#url). Au-delà de # caractères, seuls les paramètres sont copiés."
+    },
+    "btn-recipe-export": {
+      "title": "Télécharge la recette du monde actif en JSON : paramètres et liste d’actions.",
+      "help": "Télécharge la recette du monde actif en JSON : paramètres et liste d’actions."
+    },
+    "btn-recipe-import": {
+      "title": "Remplace le monde actif par une recette JSON exportée : nouveau monde, puis rejeu des actions.",
+      "help": "Remplace le monde actif par une recette JSON exportée : nouveau monde, puis rejeu des actions."
+    },
+    "btn-recipe-replay": {
+      "title": "Rejoue la recette du monde actif dans le monde B, à partir des mêmes paramètres.",
+      "help": "Rejoue la recette du monde actif dans le monde B, à partir des mêmes paramètres."
+    },
+    "recipe-file": {
+      "title": "Fichier JSON de recette à importer dans le monde actif.",
+      "help": "Fichier JSON de recette à importer dans le monde actif."
+    },
+    "goal-source": {
+      "title": "État à partir duquel chaque réplicat démarre : le monde actif tel quel, ou un préréglage enregistré.",
+      "help": "État à partir duquel chaque réplicat démarre : le monde actif tel quel, ou un préréglage enregistré."
+    },
+    "goal-example": {
+      "title": "Objectifs prêts à l’emploi ; chaque champ reste modifiable après sélection.",
+      "help": "Objectifs prêts à l’emploi ; chaque champ reste modifiable après sélection."
+    },
+    "goal-metric": {
+      "title": "Grandeur mesurée à chaque pas : population, occupation d’une zone du milieu, trait moyen ou maximal, effectif ou part d’une souche.",
+      "help": "Grandeur mesurée à chaque pas : population, occupation d’une zone du milieu, trait moyen ou maximal, effectif ou part d’une souche."
+    },
+    "goal-field-min": {
+      "title": "Seuil du champ qui définit la zone : un organisme compte s’il se trouve sur une cellule où le champ atteint cette valeur.",
+      "help": "Seuil du champ qui définit la zone : un organisme compte s’il se trouve sur une cellule où le champ atteint cette valeur."
+    },
+    "goal-target": {
+      "title": "Valeur à atteindre. L’objectif est atteint au premier pas où la comparaison tient, pendant le nombre de pas indiqué.",
+      "help": "Valeur à atteindre. L’objectif est atteint au premier pas où la comparaison tient, pendant le nombre de pas indiqué."
+    },
+    "goal-sustain": {
+      "title": "Nombre de pas consécutifs pendant lesquels la condition doit tenir avant de compter l’objectif comme atteint.",
+      "help": "Nombre de pas consécutifs pendant lesquels la condition doit tenir avant de compter l’objectif comme atteint."
+    },
+    "btn-goal-add": {
+      "title": "Ajoute l’objectif courant à la liste (# au plus). Chaque réplicat s’arrête lorsque tous les objectifs sont atteints, que le monde est vide, ou que les objectifs restants sont impossibles.",
+      "help": "Ajoute l’objectif courant à la liste (# au plus). Chaque réplicat s’arrête lorsque tous les objectifs sont atteints, que le monde est vide, ou que les objectifs restants sont impossibles."
+    },
+    "goal-extra": {
+      "title": "Objectifs additionnels. Chaque ligne est mesurée indépendamment ; × la retire. Le graphique trace le premier objectif.",
+      "help": "Objectifs additionnels. Chaque ligne est mesurée indépendamment ; × la retire. Le graphique trace le premier objectif."
+    },
+    "goal-reps": {
+      "title": "Nombre de simulations indépendantes (jusqu’à #) lancées avec des graines successives, en parallèle sur tous les cœurs sauf un. Un réplicat s’arrête dès que tous les objectifs sont atteints, que le monde est vide ou que les objectifs restants sont impossibles.",
+      "help": "Nombre de simulations indépendantes (jusqu’à #) lancées avec des graines successives, en parallèle sur tous les cœurs sauf un. Un réplicat s’arrête dès que tous les objectifs sont atteints, que le monde est vide ou que les objectifs restants sont impossibles."
+    },
+    "goal-max": {
+      "title": "Budget de pas par réplicat. Au-delà, le réplicat compte comme non atteint.",
+      "help": "Budget de pas par réplicat. Au-delà, le réplicat compte comme non atteint."
+    },
+    "goal-mut": {
+      "title": "Taux de mutation appliqué aux réplicats (le monde actif n’est pas modifié).",
+      "help": "Taux de mutation appliqué aux réplicats (le monde actif n’est pas modifié)."
+    },
+    "goal-popmax": {
+      "title": "Plafond de population des réplicats.",
+      "help": "Plafond de population des réplicats."
+    },
+    "goal-seed": {
+      "title": "Graine du premier réplicat de la prochaine course ; les suivants utilisent graine + #, + #, … Entier entre # et #. Pour rejouer un réplicat existant, utilisez l’étape #.",
+      "help": "Graine du premier réplicat de la prochaine course ; les suivants utilisent graine + #, + #, … Entier entre # et #. Pour rejouer un réplicat existant, utilisez l’étape #."
+    },
+    "goal-disturb": {
+      "title": "Active les perturbations aléatoires dans les réplicats.",
+      "help": "Active les perturbations aléatoires dans les réplicats."
+    },
+    "btn-goal-run": {
+      "title": "Lance les réplicats depuis l’état de départ. Le monde affiché continue indépendamment.",
+      "help": "Lance les réplicats depuis l’état de départ. Le monde affiché continue indépendamment."
+    },
+    "btn-goal-stop": {
+      "title": "Arrête les réplicats en cours ; les résultats déjà obtenus restent affichés.",
+      "help": "Arrête les réplicats en cours ; les résultats déjà obtenus restent affichés."
+    },
+    "btn-goal-csv": {
+      "title": "Télécharge les résultats des réplicats au format CSV : graine, pas d’atteinte (une colonne par objectif), valeur finale, population.",
+      "help": "Télécharge les résultats des réplicats au format CSV : graine, pas d’atteinte (une colonne par objectif), valeur finale, population."
+    },
+    "btn-goal-det": {
+      "title": "Relance le réplicat n° # deux fois (même graine, même état de départ) et compare hashState() des mondes finaux. ✓ si identiques.",
+      "help": "Relance le réplicat n° # deux fois (même graine, même état de départ) et compare hashState() des mondes finaux. ✓ si identiques."
+    },
+    "goal-det-result": {
+      "title": "Résultat du contrôle de déterminisme : ✓ et le hash commun, ou ✗ avec les deux hashes.",
+      "help": "Résultat du contrôle de déterminisme : ✓ et le hash commun, ou ✗ avec les deux hashes."
+    },
+    "btn-goal-report": {
+      "title": "Télécharge un rapport HTML autonome : configuration, recette, programme, objectifs, synthèse, tableau, graphique, arbre si l’explorateur est ouvert, organismes enregistrés cités.",
+      "help": "Télécharge un rapport HTML autonome : configuration, recette, programme, objectifs, synthèse, tableau, graphique, arbre si l’explorateur est ouvert, organismes enregistrés cités."
+    },
+    "btn-goal-keep": {
+      "title": "Conserve la dernière course (résultats, résumé, manifeste) dans l’historique du navigateur pour la comparer aux suivantes.",
+      "help": "Conserve la dernière course (résultats, résumé, manifeste) dans l’historique du navigateur pour la comparer aux suivantes."
+    },
+    "chart-goal": {
+      "title": "Mesure de l’objectif au fil des pas pour chaque réplicat ; la ligne pointillée est la cible.",
+      "help": "Mesure de l’objectif au fil des pas pour chaque réplicat ; la ligne pointillée est la cible."
+    },
+    "goal-sort": {
+      "title": "Ordre du tableau : réussites les plus rapides ou les plus lentes, échecs les plus précoces ou les plus tardifs, valeur ou population finale.",
+      "help": "Ordre du tableau : réussites les plus rapides ou les plus lentes, échecs les plus précoces ou les plus tardifs, valeur ou population finale."
+    },
+    "goal-results": {
+      "title": "Tous les réplicats, triés. Cliquez sur une graine ou sur ▶ pour rejouer ce réplicat dans le monde B ; « fin » ouvre son état final.",
+      "help": "Tous les réplicats, triés. Cliquez sur une graine ou sur ▶ pour rejouer ce réplicat dans le monde B ; « fin » ouvre son état final."
+    },
+    "replay-seed": {
+      "title": "Graine d’un réplicat à rejouer, telle qu’affichée dans le tableau ou la colonne seed du CSV (entier entre # et #).",
+      "help": "Graine d’un réplicat à rejouer, telle qu’affichée dans le tableau ou la colonne seed du CSV (entier entre # et #)."
+    },
+    "btn-replay-seed": {
+      "title": "Reconstruit l’état de départ de la dernière course avec cette graine et ses paramètres dans le monde B, puis lance la lecture : elle reproduit le réplicat exactement. Un nouveau clic repart du début.",
+      "help": "Reconstruit l’état de départ de la dernière course avec cette graine et ses paramètres dans le monde B, puis lance la lecture : elle reproduit le réplicat exactement. Un nouveau clic repart du début."
+    },
+    "btn-catalog-seed": {
+      "title": "Reconstruit le réplicat de cette graine jusqu’à son dernier pas, sans l’afficher, puis ouvre l’explorateur des organismes sur le monde B porté à cet état final.",
+      "help": "Reconstruit le réplicat de cette graine jusqu’à son dernier pas, sans l’afficher, puis ouvre l’explorateur des organismes sur le monde B porté à cet état final."
+    },
+    "sweep-var": {
+      "title": "Paramètre balayé : taux de mutation, plafond de population, seuil de reproduction, ou facteur d’échelle d’un champ du snapshot de départ.",
+      "help": "Paramètre balayé : taux de mutation, plafond de population, seuil de reproduction, ou facteur d’échelle d’un champ du snapshot de départ."
+    },
+    "sweep-from": {
+      "title": "Borne inférieure de la grille linéaire (incluse).",
+      "help": "Borne inférieure de la grille linéaire (incluse)."
+    },
+    "sweep-to": {
+      "title": "Borne supérieure de la grille linéaire (incluse).",
+      "help": "Borne supérieure de la grille linéaire (incluse)."
+    },
+    "sweep-steps": {
+      "title": "Nombre de valeurs également espacées entre les bornes, au moins #.",
+      "help": "Nombre de valeurs également espacées entre les bornes, au moins #."
+    },
+    "sweep-reps": {
+      "title": "Nombre de réplicats indépendants lancés à chaque valeur de la grille.",
+      "help": "Nombre de réplicats indépendants lancés à chaque valeur de la grille."
+    },
+    "btn-sweep-run": {
+      "title": "Lance le balayage : pour chaque valeur, n réplicats avec des graines qui se suivent. L’objectif et le budget de pas sont ceux de l’expérience ciblée.",
+      "help": "Lance le balayage : pour chaque valeur, n réplicats avec des graines qui se suivent. L’objectif et le budget de pas sont ceux de l’expérience ciblée."
+    },
+    "btn-sweep-csv": {
+      "title": "Télécharge le tableau du balayage : valeur, réussite, médiane, min–max, extinctions.",
+      "help": "Télécharge le tableau du balayage : valeur, réussite, médiane, min–max, extinctions."
+    },
+    "sweep-table": {
+      "title": "Une ligne par valeur de la grille : réussite k/n, médiane et étendue des pas, extinctions.",
+      "help": "Une ligne par valeur de la grille : réussite k/n, médiane et étendue des pas, extinctions."
+    },
+    "chart-sweep": {
+      "title": "Médiane des pas jusqu’à l’objectif en fonction de la variable, bande min–max.",
+      "help": "Médiane des pas jusqu’à l’objectif en fonction de la variable, bande min–max."
+    },
+    "tournament-picks": {
+      "title": "Contestataires du tournoi : souches du monde actif et organismes enregistrés. # à # ; chaque paire (hors auto-appariement) est injectée à effectifs égaux.",
+      "help": "Contestataires du tournoi : souches du monde actif et organismes enregistrés. # à # ; chaque paire (hors auto-appariement) est injectée à effectifs égaux."
+    },
+    "tournament-reps": {
+      "title": "Nombre de réplicats indépendants par paire, à graines successives.",
+      "help": "Nombre de réplicats indépendants par paire, à graines successives."
+    },
+    "tournament-max": {
+      "title": "Budget de pas de chaque rencontre. La part de chaque souche est mesurée à la fin.",
+      "help": "Budget de pas de chaque rencontre. La part de chaque souche est mesurée à la fin."
+    },
+    "btn-tournament-run": {
+      "title": "Lance toutes les paires depuis l’état de départ de l’expérience. Vainqueur : plus grande part ; écart ≤ # % = nul.",
+      "help": "Lance toutes les paires depuis l’état de départ de l’expérience. Vainqueur : plus grande part ; écart ≤ # % = nul."
+    },
+    "btn-tournament-csv": {
+      "title": "Télécharge la matrice : paires, victoires, nuls, parts moyennes.",
+      "help": "Télécharge la matrice : paires, victoires, nuls, parts moyennes."
+    },
+    "tournament-matrix": {
+      "title": "Matrice des confrontations. Une case (ligne, colonne) indique les victoires de la ligne contre la colonne ; l’intensité suit l’écart.",
+      "help": "Matrice des confrontations. Une case (ligne, colonne) indique les victoires de la ligne contre la colonne ; l’intensité suit l’écart."
+    },
+    "btn-snap": {
+      "title": "Mémorise le monde actif, ses génomes et ses champs. Ce point de restauration reste dans cette session. Raccourci : S.",
+      "help": "Mémorise le monde actif, ses génomes et ses champs. Ce point de restauration reste dans cette session. Raccourci : S."
+    },
+    "btn-restore": {
+      "title": "Restaure l’état mémorisé dans le monde actif.",
+      "help": "Restaure l’état mémorisé dans le monde actif."
+    },
+    "btn-step-a": {
+      "title": "Met en pause et avance uniquement le monde A d’un pas.",
+      "help": "Met en pause et avance uniquement le monde A d’un pas."
+    },
+    "btn-step-b": {
+      "title": "Met en pause et avance uniquement le monde B d’un pas.",
+      "help": "Met en pause et avance uniquement le monde B d’un pas."
+    },
+    "btn-step-both": {
+      "title": "Met en pause et avance les mondes A et B d’un pas chacun.",
+      "help": "Met en pause et avance les mondes A et B d’un pas chacun."
+    },
+    "seed": {
+      "title": "Graine de la nouvelle expérience. Une même graine avec les mêmes paramètres reproduit la même évolution.",
+      "help": "Graine de la nouvelle expérience. Une même graine avec les mêmes paramètres reproduit la même évolution."
+    },
+    "btn-reseed": {
+      "title": "Remplace A et B par deux nouveaux mondes à partir de cette graine. B utilise une graine dérivée.",
+      "help": "Remplace A et B par deux nouveaux mondes à partir de cette graine. B utilise une graine dérivée."
+    },
+    "btn-bottle": {
+      "title": "Ne conserve aléatoirement que # % des organismes du monde actif. Mémorisez un état avant pour pouvoir revenir en arrière.",
+      "help": "Ne conserve aléatoirement que # % des organismes du monde actif. Mémorisez un état avant pour pouvoir revenir en arrière."
+    },
+    "btn-csv": {
+      "title": "Télécharge l’historique des indicateurs au format CSV.",
+      "help": "Télécharge l’historique des indicateurs au format CSV."
+    },
+    "btn-phylo": {
+      "title": "Télécharge les lignées, leurs parents, dates d’apparition et d’extinction au format CSV.",
+      "help": "Télécharge les lignées, leurs parents, dates d’apparition et d’extinction au format CSV."
+    },
+    "btn-events": {
+      "title": "Télécharge le journal d’événements par organisme (JSON Lines : naissances, morts, repas, exsudat). Activez d’abord le journal dans Expérience.",
+      "help": "Télécharge le journal d’événements par organisme (JSON Lines : naissances, morts, repas, exsudat). Activez d’abord le journal dans Expérience."
+    },
+    "btn-manifest": {
+      "title": "Exporte le manifeste de la dernière course ciblée (état de départ, objectifs, graine, réplicats, paramètres) : le fichier se rejoue à l’identique avec le lanceur sans interface.",
+      "help": "Exporte le manifeste de la dernière course ciblée (état de départ, objectifs, graine, réplicats, paramètres) : le fichier se rejoue à l’identique avec le lanceur sans interface."
+    },
+    "btn-import": {
+      "title": "Charge dans le monde actif un fichier JSON exporté depuis OpenAvida.",
+      "help": "Charge dans le monde actif un fichier JSON exporté depuis OpenAvida."
+    },
+    "opt-events": {
+      "title": "Enregistre chaque événement par organisme dans un journal borné, exportable en JSON Lines pour l’analyse externe. Coûte de la mémoire sur les longues courses.",
+      "help": "Enregistre chaque événement par organisme dans un journal borné, exportable en JSON Lines pour l’analyse externe. Coûte de la mémoire sur les longues courses."
+    },
+    "opt-view3d": {
+      "title": "Affiche le même monde en trois dimensions. Le moteur de simulation reste identique.",
+      "help": "Affiche le même monde en trois dimensions. Le moteur de simulation reste identique."
+    },
+    "opt-brains": {
+      "title": "Active les décisions perception → action des organismes avec la politique intégrée.",
+      "help": "Active les décisions perception → action des organismes avec la politique intégrée."
+    },
+    "opt-llm": {
+      "title": "Active l’adaptateur LLM facultatif. Sans adaptateur configuré, la politique intégrée prend le relais.",
+      "help": "Active l’adaptateur LLM facultatif. Sans adaptateur configuré, la politique intégrée prend le relais."
+    },
+    "opt-mp": {
+      "title": "Partage une session entre les onglets de ce navigateur. L’hôte contrôle le temps ; les observateurs ne peuvent pas peindre.",
+      "help": "Partage une session entre les onglets de ce navigateur. L’hôte contrôle le temps ; les observateurs ne peuvent pas peindre."
+    },
+    "mp-room": {
+      "title": "Nom du salon. Le même nom permet de rejoindre une session depuis un autre onglet du même navigateur.",
+      "help": "Nom du salon. Le même nom permet de rejoindre une session depuis un autre onglet du même navigateur."
+    },
+    "mp-role": {
+      "title": "Hôte : contrôle du temps et modifications. Expérimentateur : modifications. Observateur : inspection.",
+      "help": "Hôte : contrôle du temps et modifications. Expérimentateur : modifications. Observateur : inspection."
+    },
+    "btn-mp-host": {
+      "title": "Crée une session dont cet onglet contrôle la simulation.",
+      "help": "Crée une session dont cet onglet contrôle la simulation."
+    },
+    "btn-mp-join": {
+      "title": "Rejoint le salon choisi avec le rôle sélectionné.",
+      "help": "Rejoint le salon choisi avec le rôle sélectionné."
+    },
+    "mp-peers": {
+      "title": "Participants présents dans le salon et leurs rôles.",
+      "help": "Participants présents dans le salon et leurs rôles."
+    },
+    "ex-refresh": {
+      "title": "Relit le monde affiché : liste, records et lignées repartent de son état courant.",
+      "help": "Relit le monde affiché : liste, records et lignées repartent de son état courant."
+    },
+    "ex-close": {
+      "title": "Ferme l’explorateur et revient au laboratoire. La touche Échap fait la même chose.",
+      "help": "Ferme l’explorateur et revient au laboratoire. La touche Échap fait la même chose."
+    },
+    "ex-text": {
+      "title": "Recherche libre sur les lignes : un numéro d’organisme, l# pour la lignée #, s# pour la souche #.",
+      "help": "Recherche libre sur les lignes : un numéro d’organisme, l# pour la lignée #, s# pour la souche #."
+    },
+    "ex-liveness": {
+      "title": "Restreint la liste aux organismes vivants ou aux morts du journal ; « Tous » réunit les deux.",
+      "help": "Restreint la liste aux organismes vivants ou aux morts du journal ; « Tous » réunit les deux."
+    },
+    "ex-group": {
+      "title": "Groupe les lignes par souche fondatrice, par stratégie déduite du phénotype, par lignée, ou pas du tout.",
+      "help": "Groupe les lignes par souche fondatrice, par stratégie déduite du phénotype, par lignée, ou pas du tout."
+    },
+    "ex-strain": {
+      "title": "Ne garde que les descendants de cette souche fondatrice, mutations comprises.",
+      "help": "Ne garde que les descendants de cette souche fondatrice, mutations comprises."
+    },
+    "ex-strategy": {
+      "title": "Ne garde que les organismes dont le phénotype actuel relève de cette stratégie.",
+      "help": "Ne garde que les organismes dont le phénotype actuel relève de cette stratégie."
+    },
+    "ex-lineage": {
+      "title": "Ne garde que les organismes portant ce numéro de lignée.",
+      "help": "Ne garde que les organismes portant ce numéro de lignée."
+    },
+    "ex-cause": {
+      "title": "Ne garde que les morts dont le journal indique cette cause.",
+      "help": "Ne garde que les morts dont le journal indique cette cause."
+    },
+    "ex-age-min": {
+      "title": "Écarte les organismes dont l’âge, en pas vécus, est inférieur à cette valeur.",
+      "help": "Écarte les organismes dont l’âge, en pas vécus, est inférieur à cette valeur."
+    },
+    "ex-age-max": {
+      "title": "Écarte les organismes dont l’âge, en pas vécus, dépasse cette valeur.",
+      "help": "Écarte les organismes dont l’âge, en pas vécus, dépasse cette valeur."
+    },
+    "ex-kills": {
+      "title": "Ne garde que les organismes ayant tué au moins ce nombre de proies.",
+      "help": "Ne garde que les organismes ayant tué au moins ce nombre de proies."
+    },
+    "ex-births": {
+      "title": "Ne garde que les organismes ayant produit au moins ce nombre de descendants directs.",
+      "help": "Ne garde que les organismes ayant produit au moins ce nombre de descendants directs."
+    },
+    "ex-fitness": {
+      "title": "Ne garde que les organismes dont la fitness atteint au moins cette valeur.",
+      "help": "Ne garde que les organismes dont la fitness atteint au moins cette valeur."
+    },
+    "ex-genome": {
+      "title": "Ne garde que les organismes dont le génome contient cette suite de bases ACGT.",
+      "help": "Ne garde que les organismes dont le génome contient cette suite de bases ACGT."
+    },
+    "ex-trait": {
+      "title": "Trait du phénotype auquel s’applique le seuil voisin ; « Aucun » désactive ce filtre.",
+      "help": "Trait du phénotype auquel s’applique le seuil voisin ; « Aucun » désactive ce filtre."
+    },
+    "ex-trait-min": {
+      "title": "Valeur minimale du trait choisi : les organismes en dessous sont écartés de la liste.",
+      "help": "Valeur minimale du trait choisi : les organismes en dessous sont écartés de la liste."
+    },
+    "ex-sort": {
+      "title": "Ordre des lignes à l’intérieur de chaque groupe : fitness, âge, proies tuées, descendance ou date d’apparition.",
+      "help": "Ordre des lignes à l’intérieur de chaque groupe : fitness, âge, proies tuées, descendance ou date d’apparition."
+    },
+    "ex-reset": {
+      "title": "Remet tous les filtres à leur valeur par défaut et referme les groupes développés.",
+      "help": "Remet tous les filtres à leur valeur par défaut et referme les groupes développés."
+    },
+    "ex-records": {
+      "title": "Extrêmes du monde : le détenteur de chaque record. Cliquez une ligne pour ouvrir sa fiche.",
+      "help": "Extrêmes du monde : le détenteur de chaque record. Cliquez une ligne pour ouvrir sa fiche."
+    },
+    "ex-lin-sort": {
+      "title": "Ordre du tableau des lignées : effectif vivant, effectif maximal, apparition, extinction ou descendance vivante.",
+      "help": "Ordre du tableau des lignées : effectif vivant, effectif maximal, apparition, extinction ou descendance vivante."
+    },
+    "ex-lin-alive": {
+      "title": "N’affiche que les lignées comptant au moins un organisme vivant.",
+      "help": "N’affiche que les lignées comptant au moins un organisme vivant."
+    },
+    "ex-tree-fit": {
+      "title": "Recadre l’arbre entier dans la vue : le zoom et le déplacement reviennent à l’ajustement automatique.",
+      "help": "Recadre l’arbre entier dans la vue : le zoom et le déplacement reviennent à l’ajustement automatique."
+    },
+    "ex-tree-zoom": {
+      "title": "Ramène la vue sur la lignée choisie, au niveau de zoom courant, sans changer les lignées affichées.",
+      "help": "Ramène la vue sur la lignée choisie, au niveau de zoom courant, sans changer les lignées affichées."
+    },
+    "ex-tree-siblings": {
+      "title": "Ajoute les lignées sœurs du trajet fondateur → foyer, c’est-à-dire les autres filles de chaque mère, pour situer le foyer parmi ses contemporaines.",
+      "help": "Ajoute les lignées sœurs du trajet fondateur → foyer, c’est-à-dire les autres filles de chaque mère, pour situer le foyer parmi ses contemporaines."
+    },
+    "ex-tree-extinct": {
+      "title": "Sort de l’arbre les lignées éteintes, toutes ou seulement celles éteintes depuis plus de # pas, pour ne garder que ce qui subsiste.",
+      "help": "Sort de l’arbre les lignées éteintes, toutes ou seulement celles éteintes depuis plus de # pas, pour ne garder que ce qui subsiste."
+    },
+    "ex-tree-budget": {
+      "title": "Nombre maximal de lignées descendantes dessinées : au-delà, les branches les moins peuplées sont écartées et la note l’indique.",
+      "help": "Nombre maximal de lignées descendantes dessinées : au-delà, les branches les moins peuplées sont écartées et la note l’indique."
+    },
+    "ex-tree-canvas": {
+      "title": "Arbre des lignées autour du foyer : le temps va de gauche à droite, chaque barre est une lignée, une lignée fille part de sa mère à sa naissance ; le trajet clair mène du fondateur au foyer, les points ambre marquent une mutation à effet. Glisser : déplacer ; molette : zoomer ; clic : détails ; double-clic : recentrer.",
+      "help": "Arbre des lignées autour du foyer : le temps va de gauche à droite, chaque barre est une lignée, une lignée fille part de sa mère à sa naissance ; le trajet clair mène du fondateur au foyer, les points ambre marquent une mutation à effet. Glisser : déplacer ; molette : zoomer ; clic : détails ; double-clic : recentrer."
+    }
+  }
+}

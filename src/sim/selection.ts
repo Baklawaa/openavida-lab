@@ -86,13 +86,19 @@ export interface NeutralSubstitution {
   to: number;
 }
 
-/** Hue-only differences between parent and child, i.e. neutral substitutions. */
-export function neutralOnly(parent: Phenotype, child: Phenotype, threshold = 0.05): boolean {
+/**
+ * Fitness-neutral difference between parent and child: every trait except the
+ * display-only hue is unchanged. Synonymous codon swaps (two codons of the same
+ * trait and delta), substitutions outside ORFs, and changes that only move the
+ * hue all qualify — which is what a molecular clock counts. Hue may move, but
+ * it does not have to.
+ */
+export function neutralOnly(parent: Phenotype, child: Phenotype): boolean {
   for (const trait of TRAIT_NAMES) {
     if (trait === "hue") continue;
     if (Math.abs(child[trait] - parent[trait]) > 1e-9) return false;
   }
-  return Math.abs(child.hue - parent.hue) >= threshold;
+  return true;
 }
 
 /** Substitutions per 100 ticks per lineage, from the neutral log. */

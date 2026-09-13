@@ -212,6 +212,14 @@ try {
   await page.keyboard.press('3');
   await active('#fm-2');
   assert.match(await page.locator('#field-legend').textContent(), /Toxines/);
+  // Six layers: the exudate overlay is layer 5, and the plate says what it holds.
+  await page.keyboard.press('6');
+  await active('#fm-5');
+  assert.match(await page.locator('#field-legend').textContent(), /Exsudat/);
+  // The note is written on the 250 ms UI cadence, so wait for it before reading.
+  await page.waitForFunction(() => (document.querySelector('#field-note')?.textContent ?? '').length > 0, null, { timeout: 8000 });
+  assert.match(await page.locator('#field-note').textContent(), /producteur|exsudat/);
+  await page.locator('#fm-0').click();
   await page.locator('#view-3d').click();
   await page.waitForFunction(() => window.__openavida.surface === '3d');
   await active('#view-3d');

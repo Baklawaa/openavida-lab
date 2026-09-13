@@ -27,6 +27,9 @@ interface OpenAvidaProbe {
   roomPeers: number;
   host: "inline" | "worker";
   explorerOpen: boolean;
+  /** Neutral (fitness-free) substitutions recorded in the current run. */
+  neutralSubstitutions: number;
+  historyRows: number;
 }
 
 interface Window {
@@ -38,4 +41,5 @@ interface Window {
   __openavidaStep?: (n?: number) => Promise<void>;
   __openavidaHash?: () => Promise<string>;
   __openavidaHelp?: Record<string, string>;
+  __openavidaParams?: (side?: "A" | "B") => Record<string, number | boolean>;
 }

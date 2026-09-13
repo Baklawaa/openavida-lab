@@ -54,6 +54,49 @@ describe("SimHost: shared op application and frames", () => {
     expect(opResetsHistory({ kind: "paint", which: "A", x: 0, y: 0, radius: 1, brush: "erase" })).toBe(false);
   });
 
+  it("bounds a parameter patch by the specification, in every host", () => {
+    const dual = new DualWorld(params);
+    applySimOp(dual, { kind: "setParams", which: "A", params: { maxMealsPerTick: 99, senescenceRate: -1, width: 4 } });
+    expect(dual.a.params.maxMealsPerTick).toBe(8);
+    expect(dual.a.params.senescenceRate).toBe(0);
+    expect(dual.a.params.width).toBe(8);
+    // B is untouched, and an in-range patch is written as given.
+    applySimOp(dual, { kind: "setParams", which: "B", params: { nutrientInflow: 0.02 } });
+    expect(dual.b.params.nutrientInflow).toBe(0.02);
+    expect(dual.a.params.nutrientInflow).toBe(0.004);
+  });
+
+  it("streams the neutral log to the mirror, incrementally and without duplicates", () => {
+    const w = new World({ width: 24, height: 24, seed: 12, startPopulation: 0, mutationRate: 1, maxPopulation: 400 });
+    w.injectStrain(founderPhototroph(), 12, 12, 12);
+    for (let i = 0; i < 60; i++) w.step();
+    expect(w.neutralLog.length, "the run recorded silent substitutions").toBeGreaterThan(0);
+
+    const { frame } = frameFromWorld(w, "A", { historySince: -1, neutralSince: -1, lineages: true, innovations: true });
+    const mirror = new World({ ...w.params, startPopulation: 0 });
+    expect(applyFrame(mirror, frame)).toBe(true);
+    expect(mirror.neutralLog).toEqual(w.neutralLog);
+
+    const beforeIncremental = w.neutralLog.length;
+    for (let i = 0; i < 400 && w.neutralLog.length === beforeIncremental; i++) w.step();
+    expect(w.neutralLog.length).toBeGreaterThan(beforeIncremental);
+    const { frame: incremental } = frameFromWorld(w, "A", {
+      historySince: frame.tick,
+      neutralSince: frame.tick,
+      lineages: false,
+      innovations: false,
+    });
+    expect(incremental.neutralFull).toBe(false);
+    expect(incremental.neutralLog.length).toBeGreaterThan(0);
+    applyFrame(mirror, incremental);
+    expect(mirror.neutralLog).toEqual(w.neutralLog);
+
+    // A full frame replaces the mirror's log instead of appending twice.
+    const { frame: full } = frameFromWorld(w, "A", { historySince: -1, neutralSince: -1, lineages: true, innovations: true });
+    applyFrame(mirror, full);
+    expect(mirror.neutralLog).toEqual(w.neutralLog);
+  });
+
   it("a frame applied to a fresh mirror reproduces the source world state", () => {
     const dual = new DualWorld(params);
     for (const op of scripted()) applySimOp(dual, op);

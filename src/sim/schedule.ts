@@ -5,6 +5,7 @@
  */
 import type { FieldName } from "./fields";
 import { FIELD_NAMES } from "./fields";
+import { normalizeParams } from "./params";
 import { applyRecipeOp, isRecipeOp, type RecipeOp } from "./recipe";
 import type { SimParams } from "./types";
 import type { World } from "./world";
@@ -56,7 +57,7 @@ export function applyScheduledOp(world: World, item: ScheduledOp): void {
     return;
   }
   if (op.type === "params") {
-    Object.assign(world.params, op.params);
+    Object.assign(world.params, normalizeParams({ ...world.params, ...op.params }));
     if (op.params.disturbances !== undefined) world.disturbances = Boolean(op.params.disturbances);
     return;
   }
