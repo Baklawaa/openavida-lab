@@ -291,11 +291,6 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
 
 export const LIMITS: readonly LimitEntry[] = [
   {
-    gap: "Worker mode does not stream the research event log",
-    detail: "The mirror receives fields, organisms, history and the neutral log, but not the per-organism research log, so the JSON Lines export is empty under ?worker=1. The headless runner is the supported path for recorded events.",
-    source: "src/sim/simHost.ts WorldFrame",
-  },
-  {
     gap: "The interface has no manifest import",
     detail: "A manifest can be exported from the Expérience panel and replayed by the headless runner or stored runs, but a .json manifest cannot be loaded back into the interface.",
     source: "src/ui/goalPanel.ts, src/sim/manifest.ts",

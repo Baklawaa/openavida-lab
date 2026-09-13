@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { describe, expect, it } from "vitest";
-import { configsForManifest, makeManifest, normalizeParams } from "../src/sim/index";
-import { runExperiment, runShard } from "../tools/openavida";
+import { describe, expect, it, vi } from "vitest";
+import { configsForManifest, makeManifest, normalizeParams, type Manifest } from "../src/sim/index";
+import { main, runExperiment, runShard } from "../tools/openavida";
 
 function manifest() {
   return makeManifest({
@@ -21,6 +21,44 @@ function hashes(dir: string): string[] {
     .split("\n")
     .filter((line) => line.trim().length > 0)
     .map((line) => (JSON.parse(line) as { finalHash: string }).finalHash);
+}
+
+/** Write a manifest into the temp directory so main() can be driven like the CLI. */
+function writeManifest(dir: string, file: string, m: Manifest): string {
+  const path = join(dir, file);
+  writeFileSync(path, JSON.stringify(m));
+  return path;
+}
+
+/**
+ * A manifest whose goal no replicate can reach, so every trial runs its whole
+ * tick budget and the recorded ticks are exactly the ones the flags ask for.
+ */
+function fullRunManifest(): Manifest {
+  const m = manifest();
+  m.goals = [{ metric: { kind: "population" }, op: ">=", target: 100000, sustain: 1 }];
+  return m;
+}
+
+function resultLines(dir: string): Array<{ seed: number; finalHash: string }> {
+  return readFileSync(join(dir, "results.jsonl"), "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as { seed: number; finalHash: string });
+}
+
+/** Ticks of the reference replicate, read from the exported metrics.csv. */
+function metricTicks(dir: string): number[] {
+  return readFileSync(join(dir, "metrics.csv"), "utf8")
+    .split("\n")
+    .filter((line) => line.length > 0 && !line.startsWith("#"))
+    .slice(1) // the header row
+    .map((line) => Number(line.split(",")[0]));
+}
+
+/** The messages collected by a console spy, one string per call. */
+function messages(spy: { mock: { calls: unknown[][] } }): string[] {
+  return spy.mock.calls.map((call) => String(call[0]));
 }
 
 describe("headless runner", () => {
@@ -98,6 +136,156 @@ describe("headless runner", () => {
       expect(probe.status).toBe(0);
       expect(probe.stdout).toContain("cli test");
       expect(probe.stdout).toContain("replicates  4");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("applies run overrides from the command line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "oav-flags-"));
+    try {
+      const manifestPath = writeManifest(dir, "manifest.json", fullRunManifest());
+      const outDir = join(dir, "run");
+      const code = main([
+        "run",
+        manifestPath,
+        "--out",
+        outDir,
+        "--quiet",
+        "--replicates",
+        "2",
+        "--seed",
+        "7",
+        "--max-ticks",
+        "5",
+        "--name",
+        "renamed",
+      ]);
+      expect(code).toBe(0);
+
+      expect(resultLines(outDir).map((r) => r.seed)).toEqual([7, 8]);
+      // The reference history is what metrics.csv exports: it stops at the budget.
+      expect(metricTicks(outDir).at(-1)).toBe(5);
+      // The effective manifest — overrides included — is what the run records.
+      const written = JSON.parse(readFileSync(join(outDir, "manifest.json"), "utf8")) as {
+        name: string;
+        run: Manifest["run"];
+      };
+      expect(written.name).toBe("renamed");
+      expect(written.run).toMatchObject({ replicates: 2, seed: 7, maxTicks: 5 });
+
+      // --sample-every drives the goal series kept on the reference result.
+      const sampled = join(dir, "sampled");
+      expect(
+        main([
+          "run",
+          manifestPath,
+          "--out",
+          sampled,
+          "--quiet",
+          "--replicates",
+          "1",
+          "--max-ticks",
+          "6",
+          "--sample-every",
+          "2",
+        ]),
+      ).toBe(0);
+      const reference = JSON.parse(readFileSync(join(sampled, "results.jsonl"), "utf8").split("\n")[0]!) as {
+        series: Array<[number, number]>;
+      };
+      expect(reference.series.map(([tick]) => tick)).toEqual([0, 2, 4, 6]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("records or drops the event stream from the command line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "oav-events-"));
+    try {
+      const silenced = manifest();
+      silenced.run.recordEvents = false;
+      const silencedPath = writeManifest(dir, "silenced.json", silenced);
+      const recordingPath = writeManifest(dir, "recording.json", manifest());
+
+      const onDir = join(dir, "on");
+      expect(main(["run", silencedPath, "--out", onDir, "--events", "--quiet"])).toBe(0);
+      expect(existsSync(join(onDir, "events.jsonl"))).toBe(true);
+
+      const offDir = join(dir, "off");
+      expect(main(["run", recordingPath, "--out", offDir, "--no-events", "--quiet"])).toBe(0);
+      expect(existsSync(join(offDir, "events.jsonl"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("prints one progress line per replicate with --progress-every", () => {
+    const dir = mkdtempSync(join(tmpdir(), "oav-progress-"));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const manifestPath = writeManifest(dir, "manifest.json", fullRunManifest());
+      const args = ["run", manifestPath, "--replicates", "2", "--max-ticks", "3", "--progress-every", "1"];
+      expect(main([...args, "--out", join(dir, "run")])).toBe(0);
+      expect(messages(log).filter((line) => line.startsWith("replicate "))).toEqual([
+        "replicate 1/2",
+        "replicate 2/2",
+      ]);
+
+      // --quiet suppresses the progress lines along with everything else.
+      log.mockClear();
+      expect(main([...args, "--out", join(dir, "quiet"), "--quiet"])).toBe(0);
+      expect(messages(log).filter((line) => line.startsWith("replicate "))).toEqual([]);
+    } finally {
+      log.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a resume whose run signature changed, and keeps the lines otherwise", () => {
+    const dir = mkdtempSync(join(tmpdir(), "oav-signature-"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const manifestPath = writeManifest(dir, "manifest.json", fullRunManifest());
+      const outDir = join(dir, "run");
+      const stored = ["--replicates", "2", "--max-ticks", "3", "--quiet"];
+      expect(main(["run", manifestPath, "--out", outDir, ...stored])).toBe(0);
+      const original = resultLines(outDir);
+      expect(original.length).toBe(2);
+
+      // A different replicate plan cannot be merged into the stored shards.
+      const changed = ["run", manifestPath, "--out", outDir, "--resume", "--replicates", "3", "--max-ticks", "3", "--quiet"];
+      expect(main(changed)).toBe(1);
+      const refusal = messages(errors).join("\n");
+      expect(refusal).toContain("cannot resume");
+      expect(refusal).toContain("replicates");
+      expect(resultLines(outDir)).toEqual(original);
+
+      // The same plan resumes: the stored result lines are kept unchanged.
+      expect(main(["run", manifestPath, "--out", outDir, "--resume", ...stored])).toBe(0);
+      expect(resultLines(outDir)).toEqual(original);
+    } finally {
+      errors.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("resumes a run directory written before signatures existed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "oav-legacy-"));
+    try {
+      const manifestPath = writeManifest(dir, "manifest.json", fullRunManifest());
+      const outDir = join(dir, "run");
+      const args = ["run", manifestPath, "--out", outDir, "--replicates", "2", "--max-ticks", "3", "--quiet"];
+      expect(main(args)).toBe(0);
+
+      // env.json from before this change: no signature to compare against.
+      const env = JSON.parse(readFileSync(join(outDir, "env.json"), "utf8")) as Record<string, unknown>;
+      delete env.signature;
+      writeFileSync(join(outDir, "env.json"), JSON.stringify(env, null, 2) + "\n");
+
+      const resumed = ["run", manifestPath, "--out", outDir, "--resume", "--replicates", "3", "--max-ticks", "3", "--quiet"];
+      expect(main(resumed)).toBe(0);
+      expect(resultLines(outDir).map((r) => r.seed)).toEqual([7, 8, 9]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

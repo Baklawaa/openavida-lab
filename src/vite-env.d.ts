@@ -29,6 +29,8 @@ interface OpenAvidaProbe {
   explorerOpen: boolean;
   /** Neutral (fitness-free) substitutions recorded in the current run. */
   neutralSubstitutions: number;
+  /** Research events recorded in the current run (worker frames stream them too). */
+  researchEvents: number;
   historyRows: number;
 }
 

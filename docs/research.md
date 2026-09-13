@@ -44,6 +44,28 @@ is what makes `--resume` a matter of counting the lines already written.
 Resume requires the original `--jobs`: shard files are per-layout, and the
 runner refuses to mix layouts rather than silently merging them.
 
+Flags are folded into the manifest before it is validated, so the effective
+manifest — overrides included — is what lands in the run directory:
+
+| Flag | Effect |
+| --- | --- |
+| `--replicates N` | overrides `run.replicates` |
+| `--seed N` | overrides `run.seed`; replicate i uses N+i |
+| `--max-ticks N` | overrides `run.maxTicks` |
+| `--sample-every N` | overrides `run.sampleEvery` |
+| `--events` / `--no-events` | sets `run.recordEvents` true / false |
+| `--name "<text>"` | replaces the manifest `name` |
+| `--out <dir>` | run directory (default: the manifest's directory/run) |
+| `--jobs N` | shard processes (default 1) |
+| `--resume` | keeps the replicates already written |
+| `--progress-every N` | one progress line every N completed replicates (0: none) |
+| `--quiet` | errors only |
+| `--index i --count n` | shard mode: which block of replicates this process runs |
+
+A resume also refuses when the run-defining fields recorded in `env.json`
+(replicates, seed, max ticks, sample cadence, event recording) differ from the
+current ones, so a changed plan is never merged into stored shards.
+
 ## 3. What lands in the run directory
 
 | File | Contents |
@@ -53,7 +75,7 @@ runner refuses to mix layouts rather than silently merging them.
 | `summary.json` | success rate with a Wilson interval, median ticks with a bootstrap interval, extinctions, unreachable |
 | `metrics.csv` | per-tick history of the reference replicate (provenance line first) |
 | `events.jsonl` | research events of the reference replicate (when `run.recordEvents`) |
-| `env.json` | node, platform, cores, job count, timestamp |
+| `env.json` | node, platform, cores, job count, run signature, timestamp |
 | `shard-*.jsonl` | the raw incremental shard output |
 
 ## 4. Read it

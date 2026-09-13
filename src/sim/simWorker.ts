@@ -35,6 +35,7 @@ const sentTick: Record<Side, number> = { A: -1, B: -1 };
 const sentDeath: Record<Side, number> = { A: -1, B: -1 };
 const sentInnovations: Record<Side, number> = { A: -1, B: -1 };
 const sentNeutral: Record<Side, number> = { A: -1, B: -1 };
+const sentEventLog: Record<Side, number> = { A: -1, B: -1 };
 let frameCount = 0;
 
 function sendFrames(seq: number, sides: Side[], stepped: boolean, full: boolean): void {
@@ -45,16 +46,22 @@ function sendFrames(seq: number, sides: Side[], stepped: boolean, full: boolean)
   for (const side of sides) {
     const w = worldOf(dual, side);
     const innovations = full || w.innovations.length !== sentInnovations[side] || frameCount % 30 === 0;
+    // The research log is trimmed from the front. Once the cursor sits before
+    // the oldest surviving event, an incremental send would silently drop the
+    // trimmed ones forever, so resend the whole window instead.
+    const eventsTrimmed = w.eventLog.length > 0 && w.eventLog[0]!.tick > sentEventLog[side];
     const { frame, transfer: t } = frameFromWorld(w, side, {
       historySince: full ? -1 : sentTick[side],
       deathsSince: full ? -1 : sentDeath[side],
       neutralSince: full ? -1 : sentNeutral[side],
+      eventLogSince: full || eventsTrimmed ? -1 : sentEventLog[side],
       lineages: full || !stepped || frameCount % 6 === 0,
       innovations,
     });
     sentTick[side] = w.tick;
     sentDeath[side] = w.nextDeathSeq - 1;
     sentNeutral[side] = w.tick;
+    sentEventLog[side] = w.tick;
     if (innovations) sentInnovations[side] = w.innovations.length;
     frames.push(frame);
     transfer.push(...t);

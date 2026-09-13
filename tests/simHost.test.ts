@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DualWorld,
   InlineHost,
+  RESEARCH_LOG_KEEP,
+  RESEARCH_LOG_MAX,
   World,
   applyFrame,
   applySimOp,
@@ -95,6 +97,49 @@ describe("SimHost: shared op application and frames", () => {
     const { frame: full } = frameFromWorld(w, "A", { historySince: -1, neutralSince: -1, lineages: true, innovations: true });
     applyFrame(mirror, full);
     expect(mirror.neutralLog).toEqual(w.neutralLog);
+  });
+
+  it("streams the research event log to the mirror, incrementally and without duplicates", () => {
+    const w = new World({ width: 24, height: 24, seed: 12, startPopulation: 0, mutationRate: 1, maxPopulation: 400, recordEvents: true });
+    w.injectStrain(founderPhototroph(), 12, 12, 12);
+    for (let i = 0; i < 60; i++) w.step();
+    expect(w.eventLog.length, "the run recorded research events").toBeGreaterThan(0);
+
+    const { frame } = frameFromWorld(w, "A", { historySince: -1, eventLogSince: -1, lineages: true, innovations: true });
+    const mirror = new World({ ...w.params, startPopulation: 0 });
+    expect(applyFrame(mirror, frame)).toBe(true);
+    expect(mirror.eventLog).toEqual(w.eventLog);
+
+    const beforeIncremental = w.eventLog.length;
+    for (let i = 0; i < 200 && w.eventLog.length === beforeIncremental; i++) w.step();
+    expect(w.eventLog.length).toBeGreaterThan(beforeIncremental);
+    const { frame: incremental } = frameFromWorld(w, "A", {
+      historySince: frame.tick,
+      eventLogSince: frame.tick,
+      lineages: false,
+      innovations: false,
+    });
+    expect(incremental.eventLogFull).toBe(false);
+    expect(incremental.eventLog.length).toBeGreaterThan(0);
+    const kept = mirror.eventLog.length;
+    applyFrame(mirror, incremental);
+    // The merge appends exactly the resent slice: no duplicate and no lost row.
+    expect(mirror.eventLog.length).toBe(kept + incremental.eventLog.length);
+    expect(mirror.eventLog).toEqual(w.eventLog);
+
+    // The mirror re-applies the source bound, so a long run cannot grow it.
+    const padded = new World({ ...w.params, startPopulation: 0 });
+    padded.eventLog = Array.from({ length: RESEARCH_LOG_MAX }, (_, i) => ({ ...w.eventLog[0]!, orgId: i }));
+    applyFrame(padded, incremental);
+    expect(padded.eventLog.length).toBe(RESEARCH_LOG_KEEP);
+
+    // A full frame replaces the mirror's log instead of appending twice.
+    const { frame: full } = frameFromWorld(w, "A", { historySince: -1, eventLogSince: -1, lineages: true, innovations: true });
+    applyFrame(mirror, full);
+    const once = mirror.eventLog.length;
+    applyFrame(mirror, full);
+    expect(mirror.eventLog.length).toBe(once);
+    expect(mirror.eventLog).toEqual(w.eventLog);
   });
 
   it("a frame applied to a fresh mirror reproduces the source world state", () => {

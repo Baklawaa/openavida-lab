@@ -201,6 +201,16 @@ export const GOAL_EN = {
   "goal.restore.note": "{count} replicates · run of {when} restored · from {label}",
   "goal.restore.status": "Last run restored ({count} replicates from {label}, {when}): table, sort and replay available.",
 
+  /* imported manifest -------------------------------------------------- */
+  "btn.manifestImport": "Import a manifest",
+  "goal.manifest.note": "<b>Imported manifest</b> · {name} · {replicates} replicates · {goals} goals · <span class=\"mono\">{digest}</span>{drift}<br>The next run follows the start state, goals and parameters of the manifest; the configuration fields above are ignored.",
+  "goal.manifest.loaded": "Manifest “{name}” imported: {replicates} replicates, {goals} goals.",
+  "goal.manifest.invalid": "Unreadable or invalid manifest: {reason}",
+  "goal.manifest.launched": "{reps} replicates launched from manifest “{name}”: {goals}.{clamp}",
+  "goal.manifest.clamped": " Capped at {limit} replicates: {reps} kept.",
+  "goal.manifest.clear": "Back to the panel configuration",
+  "goal.manifest.cleared": "Manifest removed: the panel configuration is back in charge.",
+
   /* run journal ---------------------------------------------------------- */
   "goal.history.title": "RUN JOURNAL",
   "goal.history.hint": "Kept runs stay in the browser. Tick two to four to compare success rate, median and effect against the reference (the first one ticked). “Manifest” exports the run for the headless runner.",

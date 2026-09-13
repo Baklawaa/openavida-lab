@@ -796,6 +796,7 @@ export function mount(root: HTMLElement): void {
       host: host.kind,
       explorerOpen: explorer.isOpen,
       neutralSubstitutions: w.neutralLog.length,
+      researchEvents: w.eventLog.length,
       historyRows: w.history.length,
     };
   }

@@ -3,14 +3,16 @@
  *
  * Runs two seeded experiments, keeps both, then exercises the stored-run
  * surface end to end: the comparison table with intervals and effect sizes,
- * the overlaid curve chart, notes that survive a reload, the manifest export,
- * replaying a stored run into world B, opening its final state, and removal.
+ * the overlaid curve chart, notes that survive a reload, the manifest export
+ * and its import back into the panel, replaying a stored run into world B,
+ * opening its final state, and removal.
  * A fresh browser context starts with an empty IndexedDB, so the gate owns the
  * whole store.
  *
  *   node tools/verify-history.mjs [url]
  */
 import assert from "node:assert/strict";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright";
 
 const base = process.argv[2] || "http://127.0.0.1:5174/";
@@ -111,10 +113,29 @@ try {
   const file = await download;
   assert.match(file.suggestedFilename(), /^openavida-.*\.json$/, "the manifest downloads as JSON");
   const manifestPath = await file.path();
-  const manifest = JSON.parse((await import("node:fs")).readFileSync(manifestPath, "utf8"));
+  const manifestText = readFileSync(manifestPath, "utf8");
+  const manifest = JSON.parse(manifestText);
   assert.equal(manifest.manifestVersion, 1, "the exported manifest carries its version");
   assert.ok(manifest.run.replicates >= 2, "the exported manifest carries the replicate plan");
   assert.ok(manifest.engine?.version, "the exported manifest carries the engine identity");
+
+  // --- manifest import ------------------------------------------------------
+  const importedPath = "scratch/history-manifest.json";
+  mkdirSync("scratch", { recursive: true });
+  writeFileSync(importedPath, manifestText);
+  await page.locator("#manifest-file").setInputFiles(importedPath);
+  await page.waitForFunction(() => document.querySelector("#manifest-note")?.hidden === false, null, { timeout: 20000 });
+  const note = (await page.locator("#manifest-note").textContent()) ?? "";
+  assert.match(note, /Manifeste importé/, "the banner announces the imported manifest");
+  assert.ok(note.includes(manifest.name), "the banner names the imported run");
+  assert.ok(note.includes(manifest.paramsDigest), "the banner quotes the parameter digest");
+
+  // Launch order makes the first row the manifest's own first replicate; the DOM seed field no longer decides.
+  await page.locator("#goal-sort").selectOption("launch");
+  await page.locator("#btn-goal-run").click();
+  await page.waitForFunction((n) => document.querySelectorAll("#goal-results tbody tr").length >= n, manifest.run.replicates, { timeout: 60000 });
+  const importedFirstSeed = (await page.locator("#goal-results tbody tr td.seed").first().textContent())?.trim();
+  assert.equal(importedFirstSeed, String(manifest.run.seed), "the run follows the imported manifest seed");
 
   // --- replay into world B --------------------------------------------------
   const firstSeed = manifest.run.seed;
@@ -139,9 +160,9 @@ try {
   assert.match(await page.locator("#history-body").textContent(), /Aucune course conservée/, "removing every run restores the empty state");
   assert.deepEqual(errors, [], `page errors: ${errors.join(" | ")}`);
   console.log(
-    JSON.stringify({ runs: 2, comparisons: true, paintedPixels: painted, manifestReplicates: manifest.run.replicates, errors: errors.length }, null, 1),
+    JSON.stringify({ runs: 2, comparisons: true, paintedPixels: painted, manifestReplicates: manifest.run.replicates, importedSeed: importedFirstSeed, errors: errors.length }, null, 1),
   );
-  console.log("History verified: kept runs, comparison table with intervals and effects, overlaid curves, persisted notes, manifest export, replay into B, stored final state, removal.");
+  console.log("History verified: kept runs, comparison table with intervals and effects, overlaid curves, persisted notes, manifest export and import round-trip, replay into B, stored final state, removal.");
 } finally {
   await browser.close();
 }

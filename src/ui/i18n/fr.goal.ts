@@ -207,6 +207,16 @@ export const GOAL_FR = {
   "goal.restore.note": "{count} réplicats · course du {when} restaurée · depuis {label}",
   "goal.restore.status": "Dernière course restaurée ({count} réplicats depuis {label}, {when}) : tableau, tri et rejeu disponibles.",
 
+  /* imported manifest -------------------------------------------------- */
+  "btn.manifestImport": "Importer un manifeste",
+  "goal.manifest.note": "<b>Manifeste importé</b> · {name} · {replicates} réplicats · {goals} objectifs · <span class=\"mono\">{digest}</span>{drift}<br>Le prochain lancement suit l’état de départ, les objectifs et les paramètres du manifeste ; les champs de configuration ci-dessus sont ignorés.",
+  "goal.manifest.loaded": "Manifeste « {name} » importé : {replicates} réplicats, {goals} objectifs.",
+  "goal.manifest.invalid": "Manifeste illisible ou invalide : {reason}",
+  "goal.manifest.launched": "{reps} réplicats lancés depuis le manifeste « {name} » : {goals}.{clamp}",
+  "goal.manifest.clamped": " Plafond de {limit} réplicats : {reps} conservés.",
+  "goal.manifest.clear": "Revenir à la configuration du panneau",
+  "goal.manifest.cleared": "Manifeste retiré : la configuration du panneau reprend la main.",
+
   /* run journal ---------------------------------------------------------- */
   "goal.history.title": "HISTORIQUE DES COURSES",
   "goal.history.hint": "Les courses conservées restent dans le navigateur. Cochez-en deux à quatre pour comparer taux de réussite, médiane et effet contre la référence (la première cochée). « Manifeste » exporte la course pour le lanceur sans interface.",

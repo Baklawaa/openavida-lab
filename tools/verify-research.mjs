@@ -5,9 +5,10 @@
  * src/sim/params.ts (one control per parameter, spec bounds, only edited values
  * sent, per-world targeting, defaults, the legacy profile, clamping), and
  * Analyse -> Recherche is checked for its four readouts, the single-strain
- * lineage fallback and the neutral-drift count. Everything runs in both hosts:
- * a mirror that silently stops updating a readout is a bug this gate exists to
- * catch.
+ * lineage fallback and the neutral-drift count. The Expérience event toggle is
+ * switched on and the research-event count compared, so the worker mirror must
+ * stream the per-organism log too. Everything runs in both hosts: a mirror that
+ * silently stops updating a readout is a bug this gate exists to catch.
  *
  *   node tools/verify-research.mjs [url]
  */
@@ -134,11 +135,20 @@ async function run(mode) {
   assert.ok(neutral > 0, `${mode}: neutral substitutions were recorded (${neutral})`);
   const shownCount = Number((card.match(/(\d+)\s+substitution/) ?? [])[1] ?? NaN);
   assert.equal(shownCount, neutral, `${mode}: the card reports the live neutral log (${shownCount} vs ${neutral})`);
+
+  // --- Expérience -> Données: the research event log reaches the probe ------
+  await page.locator("#tab-experiment").click();
+  await page.locator("#opt-events").click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.locator("#opt-events input").isChecked(), true, `${mode}: the event toggle is on`);
+  await page.evaluate(() => window.__openavidaStep(40));
+  const researchEvents = await page.evaluate(() => window.__openavida.researchEvents);
+  assert.ok(researchEvents > 0, `${mode}: research events reach the mirror (${researchEvents})`);
   assert.deepEqual(errors, [], `${mode}: page errors`);
 
   const probe = await page.evaluate(() => window.__openavida);
   await page.close();
-  return { mode, population: probe.population, tick: probe.tick, neutral };
+  return { mode, population: probe.population, tick: probe.tick, neutral, researchEvents };
 }
 
 try {
@@ -147,8 +157,9 @@ try {
   console.log(JSON.stringify({ inline, worker }, null, 1));
   assert.equal(worker.population, inline.population, "both hosts hold the same population");
   assert.equal(worker.neutral, inline.neutral, "both hosts record the same neutral substitutions");
+  assert.equal(worker.researchEvents, inline.researchEvents, "both hosts record the same research events");
   console.log(
-    `Research interfaces verified: ${KEYS.length} parameter controls, targeting, defaults, legacy profile and clamping in both hosts; research card with ${inline.neutral} neutral substitutions, identical inline and in the worker.`,
+    `Research interfaces verified: ${KEYS.length} parameter controls, targeting, defaults, legacy profile and clamping in both hosts; research card with ${inline.neutral} neutral substitutions and ${inline.researchEvents} research events, identical inline and in the worker.`,
   );
 } finally {
   await browser.close();

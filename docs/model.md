@@ -500,7 +500,6 @@ A step fits the 60 fps budget on the canonical world.
 ## 13. Known limits
 
 <!-- generated:limits -->
-- **Worker mode does not stream the research event log.** The mirror receives fields, organisms, history and the neutral log, but not the per-organism research log, so the JSON Lines export is empty under ?worker=1. The headless runner is the supported path for recorded events. (`src/sim/simHost.ts WorldFrame`)
 - **The interface has no manifest import.** A manifest can be exported from the Expérience panel and replayed by the headless runner or stored runs, but a .json manifest cannot be loaded back into the interface. (`src/ui/goalPanel.ts, src/sim/manifest.ts`)
 - **Binary snapshot files are not wired to the interface.** snapshotBin.ts encodes and decodes the OAV2 container, and the timeline stores encoded buffers, but the export button still writes JSON. (`src/sim/snapshotBin.ts, src/ui/goalPanel.ts`)
 - **Profil v1 only approximates engine-v1.** The legacy profile restores senescence 0, regulation off, no recombination, no exudate, no genome costs, 8 meals per tick and light diffusion 0.22. The meal budget and the decoder differ, so results are close but not hash-identical: use the tag engine-v1 for bit-reproducing pre-upgrade results. (`src/ui/modelPanel.ts LEGACY_V1_PROFILE`)

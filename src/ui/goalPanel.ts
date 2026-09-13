@@ -27,6 +27,7 @@ import {
   engineInfo,
   startSnapshot,
   makeManifest,
+  validateManifest,
   worldFromSnapshot,
   type FieldName,
   type Goal,
@@ -44,7 +45,7 @@ import {
   type WorldSnapshot,
 } from "../sim/index";
 import { runReplicates, type RunHandle } from "./goalRunner";
-import { recordFromRun, historyRows, type ExperimentRecord } from "./experimentHistory";
+import { engineDrift, historyRows, recordFromRun, type ExperimentRecord } from "./experimentHistory";
 import { FIELD_LABEL } from "./labels";
 import { buildReportHtml } from "./report";
 import { TRAIT_LABEL } from "./labels";
@@ -256,6 +257,7 @@ function template(): string {
           <label class="goal-check"><input id="goal-disturb" type="checkbox"> ${tDynamic("goal.config.disturbances")}</label>
         </div>
         <p class="micro">${tDynamic("goal.config.hint")}</p>
+        <div id="manifest-note" class="goal-manifest-note replay-info" hidden></div>
         <div class="row"><button type="button" id="btn-goal-run" class="primary">${icon("play")}${tDynamic("goal.run.start")}</button><button type="button" id="btn-goal-stop" disabled>${tDynamic("goal.run.stop")}</button><button type="button" id="btn-goal-csv" class="quiet" disabled>${icon("save")}CSV</button></div>
         <div class="row"><button type="button" id="btn-goal-det">${tDynamic("goal.run.determinism")}</button><span id="goal-det-result" class="micro"></span></div>
         <div id="goal-progress" class="goal-progress"></div>
@@ -337,6 +339,8 @@ export class GoalPanel {
   private tournamentPickKey = "";
   /** Start state and configs of the last run or sweep, for exact replays. */
   private lastRun: { snapshot: WorldSnapshot; label: string; configs: TrialConfig[] } | null = null;
+  /** Manifest loaded from a file: while set, it specifies the next run and is returned by manifest(). */
+  private imported: Manifest | null = null;
   private lastStrains: Strain[] = [];
   private lastMetricKey = "";
   private sweepPoints: SweepPoint[] = [];
@@ -562,44 +566,133 @@ export class GoalPanel {
     return { snapshot: rec.snapshot, label: rec.name };
   }
 
+  /* ---------- imported manifest ---------- */
+
+  /**
+   * The import controls live in the data row of layout.ts, outside the panel
+   * root but inside the same tab panel. Missing controls (a bare panel in a
+   * test) simply leave the wiring unbound instead of throwing.
+   */
+  private sectionEl<T extends HTMLElement>(sel: string): T | null {
+    const scope = this.root.closest<HTMLElement>("#panel-experiment");
+    return (scope ?? this.root.ownerDocument).querySelector<T>(sel);
+  }
+
+  /**
+   * Adopt a manifest as the specification of the next run; the configuration
+   * fields are ignored until it is cleared. Errors are reported, never thrown.
+   */
+  async loadManifest(text: string): Promise<void> {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text) as unknown;
+    } catch (err) {
+      this.opts.status(tDynamic("goal.manifest.invalid", { reason: err instanceof Error ? err.message : String(err) }));
+      return;
+    }
+    const { manifest, errors } = validateManifest(raw);
+    if (!manifest) {
+      this.opts.status(tDynamic("goal.manifest.invalid", { reason: errors[0]! }));
+      return;
+    }
+    this.imported = manifest;
+    this.renderManifestNote();
+    this.opts.status(tDynamic("goal.manifest.loaded", { name: manifest.name, replicates: manifest.run.replicates, goals: manifest.goals.length }));
+  }
+
+  /** Banner above the run buttons: what the manifest holds, and any engine drift. */
+  private renderManifestNote(): void {
+    const box = this.q("#manifest-note");
+    const manifest = this.imported;
+    if (!manifest) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    const drift = engineDrift(manifest.engine, engineInfo());
+    box.innerHTML = tDynamic("goal.manifest.note", {
+      name: escapeGoalHtml(manifest.name),
+      replicates: manifest.run.replicates,
+      goals: manifest.goals.length,
+      digest: escapeGoalHtml(manifest.paramsDigest),
+      drift: drift ? ` · <span class="warn">${drift}</span>` : "",
+    }) + `<div class="row"><button type="button" id="btn-manifest-clear">${tDynamic("goal.manifest.clear")}</button></div>`;
+    box.hidden = false;
+  }
+
+  /** Drop the imported manifest: the panel's own configuration drives runs again. */
+  private clearManifest(): void {
+    if (!this.imported) return;
+    this.imported = null;
+    this.renderManifestNote();
+    this.refresh();
+    this.opts.status(tDynamic("goal.manifest.cleared"));
+  }
+
+  /** A run needs organisms to evolve: report and refuse an empty start world. */
+  private refuseEmptyStart(snapshot: WorldSnapshot): boolean {
+    if (snapshot.organisms.length > 0) return false;
+    this.opts.status(tDynamic("goal.status.emptyStart"));
+    return true;
+  }
+
   /* ---------- runs ---------- */
 
   private async run(): Promise<void> {
     if (this.handle) return;
-    const goals = this.currentGoals();
+    const imported = this.imported;
+    const goals = imported ? imported.goals : this.currentGoals();
     const goal = goals?.[0] ?? null;
     if (!goal || !goals) {
       this.opts.status(tDynamic("goal.status.incomplete"));
       return;
     }
-    const start = await this.startSnapshot();
-    if (!start) return;
-    if (start.snapshot.organisms.length === 0) {
-      this.opts.status(tDynamic("goal.status.emptyStart"));
-      return;
+    let snapshot: WorldSnapshot;
+    let label: string;
+    let configs: TrialConfig[];
+    let maxTicks: number;
+    let clampNote = "";
+    if (imported) {
+      // An imported manifest is authoritative: the configuration fields above are ignored.
+      snapshot = startSnapshot(imported);
+      if (this.refuseEmptyStart(snapshot)) return;
+      label = imported.name;
+      const reps = Math.max(1, Math.min(MAX_REPLICATES, Math.round(imported.run.replicates)));
+      if (reps < imported.run.replicates) {
+        clampNote = tDynamic("goal.manifest.clamped", { limit: MAX_REPLICATES, reps });
+      }
+      configs = configsForManifest(reps < imported.run.replicates ? { ...imported, run: { ...imported.run, replicates: reps } } : imported);
+      maxTicks = configs[0]?.maxTicks ?? imported.run.maxTicks;
+    } else {
+      const start = await this.startSnapshot();
+      if (!start) return;
+      snapshot = start.snapshot;
+      if (this.refuseEmptyStart(snapshot)) return;
+      label = start.label;
+      const reps = Math.max(1, Math.min(MAX_REPLICATES, Math.round(Number(this.q<HTMLInputElement>("#goal-reps").value) || 1)));
+      maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
+      const seed = parseSeed(this.q<HTMLInputElement>("#goal-seed").value);
+      if (seed === null) {
+        this.opts.status(SEED_HINT);
+        this.q("#goal-seed").focus();
+        return;
+      }
+      const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
+      const maxPopulation = Math.max(16, Math.round(Number(this.q<HTMLInputElement>("#goal-popmax").value) || 16));
+      const disturbances = this.q<HTMLInputElement>("#goal-disturb").checked;
+      const sampleEvery = Math.max(1, Math.round(maxTicks / 80));
+      configs = replicateSeeds(seed, reps).map((s, i) => ({
+        seed: s,
+        maxTicks,
+        sampleEvery,
+        overrides: { mutationRate, maxPopulation, disturbances },
+        keepSnapshot: i < 8,
+      }));
     }
-    const reps = Math.max(1, Math.min(MAX_REPLICATES, Math.round(Number(this.q<HTMLInputElement>("#goal-reps").value) || 1)));
-    const maxTicks = Math.max(10, Math.round(Number(this.q<HTMLInputElement>("#goal-max").value) || 100));
-    const seed = parseSeed(this.q<HTMLInputElement>("#goal-seed").value);
-    if (seed === null) {
-      this.opts.status(SEED_HINT);
-      this.q("#goal-seed").focus();
-      return;
-    }
-    const mutationRate = Math.max(0, Math.min(1, Number(this.q<HTMLInputElement>("#goal-mut").value)));
-    const maxPopulation = Math.max(16, Math.round(Number(this.q<HTMLInputElement>("#goal-popmax").value) || 16));
-    const disturbances = this.q<HTMLInputElement>("#goal-disturb").checked;
-    const sampleEvery = Math.max(1, Math.round(maxTicks / 80));
-    const configs: TrialConfig[] = replicateSeeds(seed, reps).map((s, i) => ({
-      seed: s,
-      maxTicks,
-      sampleEvery,
-      overrides: { mutationRate, maxPopulation, disturbances },
-      keepSnapshot: i < 8,
-    }));
+    const reps = configs.length;
     this.lastGoal = goal;
     this.lastGoals = goals;
-    this.lastRun = { snapshot: start.snapshot, label: start.label, configs };
+    this.lastRun = { snapshot, label, configs };
     this.results = new Array(reps);
     this.progress = new Array(reps).fill(0);
     this.q<HTMLButtonElement>("#btn-goal-run").disabled = true;
@@ -611,11 +704,14 @@ export class GoalPanel {
     this.q("#goal-summary").innerHTML = "";
     this.q("#goal-results").innerHTML = "";
     this.renderProgress(maxTicks);
-    this.opts.status(tDynamic("goal.status.launched", { reps, label: start.label, goals: goals.map((g, i) => `${goals.length > 1 ? `${i + 1}. ` : ""}${describeGoal(g, this.lastStrains)}`).join(" · ") }));
+    const goalList = goals.map((g, i) => `${goals.length > 1 ? `${i + 1}. ` : ""}${describeGoal(g, this.lastStrains)}`).join(" · ");
+    this.opts.status(imported
+      ? tDynamic("goal.manifest.launched", { reps, name: label, goals: goalList, clamp: clampNote })
+      : tDynamic("goal.status.launched", { reps, label, goals: goalList }));
     const t0 = performance.now();
-    this.handle = runReplicates(start.snapshot, goals.length === 1 ? goal : goals, configs, {
+    this.handle = runReplicates(snapshot, goals.length === 1 ? goal : goals, configs, {
       onProgress: (i, tick) => {
-        this.progress[i] = tick - start.snapshot.tick;
+        this.progress[i] = tick - snapshot.tick;
         this.scheduleRender(maxTicks, false);
       },
       onResult: (i, r) => {
@@ -1146,6 +1242,7 @@ export class GoalPanel {
    * nothing has run yet. The headless runner consumes it unchanged.
    */
   manifest(): Manifest | null {
+    if (this.imported) return this.imported;
     if (!this.lastRun || this.lastGoals.length === 0) return null;
     const config = this.lastRun.configs[0];
     return makeManifest({
@@ -1500,6 +1597,23 @@ export class GoalPanel {
     this.q("#btn-goal-csv").addEventListener("click", () => this.exportCsv());
     this.q("#btn-goal-report").addEventListener("click", () => void this.exportReport());
     this.q("#btn-goal-keep").addEventListener("click", () => void this.keepLastRun());
+    this.q("#manifest-note").addEventListener("click", (ev) => {
+      if ((ev.target as HTMLElement).closest("#btn-manifest-clear")) this.clearManifest();
+    });
+    const manifestFile = this.sectionEl<HTMLInputElement>("#manifest-file");
+    this.sectionEl<HTMLButtonElement>("#btn-manifest-import")?.addEventListener("click", () => manifestFile?.click());
+    manifestFile?.addEventListener("change", async (ev) => {
+      const input = ev.target as HTMLInputElement;
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        await this.loadManifest(await file.text());
+      } catch (err) {
+        this.opts.status(tDynamic("goal.manifest.invalid", { reason: err instanceof Error ? err.message : String(err) }));
+      } finally {
+        input.value = "";
+      }
+    });
     const historyBody = this.q("#history-body");
     historyBody.addEventListener("click", (ev) => {
       const target = ev.target as HTMLElement;

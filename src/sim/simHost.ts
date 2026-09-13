@@ -22,7 +22,7 @@ import type { TimelineMeta } from "./timeline";
 import type { EventFlags, WorldEvent } from "./events";
 import { OccupancyHeat } from "./heat";
 import type { Innovation, Strain } from "./species";
-import { DEATH_LOG_KEEP, DEATH_LOG_MAX } from "./types";
+import { DEATH_LOG_KEEP, DEATH_LOG_MAX, RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX } from "./types";
 import { normalizeParams } from "./params";
 import type {
   BrushKind,
@@ -31,6 +31,7 @@ import type {
   LineageNode,
   MetricsSample,
   Organism,
+  ResearchEvent,
   SimParams,
   WorldSnapshot,
 } from "./types";
@@ -226,6 +227,9 @@ export interface WorldFrame {
   /** Neutral (fitness-free) substitutions with tick > neutralSince; all when neutralFull. */
   neutralLog: NeutralSubstitution[];
   neutralFull: boolean;
+  /** Research events with tick > eventLogSince; all when eventLogFull. */
+  eventLog: ResearchEvent[];
+  eventLogFull: boolean;
   lineages?: LineageNode[];
   lastStepMs: number;
   lastPredation: number;
@@ -254,6 +258,8 @@ export interface FrameOptions {
   deathsSince?: number;
   /** Send neutral substitutions with tick > neutralSince; -1 = everything. */
   neutralSince?: number;
+  /** Send research events with tick > eventLogSince; -1 = everything. */
+  eventLogSince?: number;
   lineages: boolean;
   innovations: boolean;
 }
@@ -295,6 +301,11 @@ export function frameFromWorld(w: World, which: Side, opts: FrameOptions): { fra
         ? w.neutralLog.map((e) => ({ ...e }))
         : w.neutralLog.filter((e) => e.tick > opts.neutralSince!).map((e) => ({ ...e })),
     neutralFull: opts.neutralSince === undefined || opts.neutralSince < 0,
+    eventLog:
+      opts.eventLogSince === undefined || opts.eventLogSince < 0
+        ? w.eventLog.map((e) => ({ ...e }))
+        : w.eventLog.filter((e) => e.tick > opts.eventLogSince!).map((e) => ({ ...e })),
+    eventLogFull: opts.eventLogSince === undefined || opts.eventLogSince < 0,
     lastStepMs: w.lastStepMs,
     lastPredation: w.lastPredation,
     lastExudate: w.lastExudate,
@@ -381,6 +392,19 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
     if (cut < w.neutralLog.length) w.neutralLog.splice(cut);
     w.neutralLog.push(...f.neutralLog);
     if (w.neutralLog.length > NEUTRAL_LOG_MAX) w.neutralLog.splice(0, w.neutralLog.length - NEUTRAL_LOG_MAX);
+  }
+  if (f.eventLogFull) w.eventLog = f.eventLog;
+  else if (f.eventLog.length) {
+    // Same rule as the neutral log: drop the mirror's rows from the first
+    // resent tick on, so a replayed segment cannot be counted twice.
+    const first = f.eventLog[0]!.tick;
+    let cut = w.eventLog.length;
+    while (cut > 0 && w.eventLog[cut - 1]!.tick >= first) cut--;
+    if (cut < w.eventLog.length) w.eventLog.splice(cut);
+    w.eventLog.push(...f.eventLog);
+    // Re-apply the source bound: the mirror must not grow past the window the
+    // authoritative world keeps.
+    if (w.eventLog.length > RESEARCH_LOG_MAX) w.eventLog.splice(0, w.eventLog.length - RESEARCH_LOG_KEEP);
   }
   if (f.lineages) w.lineages = new Map(f.lineages.map((l) => [l.id, l]));
   w.lastStepMs = f.lastStepMs;

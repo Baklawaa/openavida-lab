@@ -1,13 +1,32 @@
 /**
  * Headless experiment runner.
  *
- *   node dist-cli/openavida.mjs run <manifest.json> --out runs/x [--jobs N] [--resume] [--quiet]
+ *   node dist-cli/openavida.mjs run <manifest.json> --out runs/x [options]
  *   node dist-cli/openavida.mjs shard <manifest.json> --out runs/x --index i --count n
+ *
+ * Run overrides, folded into the payload before validation so the effective
+ * manifest — not the file's original values — is what the run directory records:
+ *   --replicates N    replicate count (run.replicates)
+ *   --seed N          first replicate seed (run.seed; replicate i uses N+i)
+ *   --max-ticks N     tick budget per replicate (run.maxTicks)
+ *   --sample-every N  metric sampling cadence (run.sampleEvery)
+ *   --events          record the research event stream (run.recordEvents)
+ *   --no-events       do not record it
+ *   --name "<text>"   replace the manifest name
+ *
+ * Runner flags:
+ *   --out <dir>          run directory (default: the manifest's directory/run)
+ *   --jobs N             shard processes (default 1)
+ *   --resume             keep the replicates already written
+ *   --progress-every N   one progress line every N replicates (0: none)
+ *   --quiet              print nothing but errors
+ *   --index i --count n  shard mode: which block of replicates this process runs
  *
  * Replicates are independent (each gets its own seed and its own world built
  * from the start snapshot), so sharding never changes a result and the merged
  * order is always the replicate order. Shards append one JSON line per result,
- * which makes --resume a matter of counting the lines already written.
+ * which makes --resume a matter of counting the lines already written; a resume
+ * refuses when the run-defining fields recorded in env.json have changed.
  *
  * Node-only: this file lives outside src/ so the browser build never sees it.
  */
@@ -26,8 +45,11 @@ export interface RunOptions {
   jobs?: number;
   resume?: boolean;
   quiet?: boolean;
+  /** Replicate cadence handed to forked shard children (0 or absent: no lines). */
+  progressEvery?: number;
   /** Run shards in this process even when a bundle exists (tests). */
   inline?: boolean;
+  /** Called after each replicate this process completes. */
   onProgress?: (done: number, total: number) => void;
 }
 
@@ -43,6 +65,27 @@ export interface RunReport {
 }
 
 type ShardOptions = RunOptions & { index: number; count: number };
+
+/** The run-defining fields a resume must find unchanged in env.json. */
+interface RunSignature {
+  replicates: number;
+  seed: number;
+  maxTicks: number;
+  sampleEvery: number;
+  recordEvents: boolean;
+}
+
+const SIGNATURE_FIELDS = ["replicates", "seed", "maxTicks", "sampleEvery", "recordEvents"] as const;
+
+function runSignature(manifest: Manifest): RunSignature {
+  return {
+    replicates: manifest.run.replicates,
+    seed: manifest.run.seed,
+    maxTicks: manifest.run.maxTicks,
+    sampleEvery: manifest.run.sampleEvery,
+    recordEvents: manifest.run.recordEvents === true,
+  };
+}
 
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, JSON.stringify(value, null, 2) + "\n");
@@ -91,16 +134,34 @@ export function runExperiment(manifest: Manifest, opts: RunOptions): RunReport {
   const configs = configsForManifest(manifest);
   const jobs = Math.max(1, Math.min(opts.jobs ?? 1, Math.max(1, configs.length)));
   const manifestPath = join(outDir, "manifest.json");
-  // Shard files are per-job-count: resuming into a different layout would
-  // merge incompatible files, so refuse instead of silently mixing them.
+  const signature = runSignature(manifest);
+  // Shard files are per-job-count, and the replicate plan defines what each
+  // line means: resuming into a different layout or plan would merge
+  // incompatible results, so refuse instead of silently mixing them.
   const envPath = join(outDir, "env.json");
   if (opts.resume && existsSync(envPath)) {
     try {
-      const previous = JSON.parse(readFileSync(envPath, "utf8")) as { jobs?: number };
+      const previous = JSON.parse(readFileSync(envPath, "utf8")) as {
+        jobs?: number;
+        signature?: Partial<RunSignature>;
+      };
       if (typeof previous.jobs === "number" && previous.jobs !== jobs) {
         throw new Error(
           `cannot resume: this run used --jobs ${previous.jobs}, now ${jobs}. Delete the run directory or use the original job count.`,
         );
+      }
+      // A run directory written before signatures existed still resumes.
+      const stored = previous.signature;
+      if (stored && typeof stored === "object") {
+        const changed = SIGNATURE_FIELDS.filter((key) => stored[key] !== signature[key]);
+        if (changed.length) {
+          const detail = changed
+            .map((key) => `${key} ${String(stored[key])} → ${String(signature[key])}`)
+            .join(", ");
+          throw new Error(
+            `cannot resume: the run signature changed (${detail}). Delete the run directory or use the original run settings.`,
+          );
+        }
       }
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("cannot resume")) throw err;
@@ -115,8 +176,11 @@ export function runExperiment(manifest: Manifest, opts: RunOptions): RunReport {
       const args = [bundle, "shard", manifestPath, "--out", outDir, "--index", String(i), "--count", String(jobs)];
       if (opts.resume) args.push("--resume");
       if (opts.quiet) args.push("--quiet");
+      // Children print the replicate lines; the parent reports shard completion.
+      if (opts.progressEvery) args.push("--progress-every", String(opts.progressEvery));
       const res = spawnSync(process.execPath, args, { stdio: "inherit" });
       if (res.status !== 0) throw new Error(`shard ${i} exited with ${res.status}`);
+      if (!opts.quiet) console.log(`shard ${i + 1}/${jobs} done`);
     }
   } else {
     if (jobs > 1 && !opts.quiet && !opts.inline) {
@@ -180,6 +244,7 @@ export function runExperiment(manifest: Manifest, opts: RunOptions): RunReport {
     host: hostname(),
     cpus: cpus().length,
     jobs,
+    signature,
     createdAt: new Date().toISOString(),
   });
 
@@ -195,14 +260,27 @@ export function runExperiment(manifest: Manifest, opts: RunOptions): RunReport {
   };
 }
 
+/** Flags that consume the next argument as their value; every other flag is boolean. */
+const VALUE_FLAGS = new Set([
+  "out",
+  "jobs",
+  "index",
+  "count",
+  "replicates",
+  "seed",
+  "max-ticks",
+  "sample-every",
+  "name",
+  "progress-every",
+]);
+
 function parseFlags(args: string[]): Record<string, string | boolean> {
   const flags: Record<string, string | boolean> = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     if (!arg.startsWith("--")) continue;
     const key = arg.slice(2);
-    const needsValue = ["out", "jobs", "index", "count"].includes(key);
-    if (!needsValue) {
+    if (!VALUE_FLAGS.has(key)) {
       flags[key] = true;
       continue;
     }
@@ -214,11 +292,61 @@ function parseFlags(args: string[]): Record<string, string | boolean> {
   return flags;
 }
 
+/** Run fields a flag may replace, as [flag, manifest key] pairs. */
+const RUN_OVERRIDES: ReadonlyArray<readonly [string, "replicates" | "seed" | "maxTicks" | "sampleEvery"]> = [
+  ["replicates", "replicates"],
+  ["seed", "seed"],
+  ["max-ticks", "maxTicks"],
+  ["sample-every", "sampleEvery"],
+];
+
+/**
+ * Fold the command-line overrides into the parsed payload before validation,
+ * so the runner validates — and records — the effective run rather than the
+ * values the manifest file happened to carry.
+ */
+function applyOverrides(raw: unknown, flags: Record<string, string | boolean>): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const payload = { ...(raw as Record<string, unknown>) };
+  const run = {
+    ...((payload.run && typeof payload.run === "object" ? payload.run : {}) as Record<string, unknown>),
+  };
+  for (const [flag, key] of RUN_OVERRIDES) {
+    const value = flags[flag];
+    if (typeof value !== "string") continue;
+    const n = Number(value);
+    if (!Number.isFinite(n)) throw new Error(`--${flag} expects a number (got "${value}")`);
+    run[key] = n;
+  }
+  if (flags.events === true) run.recordEvents = true;
+  if (flags["no-events"] === true) run.recordEvents = false;
+  if (typeof flags.name === "string") payload.name = flags.name;
+  payload.run = run;
+  return payload;
+}
+
 function printUsage(): void {
   console.log(`OpenAvida headless runner
 
-  openavida run <manifest.json> --out <dir> [--jobs N] [--resume] [--quiet]
-  openavida shard <manifest.json> --out <dir> --index i --count n [--resume]
+  openavida run <manifest.json> --out <dir> [options]
+  openavida shard <manifest.json> --out <dir> --index i --count n [options]
+
+Overrides — applied before validation; the effective manifest lands in the run directory:
+  --replicates N    replicate count
+  --seed N          first replicate seed (replicate i uses N+i)
+  --max-ticks N     tick budget per replicate
+  --sample-every N  metric sampling cadence
+  --events          record the research event stream
+  --no-events       do not record it
+  --name "<text>"   replace the manifest name
+
+Runner:
+  --out <dir>          run directory (default: <manifest dir>/run)
+  --jobs N             shard processes (default 1)
+  --resume             keep the replicates already written
+  --progress-every N   print a line every N completed replicates (0: none)
+  --quiet              print nothing but errors
+  --index i --count n  shard mode: this shard's index and shard count
 
 Outputs: manifest.json, results.jsonl, summary.json, metrics.csv,
 events.jsonl (when the manifest records events), env.json, shard-*.jsonl`);
@@ -240,6 +368,9 @@ export function main(argv: string[]): number {
     console.error("a manifest path is required");
     return 1;
   }
+  // Flags are parsed first: the overrides they carry are part of the payload
+  // validation sees, and of the manifest the run directory records.
+  const flags = parseFlags(rest.slice(1));
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -247,17 +378,38 @@ export function main(argv: string[]): number {
     console.error(`cannot read ${manifestPath}: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }
-  const { manifest, errors } = validateManifest(raw);
+  let payload: unknown;
+  try {
+    payload = applyOverrides(raw, flags);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    return 1;
+  }
+  const { manifest, errors } = validateManifest(payload);
   if (!manifest) {
     for (const error of errors) console.error(`manifest error: ${error}`);
     return 1;
   }
-  const flags = parseFlags(rest.slice(1));
   const outDir = typeof flags.out === "string" ? flags.out : join(dirname(resolve(manifestPath)), "run");
+  const progressEvery =
+    typeof flags["progress-every"] === "string"
+      ? Math.max(0, Math.floor(Number(flags["progress-every"]) || 0))
+      : 0;
   const common: RunOptions = {
     outDir,
     resume: flags.resume === true,
     quiet: flags.quiet === true,
+    progressEvery,
+    // No callback at all when progress is off or silenced: --quiet must leave
+    // stdout to errors only.
+    ...(progressEvery > 0 && flags.quiet !== true
+      ? {
+          onProgress: (done: number, total: number) => {
+            // The last line always prints, so a run never ends without a trace.
+            if (done % progressEvery === 0 || done === total) console.log(`replicate ${done}/${total}`);
+          },
+        }
+      : {}),
   };
   try {
     if (command === "shard") {
