@@ -55,6 +55,12 @@ export interface LabState {
   kit: string;
   /** Selected organism id, -1 when none. */
   selectedId: number;
+  /**
+   * Text of #inspect-pathways as last written by the feeds. The window probe
+   * reports it, and the pathway markup only moves on selection, so the app
+   * refreshes this on the UI cadence instead of reading the DOM every frame.
+   */
+  pathwaysText: string;
   /** Snapshot saved by the snapshot button. */
   snapshot: WorldSnapshot | null;
   /** performance.now() of the last throttled UI refresh. */

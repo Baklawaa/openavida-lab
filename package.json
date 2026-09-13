@@ -11,6 +11,7 @@
     "test": "vitest run",
     "baseline": "OPENAVIDA_UPDATE_BASELINE=1 vitest run tests/engine.test.ts",
     "docs": "OPENAVIDA_UPDATE_DOC=1 vitest run tests/modelDoc.test.ts",
+    "perf": "vite-node tools/perf.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "gates": "node tools/gates.mjs",

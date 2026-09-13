@@ -14,7 +14,7 @@ import { EXUDATE_FITNESS, EXUDATE_MAX, EXUDATE_UPTAKE_PER_UPTAKE, EXUDATE_YIELD,
 import { KIN_THRESHOLD, MASS_DECAY, MASS_HUNT_BONUS, MASS_KILL_AGGRESSION, MASS_MAINTENANCE, MASS_PER_KILL, MASS_SIZE_GAIN, MASS_TO_BREED, MEAL_BODY_BONUS, PREY_ATTRACTION, PREY_SENSE_RADIUS } from "../src/sim/body";
 import { ALPHABET, CODON_LEN, MAX_GENOME, MIN_GENOME, REG_CROSS, REG_MAX, REG_SELF, REG_WINDOW, START_CODON, STOP_CODONS } from "../src/sim/mapping";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX, LINEAGE_TOP_N, RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX, SNAPSHOT_VERSION } from "../src/sim/types";
-import { NEUTRAL_LOG_MAX } from "../src/sim/world";
+import { HISTORY_KEEP, HISTORY_MAX, NEUTRAL_LOG_MAX } from "../src/sim/world";
 import { EVENT_LOG_MAX, EVENT_WINDOW } from "../src/sim/events";
 import { HEAT_STEPS, TRAIL_LENGTH } from "../src/sim/heat";
 import { DEFAULT_TIMELINE_BUDGET, DEFAULT_TIMELINE_EVERY } from "../src/sim/timeline";
@@ -25,10 +25,11 @@ import { MANIFEST_VERSION } from "../src/sim/manifest";
 import { HASH_ALGO, ENGINE_VERSION, MODEL_REVISION, engineInfo } from "../src/sim/engine";
 import { PARAM_SPEC } from "../src/sim/params";
 import { DEFAULT_OVERLAY_ALPHA, EXUDATE_OVERLAY_ALPHA, OVERLAY_GAMMA } from "../src/render/overlay";
+import { HISTORY_CURVES, HISTORY_RESULTS_CAP } from "../src/ui/experimentHistory";
 
 /* ------------------------------------------------------------------ markers */
 
-export const SECTION_IDS = ["identity", "params", "constants", "revisions", "calibration", "limits"] as const;
+export const SECTION_IDS = ["identity", "params", "constants", "revisions", "calibration", "limits", "memory"] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export function beginMarker(id: SectionId): string {
@@ -81,6 +82,17 @@ export interface LimitEntry {
   source: string;
 }
 
+export interface MemoryBoundEntry {
+  /** The structure that grows with the run. */
+  structure: string;
+  /** What one retained item holds. */
+  holds: string;
+  /** The bound, built from the constants that define it at render time. */
+  bound: string;
+  /** Where the bound is applied. */
+  enforcedIn: string;
+}
+
 const num = (v: number): string => String(v);
 
 /**
@@ -118,6 +130,7 @@ export const MODEL_CONSTANTS: readonly ConstantEntry[] = [
   { group: "Regulation", name: "REG_CROSS", value: num(REG_CROSS), source: "src/sim/mapping.ts", note: "Amplification per upstream codon of the most frequent other trait." },
   { group: "Regulation", name: "REG_MAX", value: num(REG_MAX), source: "src/sim/mapping.ts", note: "Cap on the regulatory multiplier." },
   { group: "Logs and bounds", name: "LINEAGE_TOP_N", value: num(LINEAGE_TOP_N), source: "src/sim/types.ts", note: "Living lineages stored per history row, for the lineage-level selection readout." },
+  { group: "Logs and bounds", name: "HISTORY_MAX / KEEP", names: ["HISTORY_MAX", "HISTORY_KEEP"], value: `${HISTORY_MAX} / ${HISTORY_KEEP}`, source: "src/sim/world.ts", note: "Metrics samples are trimmed to KEEP once they pass MAX, so the history stays bounded on long runs." },
   { group: "Logs and bounds", name: "DEATH_LOG_MAX / KEEP", names: ["DEATH_LOG_MAX", "DEATH_LOG_KEEP"], value: `${DEATH_LOG_MAX} / ${DEATH_LOG_KEEP}`, source: "src/sim/types.ts", note: "Death records are trimmed to KEEP once they pass MAX." },
   { group: "Logs and bounds", name: "RESEARCH_LOG_MAX / KEEP", names: ["RESEARCH_LOG_MAX", "RESEARCH_LOG_KEEP"], value: `${RESEARCH_LOG_MAX} / ${RESEARCH_LOG_KEEP}`, source: "src/sim/types.ts", note: "Per-organism research events, same trimming rule." },
   { group: "Logs and bounds", name: "NEUTRAL_LOG_MAX", value: num(NEUTRAL_LOG_MAX), source: "src/sim/world.ts", note: "Hue-only substitutions kept for the molecular clock." },
@@ -135,6 +148,56 @@ export const MODEL_CONSTANTS: readonly ConstantEntry[] = [
   { group: "Rendering", name: "OVERLAY_GAMMA", value: num(OVERLAY_GAMMA), source: "src/render/overlay.ts", note: "Contrast applied before the overlay field becomes a byte." },
   { group: "Rendering", name: "DEFAULT_OVERLAY_ALPHA", value: num(DEFAULT_OVERLAY_ALPHA), source: "src/render/overlay.ts", note: "Alpha of the strain heat map." },
   { group: "Rendering", name: "EXUDATE_OVERLAY_ALPHA", value: num(EXUDATE_OVERLAY_ALPHA), source: "src/render/overlay.ts", note: "Alpha of the exudate layer, raised so a thin field is readable." },
+];
+
+/**
+ * Every structure that grows with the run and the constants that cap it. The
+ * bounds are interpolated from the imported constants, so raising a cap cannot
+ * leave §8 stale the way a hand-written list did.
+ */
+export const MEMORY_BOUNDS: readonly MemoryBoundEntry[] = [
+  {
+    structure: "`World.history`",
+    holds: "one `MetricsSample` per tick (population, diversity, trait distribution, lineage top list)",
+    bound: `${HISTORY_MAX} samples, trimmed to ${HISTORY_KEEP}`,
+    enforcedIn: "`src/sim/world.ts` `recordMetrics`; the worker mirror re-applies the same bound in `src/sim/simHost.ts`",
+  },
+  {
+    structure: "`World.deaths`",
+    holds: "death records with cause, age, genome and parent, for the death log and the explorer",
+    bound: `${DEATH_LOG_MAX} records, trimmed to ${DEATH_LOG_KEEP}`,
+    enforcedIn: "`src/sim/world.ts` `reap`",
+  },
+  {
+    structure: "`World.eventLog`",
+    holds: "research events (birth, death, meal, exudation, recombination, neutral) when `recordEvents` is on",
+    bound: `${RESEARCH_LOG_MAX} events, trimmed to ${RESEARCH_LOG_KEEP}`,
+    enforcedIn: "`src/sim/world.ts` `pushEvent`",
+  },
+  {
+    structure: "`World.neutralLog`",
+    holds: "hue-only substitutions kept for the molecular clock",
+    bound: `${NEUTRAL_LOG_MAX} substitutions`,
+    enforcedIn: "`src/sim/world.ts` `birth`",
+  },
+  {
+    structure: "`Timeline` ring",
+    holds: `encoded OAV2 snapshots taken every ${DEFAULT_TIMELINE_EVERY} ticks`,
+    bound: `${DEFAULT_TIMELINE_BUDGET / (1024 * 1024)} MB; the oldest entry after the origin is evicted first`,
+    enforcedIn: "`src/sim/timeline.ts` `Timeline.evict`",
+  },
+  {
+    structure: "`ExperimentRecord.results`",
+    holds: "stored `TrialResult` replicates per journal record (the summary keeps the full statistics)",
+    bound: `${HISTORY_RESULTS_CAP} replicates`,
+    enforcedIn: "`src/ui/experimentHistory.ts` `recordFromRun`",
+  },
+  {
+    structure: "`ExperimentRecord.curves`",
+    holds: "evenly sampled replicate curves per journal record, for the overlay chart",
+    bound: `${HISTORY_CURVES} curves`,
+    enforcedIn: "`src/ui/experimentHistory.ts` `sampleCurves`",
+  },
 ];
 
 export const REVISION_LOG: readonly RevisionEntry[] = [
@@ -280,26 +343,16 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
   },
   {
     id: "perf-budget",
-    claim: "A step fits the 60 fps budget on the canonical world.",
-    method: "tests/engine.test.ts perf world (128x128, 260 founders, seed 0xa7f31ab), 48 steps, ms per step.",
-    measured: "10.6 ms/step on the canonical world against a 16.67 ms target; 3.85 ms/step at about 74 organisms on a quiet machine.",
-    tolerance: "Below 16.67 ms/step.",
-    check: { kind: "test", file: "tests/engine.test.ts" },
-    source: "workbench.md, Stage 3 performance note",
+    claim: "A step fits the 60 fps budget on the canonical world, and the mature plate fits its own measured budget.",
+    method: "npx vite-node tools/perf.ts: three 128x128 scenarios on seed 0xa7f31ab with 50 measured steps each — canonical (260 founders, 48 warmup ticks), mature (180 founders, stepped to tick 400) and chemostat (dilutionRate 0.02, inflowNutrient 0.12, 400 warmup ticks).",
+    measured: "3.80 ms/step at 74 organisms on the canonical world (p95 3.99); 5.01 ms/step at 672 organisms on the mature plate (p95 5.30); 4.97 ms/step at 705 organisms in the chemostat (p95 5.39).",
+    tolerance: "Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).",
+    check: { kind: "test", file: "tests/perf.test.ts" },
+    source: "tools/perf.ts, tests/perf.test.ts",
   },
 ];
 
 export const LIMITS: readonly LimitEntry[] = [
-  {
-    gap: "The interface has no manifest import",
-    detail: "A manifest can be exported from the Expérience panel and replayed by the headless runner or stored runs, but a .json manifest cannot be loaded back into the interface.",
-    source: "src/ui/goalPanel.ts, src/sim/manifest.ts",
-  },
-  {
-    gap: "Binary snapshot files are not wired to the interface",
-    detail: "snapshotBin.ts encodes and decodes the OAV2 container, and the timeline stores encoded buffers, but the export button still writes JSON.",
-    source: "src/sim/snapshotBin.ts, src/ui/goalPanel.ts",
-  },
   {
     gap: "Profil v1 only approximates engine-v1",
     detail: "The legacy profile restores senescence 0, regulation off, no recombination, no exudate, no genome costs, 8 meals per tick and light diffusion 0.22. The meal budget and the decoder differ, so results are close but not hash-identical: use the tag engine-v1 for bit-reproducing pre-upgrade results.",
@@ -316,9 +369,9 @@ export const LIMITS: readonly LimitEntry[] = [
     source: "src/sim/fields.ts applyVentsAndDecay, tests/validation.test.ts",
   },
   {
-    gap: "The perf baseline is measured on a lightly populated world",
-    detail: "The canonical perf world loses organisms over its 48 steps, so the recorded ms/step does not describe a mature plate at the 1100-organism cap.",
-    source: "tests/engine.test.ts, workbench.md",
+    gap: "The perf budget is scenario-specific",
+    detail: "The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 670-780 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. No single scenario describes the 1100-organism cap.",
+    source: "tests/perf.test.ts, tools/perf.ts",
   },
 ];
 
@@ -442,6 +495,20 @@ function renderLimits(): string {
   return LIMITS.map((l) => `- **${l.gap}.** ${l.detail} (${code(l.source)})`).join("\n");
 }
 
+function renderMemory(): string {
+  const rows = MEMORY_BOUNDS.map((e) => [
+    e.structure,
+    escapeCell(e.holds),
+    escapeCell(e.bound),
+    e.enforcedIn,
+  ]);
+  return [
+    "What caps each structure that grows with the run, read from the constants themselves. A raised cap shows up here instead of leaving a hand-written list stale.",
+    "",
+    table(["Structure", "Holds", "Bound", "Enforced in"], rows),
+  ].join("\n");
+}
+
 const RENDERERS: Record<SectionId, () => string> = {
   identity: renderIdentity,
   params: renderParams,
@@ -449,6 +516,7 @@ const RENDERERS: Record<SectionId, () => string> = {
   revisions: renderRevisions,
   calibration: renderCalibration,
   limits: renderLimits,
+  memory: renderMemory,
 };
 
 export function renderSection(id: SectionId): string {

@@ -584,3 +584,34 @@ Third wave, one subagent. **No model change, and the rendered interface did not 
 - Three blocks stayed in `app.ts` for a good reason: `setTool`/`selectKit`/`showKit` (the pointer test asserts they are called there), `drawCharts` and the lineage-tree hit testing.
 - GATES: typecheck ok (both configs); vitest **288/288** (65 files); build ok; ten browser verifier runs OK; copy FR and EN byte-identical; baseline unchanged `e953dcdc`.
 
+
+## Upgrade Stage 11 (part 1) — the mature plate measured, hot paths fixed, bounds pinned (2026-09-14)
+
+First wave of stage 11, three subagents on disjoint files. **No model change: the perf hash stays `e953dcdc`.**
+
+### The measurement that was owed
+`tools/perf.ts` is now a scenario runner (`npm run perf`: canonical, mature, chemostat, snapshot/frame; warmup + 50 measured steps each; table + JSON out). Measured on this machine (darwin/arm64, node 26.5.0), reproduced twice:
+| Scenario | Population | Mean | p95 |
+| --- | --- | --- | --- |
+| canonical (260 founders, 48 warmup) | 74 | **3.80 ms/step** | 3.99 |
+| mature (180 founders, tick 400) | 672 | **5.01 ms/step** | 5.30 |
+| chemostat (dilution 0.02) | 705 | **4.97 ms/step** | 5.39 |
+
+So the sim holds 60 fps at maturity with room to spare (5 ms of a 16.67 ms budget): the step cost is dominated by the 16 384-cell field work, not by the organisms. `tests/perf.test.ts` now asserts budgets instead of only finiteness: canonical ≤ 16.67 ms (the 60 fps target), mature ≤ 12.9 and chemostat ≤ 12.4 (2.5× the slowest recorded run), each printing its numbers. The calibration record and `docs/model.md` carry the figures and the command that produced them, and the "lightly populated world" limit is gone.
+
+### The UI was the real hot spot
+The five inspected offenders are fixed, with a before/after bench in a throwaway happy-dom harness (`npx vitest run --config /private/tmp/oabench/vitest.config.mjs`, same command both sides):
+- **`paintFeeds` at 4 Hz rebuilt innerHTML for every feed unconditionally** → now keyed on a cheap signature (tick, population, deaths/events lengths, strains, selection, strain names) with `researchHtml` memoised: **1.97 ms → 0.0002 ms** when nothing changed (the bulk of the paused-frame win).
+- **`refreshMetrics` ran ~15 DOM writes plus a full population sort every frame** → `setText` writes only on change, the strongest organism is cached per tick, the probe's pathway string moves to the UI cadence: **0.71 → 0.60–0.65 ms/frame** (paused frame 1.02 → 0.71–0.79 ms).
+- **`drawCharts` re-mapped the whole history 4×/s** → early-return when the drawn key (tick, history length, population, lineages, extinctions, canvas boxes) is unchanged: ~0.04 ms/frame saved at the cadence.
+- **`OccupancyHeat` decayed every strain's 16 384-cell map per tick and `normalized()` allocated 64 KB per frame** → lazy `decay^(tick delta)` per map (WeakMap keyed by the array, so a frame-installed map starts current) and an optional output buffer the renderer now reuses: **zero allocations in the steady heat path**, with a test proving lazy decay equals the eager loop cell by cell.
+- Nothing visible moved: the copy goldens were **not regenerated** and still pass byte for byte, and the sim hash is unchanged (`tests/engine.test.ts` green).
+
+### Memory bounds are now enforced
+`tests/memory.test.ts` (6 tests, 6.4 s) pushes each growing structure past its ceiling: metrics history (trim window crossed directly, settles at exactly 3000 rows) with a **measured 818 bytes per row** with trait distributions on, death log, research event log, neutral log, and the timeline ring (byte budget respected after every one of 201 records, origin kept). `HISTORY_MAX`/`HISTORY_KEEP` are now exported constants used by both the world and the worker-mirror trim, and `docs/model.md` §8 gains a generated **memory bounds** table (new `memory` section) so the numbers and the enforcement cannot drift apart.
+
+### Docs truth
+The limit list no longer claims there is no manifest import and no binary export (Stage 9 fixed both). What remains is honest: `Profil v1` is not bit-identical to `engine-v1`, the 3D view has no exudate plane (Stage 12), and nutrient inflow is a source term by design.
+
+- GATES: typecheck ok (both configs); vitest **298/298** (66 files); build ok; ten browser verifier runs OK; copy FR/EN byte-identical; baseline unchanged `e953dcdc`.
+

@@ -63,9 +63,40 @@ export interface Feeds {
 
 export function createFeeds(ctx: LabContext): Feeds {
   const { root, state, dual, renderer } = ctx;
+  /** Signature of the last feed pass; paintFeeds runs at 4 Hz and most passes repeat it. */
+  let paintSignature = "";
+  /** Signature of the last research card, which reads fewer inputs than the whole panel. */
+  let researchSignature = "";
+  let researchCache = "";
+
+  /** Strain names are rendered by the research card, so a rename must reach the signature. */
+  function strainNames(w: World): string {
+    let names = "";
+    for (const s of w.strains.values()) names += `${s.id}:${s.name};`;
+    return names;
+  }
+
+  /** Cheap identity of everything the feed DOM is built from. */
+  function feedSignature(w: World): string {
+    return `${w.tick}|${w.organisms.length}|${w.deaths.length}|${w.events.length}|${w.strains.size}|${state.selectedId}|${strainNames(w)}`;
+  }
+
+  /**
+   * Inputs of the research card alone: it reads the history, the lineages, the
+   * strain names and the neutral log, never the death or event logs, so a
+   * repaint those trigger (the bottleneck op trims the population without a
+   * step) reuses the card instead of refitting every selection series.
+   */
+  function researchInputs(w: World): string {
+    return `${w.tick}|${w.history.length}|${w.organisms.length}|${w.strains.size}|${w.lineages.size}|${w.extinctions.length}|${w.neutralLog.length}|${strainNames(w)}`;
+  }
 
   function paintFeeds(): void {
     const w = ctx.viewWorld();
+    const signature = feedSignature(w);
+    // Nothing the panel draws from moved: keep the DOM exactly as it is.
+    if (signature === paintSignature) return;
+    paintSignature = signature;
     const board = root.querySelector("#leaderboard")!;
     const top = strongestLiving(w.organisms, 8);
     if (top.length === 0) {
@@ -84,7 +115,14 @@ export function createFeeds(ctx: LabContext): Feeds {
         .join("");
     }
     const research = root.querySelector("#research-body");
-    if (research) research.innerHTML = researchHtml(w);
+    if (research) {
+      const inputs = researchInputs(w);
+      if (inputs !== researchSignature) {
+        researchSignature = inputs;
+        researchCache = researchHtml(w);
+      }
+      research.innerHTML = researchCache;
+    }
     const eventLog = root.querySelector("#event-log")!;
     const recentEvents = w.events.slice(-40).reverse();
     root.querySelector("#event-count")!.textContent = String(w.events.length);
@@ -148,6 +186,7 @@ export function createFeeds(ctx: LabContext): Feeds {
         pEl.innerHTML = "";
         genesEl.innerHTML = "";
         pwEl.innerHTML = "";
+        state.pathwaysText = "";
         brEl.innerHTML = "";
         ctx.browser.clear();
       }
@@ -164,6 +203,8 @@ export function createFeeds(ctx: LabContext): Feeds {
     genesEl.innerHTML = genesHtml(track);
     const env = world.fields.sample(org.x, org.y);
     pwEl.innerHTML = pathwaysHtml(inspectBiochem(decoded, env, org));
+    // The probe reports this text; cache it here so no frame has to read the DOM.
+    state.pathwaysText = pwEl.textContent ?? "";
     brEl.innerHTML = tracesHtml(world.brain?.traces ?? [], org.id);
     if (shouldWriteEditor(reason)) ctx.dna.load(org.genome);
     ctx.browser.setSequence(org.genome);

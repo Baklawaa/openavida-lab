@@ -227,6 +227,8 @@ export class LabRenderer {
   private plateB: WebGLTexture;
   private rgba: Uint8Array;
   private plate: Uint8Array;
+  /** Reusable normalised buffer for the strain heat overlay. */
+  private heatScratch = new Float32Array(0);
 
   fieldMode: FieldMode = 0;
   view: ViewMode = "A";
@@ -289,6 +291,16 @@ export class LabRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return t;
+  }
+
+  /**
+   * Buffer the app normalises a strain heat map into. Reused across frames so a
+   * steady heat frame allocates nothing; the exudate overlay keeps its own.
+   */
+  heatBuffer(width: number, height: number): Float32Array {
+    const n = width * height;
+    if (this.heatScratch.length !== n) this.heatScratch = new Float32Array(n);
+    return this.heatScratch;
   }
 
   resize(cssW: number, cssH: number): void {

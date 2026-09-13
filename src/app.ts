@@ -73,6 +73,7 @@ export function mount(root: HTMLElement): void {
     tool: "place" as LabTool,
     kit: "phototroph",
     selectedId: -1,
+    pathwaysText: "",
     snapshot: null,
     lastUi: 0,
     flags,
@@ -148,6 +149,22 @@ export function mount(root: HTMLElement): void {
 
   function status(msg: string): void {
     (root.querySelector("#status-line") as HTMLElement).textContent = msg;
+  }
+
+  /**
+   * Write a metric node only when its string changed. refreshMetrics runs every
+   * frame and most frames repeat the previous tick; an unchanged write still
+   * costs a style invalidation, so the compare pays for itself.
+   */
+  function setText(id: string, value: string): void {
+    const node = document.getElementById(id);
+    if (node && node.textContent !== value) node.textContent = value;
+  }
+
+  /** Same for the boolean `hidden` flag, which refreshMetrics rewrites per frame. */
+  function setHidden(id: string, hidden: boolean): void {
+    const node = document.getElementById(id);
+    if (node && node.hidden !== hidden) node.hidden = hidden;
   }
 
   // The context every lab module works through. Fields are filled in as the
@@ -404,14 +421,30 @@ export function mount(root: HTMLElement): void {
 
   /** Rows drawn by the last phylogeny pass, in CSS pixels: what a click or hover on #chart-phy resolves against. */
   let phyHits: PhylogenyHit[] = [];
+  /** World and key of the last chart pass, so a paused lab does not re-map its history at 4 Hz. */
+  let chartWorld: World | null = null;
+  let chartKey = "";
   function drawCharts(): void {
     if (root.classList.contains("charts-collapsed") && !root.classList.contains("wide-workspace")) return;
     const w = viewWorld();
-    const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
     const size = (c: HTMLCanvasElement) => [c.parentElement!.clientWidth - 28, Math.max(75, c.parentElement!.clientHeight - 42)] as const;
-    drawFitness(cFit, ...size(cFit), hist, w.schedule.map((s) => s.at));
-    drawShannon(cShan, ...size(cShan), hist);
-    phyHits = drawPhylogeny(cPhy, ...size(cPhy), w.lineages.values(), w.tick, renderer.highlightLineage);
+    const [fw, fh] = size(cFit);
+    const [sw, sh] = size(cShan);
+    const [pw, ph] = size(cPhy);
+    const marks = w.schedule.map((s) => s.at);
+    // Everything the three canvases draw from: the history they map, the
+    // phylogeny they lay out, the canvas boxes a resize changes, the pixel
+    // ratio a zoom changes, and the lineage the explorer highlights. When none
+    // of it moved, the previous pass is still on screen — hit rows included.
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const key = `${w.tick}|${w.history.length}|${w.organisms.length}|${w.lineages.size}|${w.extinctions.length}|${marks.join(",")}|${fw}x${fh}|${sw}x${sh}|${pw}x${ph}|${dpr}|${renderer.highlightLineage}`;
+    if (w === chartWorld && key === chartKey) return;
+    chartWorld = w;
+    chartKey = key;
+    const hist = w.history.length > 400 ? w.history.filter((_, i) => i % 4 === 0 || i > w.history.length - 80) : w.history;
+    drawFitness(cFit, fw, fh, hist, marks);
+    drawShannon(cShan, sw, sh, hist);
+    phyHits = drawPhylogeny(cPhy, pw, ph, w.lineages.values(), w.tick, renderer.highlightLineage);
   }
   cPhy.addEventListener("click", (ev) => {
     const hit = phylogenyHitAt(phyHits, ev.offsetX, ev.offsetY);
@@ -457,39 +490,38 @@ export function mount(root: HTMLElement): void {
     if (!(root.querySelector("#panel-experiment") as HTMLElement).hidden) goals.layout();
   }
 
+  /** Strongest living organism of the last selection pass, cached per world/tick/population. */
+  let topWorld: World | null = null;
+  let topTick = -1;
+  let topPopulation = -1;
+  let topFitness = 0;
+
   function refreshMetrics(): void {
     const live = current();
     const w = viewWorld();
     const last = w.history[w.history.length - 1];
-    const set = (id: string, v: string) => {
-      const n = document.getElementById(id);
-      if (n && n.textContent !== v) n.textContent = v;
-    };
     const activeWorld = live === dual.b ? "B" : "A";
-    set("chart-world", tDynamic("app.charts.world", { world: activeWorld }));
-    set("world-size", `${w.w} × ${w.h}`);
-    set("stage-label", state.view === "split" ? tDynamic("app.stage.side", { side: "A", count: dual.a.organisms.length, selected: activeWorld === "A" ? tDynamic("app.stage.selected") : "" }) : tDynamic("app.stage.world", { world: activeWorld }));
-    set("stage-label-b", tDynamic("app.stage.side", { side: "B", count: dual.b.organisms.length, selected: activeWorld === "B" ? tDynamic("app.stage.selected") : "" }));
-    (root.querySelector("#stage-label-b") as HTMLElement).hidden = state.view !== "split";
-    (root.querySelector("#empty-world") as HTMLElement).hidden = state.tool !== "place" || state.view === "split" || w.organisms.length > 0;
-    set("m-tick", String(w.tick));
-    set("m-pop", String(w.organisms.length));
-    set("m-lin", String(last?.lineageCount ?? 0));
-    set("m-h", (last?.shannon ?? 0).toFixed(3));
-    set("m-fit", (last?.meanFitness ?? 0).toFixed(3));
+    setText("chart-world", tDynamic("app.charts.world", { world: activeWorld }));
+    setText("world-size", `${w.w} × ${w.h}`);
+    setText("stage-label", state.view === "split" ? tDynamic("app.stage.side", { side: "A", count: dual.a.organisms.length, selected: activeWorld === "A" ? tDynamic("app.stage.selected") : "" }) : tDynamic("app.stage.world", { world: activeWorld }));
+    setText("stage-label-b", tDynamic("app.stage.side", { side: "B", count: dual.b.organisms.length, selected: activeWorld === "B" ? tDynamic("app.stage.selected") : "" }));
+    setHidden("stage-label-b", state.view !== "split");
+    setHidden("empty-world", state.tool !== "place" || state.view === "split" || w.organisms.length > 0);
+    setText("m-tick", String(w.tick));
+    setText("m-pop", String(w.organisms.length));
+    setText("m-lin", String(last?.lineageCount ?? 0));
+    setText("m-h", (last?.shannon ?? 0).toFixed(3));
+    setText("m-fit", (last?.meanFitness ?? 0).toFixed(3));
     const fix = last && last.fixationFraction >= 0.9 ? `${(last.fixationFraction * 100).toFixed(0)}%` : "—";
-    set("m-fix", fix);
-    set("m-ex", String(w.extinctions.length));
-    set("m-ms", `${w.lastStepMs.toFixed(2)}ms`);
-    const seedEl = document.getElementById("m-seed");
-    if (seedEl) {
-      seedEl.textContent = `seed 0x${w.params.seed.toString(16)} · ${w.w}×${w.h} · ${state.view}`;
-    }
+    setText("m-fix", fix);
+    setText("m-ex", String(w.extinctions.length));
+    setText("m-ms", `${w.lastStepMs.toFixed(2)}ms`);
+    setText("m-seed", `seed 0x${w.params.seed.toString(16)} · ${w.w}×${w.h} · ${state.view}`);
     if (state.selectedId >= 0) {
       const org = w.organisms.find((o) => o.id === state.selectedId);
       if (!org) {
         ctx.selectOrganism(w, -1);
-        root.querySelector("#inspect-meta")!.textContent = tDynamic("app.inspect.dead");
+        setText("inspect-meta", tDynamic("app.inspect.dead"));
       }
     }
     ctx.refreshTimeline();
@@ -498,30 +530,36 @@ export function mount(root: HTMLElement): void {
     if (now - state.lastUi > 250) {
       drawCharts();
       ctx.paintFeeds();
+      // The pathway markup only moves on selection, so the probe's copy is
+      // refreshed here — once per UI cadence — instead of read every frame.
+      state.pathwaysText = document.getElementById("inspect-pathways")?.textContent ?? "";
       if (state.selectedId >= 0) ctx.selectOrganism(w, state.selectedId, "refresh");
       species.refresh();
       goals.refresh();
       ctx.updatePlayback();
-      const note = document.getElementById("field-note");
-      if (note) {
-        const stats = renderer.fieldMode === 5 ? describeExudate(w) : null;
-        const parts = !stats
-          ? []
-          : stats.max <= 0
-            ? [tDynamic("render.exudate.empty")]
-            : [
-                tDynamic(stats.producers > 1 ? "render.exudate.producers.many" : "render.exudate.producers.one", { producers: stats.producers }),
-                tDynamic(stats.visible > 1 ? "render.exudate.cells.many" : "render.exudate.cells.one", { visible: stats.visible }),
-                tDynamic("render.exudate.totals", { max: stats.max.toFixed(3), total: stats.total.toFixed(2) }),
-              ];
-        note.textContent = parts.join(" · ");
-      }
+      const stats = renderer.fieldMode === 5 ? describeExudate(w) : null;
+      const parts = !stats
+        ? []
+        : stats.max <= 0
+          ? [tDynamic("render.exudate.empty")]
+          : [
+              tDynamic(stats.producers > 1 ? "render.exudate.producers.many" : "render.exudate.producers.one", { producers: stats.producers }),
+              tDynamic(stats.visible > 1 ? "render.exudate.cells.many" : "render.exudate.cells.one", { visible: stats.visible }),
+              tDynamic("render.exudate.totals", { max: stats.max.toFixed(3), total: stats.total.toFixed(2) }),
+            ];
+      setText("field-note", parts.join(" · "));
       state.lastUi = now;
     }
     const gl = state.surface === "3d" && view3d ? view3d.gl : renderer.gl;
     const lastDeath = w.deaths[w.deaths.length - 1];
-    const top = strongestLiving(w.organisms, 1)[0];
-    const pw = (document.getElementById("inspect-pathways") as HTMLElement | null)?.textContent ?? "";
+    // One selection pass per tick and per population change, not one sort per
+    // frame: the probe only needs the strongest living fitness.
+    if (w !== topWorld || w.tick !== topTick || w.organisms.length !== topPopulation) {
+      topWorld = w;
+      topTick = w.tick;
+      topPopulation = w.organisms.length;
+      topFitness = strongestLiving(w.organisms, 1)[0]?.fitness ?? 0;
+    }
     window.__openavida = {
       tick: w.tick,
       population: w.organisms.length,
@@ -537,14 +575,14 @@ export function mount(root: HTMLElement): void {
       world: activeWorld,
       deathCount: w.deaths.length,
       lastDeathCause: lastDeath?.cause ?? "",
-      topFit: top?.fitness ?? 0,
+      topFit: topFitness,
       builderGenes: dna.geneCount,
       surface: state.surface,
       view3d: state.flags.view3d,
       brains: state.flags.brains,
       llmBrains: state.flags.llmBrains,
       multiplayer: state.flags.multiplayer,
-      pathways: pw,
+      pathways: state.pathwaysText,
       brainTraces: w.brain?.traces.length ?? 0,
       roomPeers: state.room?.metrics.peers ?? 0,
       host: host.kind,
@@ -779,8 +817,12 @@ export function mount(root: HTMLElement): void {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const cssW = viz.clientWidth;
     const cssH = viz.clientHeight;
-    trailCanvas.width = Math.max(1, Math.round(cssW * dpr));
-    trailCanvas.height = Math.max(1, Math.round(cssH * dpr));
+    // Assigning width/height reallocates the canvas and resets its context, so
+    // a steady frame only clears it; the plate resize is what changes the size.
+    const pixelW = Math.max(1, Math.round(cssW * dpr));
+    const pixelH = Math.max(1, Math.round(cssH * dpr));
+    if (trailCanvas.width !== pixelW) trailCanvas.width = pixelW;
+    if (trailCanvas.height !== pixelH) trailCanvas.height = pixelH;
     const ctx = trailCanvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -803,6 +845,9 @@ export function mount(root: HTMLElement): void {
     }
   }
 
+  /** Which layer the renderer's heat colour was last set for: -1 none, -2 exudate, else strain id. */
+  const EXUDATE_LAYER = -2;
+  let heatColorId: number | null = -1;
   const exudateLayer = { data: new Float32Array(0) };
   /** Normalised exudate field for the layer overlay, in a reused buffer. */
   function exudateOverlay(w: World): Float32Array {
@@ -841,22 +886,32 @@ export function mount(root: HTMLElement): void {
       const shown = viewWorld();
       const a = state.preview && side === "A" ? state.preview : dual.a;
       const b = state.preview && side === "B" ? state.preview : dual.b;
-      renderer.heatSize = [shown.w, shown.h];
+      if (renderer.heatSize[0] !== shown.w || renderer.heatSize[1] !== shown.h) {
+        renderer.heatSize = [shown.w, shown.h];
+      }
       if (renderer.fieldMode === 5) {
         // Exudate layer: the fifth field normalised to its own maximum, drawn
         // through the same R8 overlay path as the strain heat map, at the
         // overlay alpha and gamma that make a thin field readable.
         renderer.heatStrain = exudateOverlay(shown);
-        renderer.heatColor = [0.72, 0.45, 1];
+        if (heatColorId !== EXUDATE_LAYER) {
+          heatColorId = EXUDATE_LAYER;
+          renderer.heatColor = [0.72, 0.45, 1];
+        }
         renderer.heatAlpha = EXUDATE_OVERLAY_ALPHA;
       } else {
         renderer.heatAlpha = DEFAULT_OVERLAY_ALPHA;
         const heatId = shown.heatStrainId;
-        renderer.heatStrain = heatId === null ? null : shown.heat.normalized(heatId);
-        const strain = heatId !== null ? shown.strains.get(heatId) : undefined;
-        if (strain) {
-          const n = parseInt(strain.color.slice(1), 16);
-          renderer.heatColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+        // The renderer owns the map buffer, so a steady heat frame allocates
+        // nothing; the colour only moves when the layer changes strain.
+        renderer.heatStrain = heatId === null ? null : shown.heat.normalized(heatId, renderer.heatBuffer(shown.w, shown.h));
+        if (heatId !== heatColorId) {
+          heatColorId = heatId;
+          const strain = heatId !== null ? shown.strains.get(heatId) : undefined;
+          if (strain) {
+            const n = parseInt(strain.color.slice(1), 16);
+            renderer.heatColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+          }
         }
       }
       renderer.draw(a, b, now / 1000);

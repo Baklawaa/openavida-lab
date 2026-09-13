@@ -68,6 +68,10 @@ import {
 /** Hue-only substitutions kept for the molecular clock. */
 export const NEUTRAL_LOG_MAX = 2000;
 
+/** Metrics history size: keep the last HISTORY_KEEP once it exceeds HISTORY_MAX. */
+export const HISTORY_MAX = 4000;
+export const HISTORY_KEEP = 3000;
+
 const BRUSH_TERRAIN: Partial<Record<BrushKind, TerrainKind>> = {
   barrier: TERRAIN.barrier,
   erase: TERRAIN.empty,
@@ -880,7 +884,7 @@ export class World {
     m.meanOffspringPerAdult = this.meanOffspringPerAdult();
     if (this.params.recordTraitDistribution) m.traitDist = traitDistribution(this.organisms);
     this.history.push(m);
-    if (this.history.length > 4000) this.history.splice(0, this.history.length - 3000);
+    if (this.history.length > HISTORY_MAX) this.history.splice(0, this.history.length - HISTORY_KEEP);
     return m;
   }
 

@@ -35,7 +35,7 @@ import type {
   SimParams,
   WorldSnapshot,
 } from "./types";
-import { NEUTRAL_LOG_MAX, World, worldFromSnapshot } from "./world";
+import { HISTORY_KEEP, HISTORY_MAX, NEUTRAL_LOG_MAX, World, worldFromSnapshot } from "./world";
 import type { NeutralSubstitution } from "./selection";
 
 export type Side = "A" | "B";
@@ -380,7 +380,7 @@ export function applyFrame(w: World, f: WorldFrame): boolean {
     while (cut > 0 && w.history[cut - 1]!.tick >= first) cut--;
     if (cut < w.history.length) w.history.splice(cut);
     w.history.push(...f.history);
-    if (w.history.length > 4000) w.history.splice(0, w.history.length - 3000);
+    if (w.history.length > HISTORY_MAX) w.history.splice(0, w.history.length - HISTORY_KEEP);
   }
   if (f.neutralFull) w.neutralLog = f.neutralLog;
   else if (f.neutralLog.length) {

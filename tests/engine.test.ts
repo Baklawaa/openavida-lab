@@ -30,7 +30,6 @@ interface Baseline {
 
 describe("engine identity and baseline", () => {
   it("pins the canonical perf-world hash so behaviour changes cannot land silently", () => {
-    // calibration:perf-budget
     const actual = perfWorldHash();
     let baseline: Baseline = { version: "", revision: 0, hashAlgo: "", seed: "", steps: 0, perfHash: "" };
     try {

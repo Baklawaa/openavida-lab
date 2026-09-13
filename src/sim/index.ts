@@ -117,6 +117,7 @@ export {
 export { DEFAULT_PARAMS, World } from "./world";
 export { BRUSH_KINDS, DEATH_LOG_KEEP, DEATH_LOG_MAX, TERRAIN, normalizeParams, type BrushKind, type DeathCause, type EnvSample, type MetricsSample, type NeighborEffects, type SimParams, type WorldSnapshot } from "./types";
 export { LINEAGE_TOP_N, RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX, SNAPSHOT_VERSION } from "./types";
+export { HISTORY_KEEP, HISTORY_MAX, NEUTRAL_LOG_MAX } from "./world";
 export type { ResearchEvent, ResearchEventKind } from "./types";
 export { SNAPSHOT_BIN_MAGIC, SNAPSHOT_BIN_VERSION, decodeSnapshot, encodeSnapshot } from "./snapshotBin";
 export { migrateSnapshot, snapshotVersion } from "./migrate";

@@ -2,9 +2,9 @@
 
 What the simulation computes, why its defaults have the values they have, and
 how to reproduce a published result. The parameter table, the constant table,
-the engine identity, the revision log, the calibration record and the list of
-known limits are **generated from the code** by `tools/modeldoc.ts`; everything
-else is prose. `npm test` re-renders the generated blocks and fails when the
+the memory bounds, the engine identity, the revision log, the calibration
+record and the list of known limits are **generated from the code** by
+`tools/modeldoc.ts`; everything else is prose. `npm test` re-renders the generated blocks and fails when the
 document is stale, and `npm run docs` rewrites it.
 
 A run is fully described by its engine identity, its parameter set and its seed
@@ -228,6 +228,22 @@ birth,
 death, meal, exudation, recombination and neutral substitution as bounded
 research events.
 
+### Memory bounds
+
+<!-- generated:memory -->
+What caps each structure that grows with the run, read from the constants themselves. A raised cap shows up here instead of leaving a hand-written list stale.
+
+| Structure | Holds | Bound | Enforced in |
+| --- | --- | --- | --- |
+| `World.history` | one `MetricsSample` per tick (population, diversity, trait distribution, lineage top list) | 4000 samples, trimmed to 3000 | `src/sim/world.ts` `recordMetrics`; the worker mirror re-applies the same bound in `src/sim/simHost.ts` |
+| `World.deaths` | death records with cause, age, genome and parent, for the death log and the explorer | 4000 records, trimmed to 3000 | `src/sim/world.ts` `reap` |
+| `World.eventLog` | research events (birth, death, meal, exudation, recombination, neutral) when `recordEvents` is on | 20000 events, trimmed to 10000 | `src/sim/world.ts` `pushEvent` |
+| `World.neutralLog` | hue-only substitutions kept for the molecular clock | 2000 substitutions | `src/sim/world.ts` `birth` |
+| `Timeline` ring | encoded OAV2 snapshots taken every 25 ticks | 150 MB; the oldest entry after the origin is evicted first | `src/sim/timeline.ts` `Timeline.evict` |
+| `ExperimentRecord.results` | stored `TrialResult` replicates per journal record (the summary keeps the full statistics) | 200 replicates | `src/ui/experimentHistory.ts` `recordFromRun` |
+| `ExperimentRecord.curves` | evenly sampled replicate curves per journal record, for the overlay chart | 100 curves | `src/ui/experimentHistory.ts` `sampleCurves` |
+<!-- /generated:memory -->
+
 ## 9. Parameters
 
 <!-- generated:params -->
@@ -318,6 +334,7 @@ Values the model hard-codes rather than exposing as parameters. Each row is read
 | Regulation | `REG_CROSS` | `0.2` | `src/sim/mapping.ts` | Amplification per upstream codon of the most frequent other trait. |
 | Regulation | `REG_MAX` | `3` | `src/sim/mapping.ts` | Cap on the regulatory multiplier. |
 | Logs and bounds | `LINEAGE_TOP_N` | `5` | `src/sim/types.ts` | Living lineages stored per history row, for the lineage-level selection readout. |
+| Logs and bounds | `HISTORY_MAX / KEEP` | `4000 / 3000` | `src/sim/world.ts` | Metrics samples are trimmed to KEEP once they pass MAX, so the history stays bounded on long runs. |
 | Logs and bounds | `DEATH_LOG_MAX / KEEP` | `4000 / 3000` | `src/sim/types.ts` | Death records are trimmed to KEEP once they pass MAX. |
 | Logs and bounds | `RESEARCH_LOG_MAX / KEEP` | `20000 / 10000` | `src/sim/types.ts` | Per-organism research events, same trimming rule. |
 | Logs and bounds | `NEUTRAL_LOG_MAX` | `2000` | `src/sim/world.ts` | Hue-only substitutions kept for the molecular clock. |
@@ -488,24 +505,22 @@ Population size is bounded by the plate rather than by the parameter.
 
 ### perf-budget
 
-A step fits the 60 fps budget on the canonical world.
+A step fits the 60 fps budget on the canonical world, and the mature plate fits its own measured budget.
 
-- **Method.** tests/engine.test.ts perf world (128x128, 260 founders, seed 0xa7f31ab), 48 steps, ms per step.
-- **Measured.** 10.6 ms/step on the canonical world against a 16.67 ms target; 3.85 ms/step at about 74 organisms on a quiet machine.
-- **Tolerance.** Below 16.67 ms/step.
-- **Checked by.** re-measured by `tests/engine.test.ts` on every run.
-- **Source.** workbench.md, Stage 3 performance note.
+- **Method.** npx vite-node tools/perf.ts: three 128x128 scenarios on seed 0xa7f31ab with 50 measured steps each — canonical (260 founders, 48 warmup ticks), mature (180 founders, stepped to tick 400) and chemostat (dilutionRate 0.02, inflowNutrient 0.12, 400 warmup ticks).
+- **Measured.** 3.80 ms/step at 74 organisms on the canonical world (p95 3.99); 5.01 ms/step at 672 organisms on the mature plate (p95 5.30); 4.97 ms/step at 705 organisms in the chemostat (p95 5.39).
+- **Tolerance.** Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).
+- **Checked by.** re-measured by `tests/perf.test.ts` on every run.
+- **Source.** tools/perf.ts, tests/perf.test.ts.
 <!-- /generated:calibration -->
 
 ## 13. Known limits
 
 <!-- generated:limits -->
-- **The interface has no manifest import.** A manifest can be exported from the Expérience panel and replayed by the headless runner or stored runs, but a .json manifest cannot be loaded back into the interface. (`src/ui/goalPanel.ts, src/sim/manifest.ts`)
-- **Binary snapshot files are not wired to the interface.** snapshotBin.ts encodes and decodes the OAV2 container, and the timeline stores encoded buffers, but the export button still writes JSON. (`src/sim/snapshotBin.ts, src/ui/goalPanel.ts`)
 - **Profil v1 only approximates engine-v1.** The legacy profile restores senescence 0, regulation off, no recombination, no exudate, no genome costs, 8 meals per tick and light diffusion 0.22. The meal budget and the decoder differ, so results are close but not hash-identical: use the tag engine-v1 for bit-reproducing pre-upgrade results. (`src/ui/modelPanel.ts LEGACY_V1_PROFILE`)
 - **The 3D view has no exudate plane.** Layer 5 falls back to the composite rendering in 3D; the exudate layer is a 2D overlay. (`src/render/view3d.ts, src/app.ts`)
 - **Nutrient inflow is a source term.** nutrientInflow injects nutrient from outside the modelled system, so total field mass is only conserved when it is zero. The validation tests zero it deliberately, and the parameter is bounded at 0.2 per tick. (`src/sim/fields.ts applyVentsAndDecay, tests/validation.test.ts`)
-- **The perf baseline is measured on a lightly populated world.** The canonical perf world loses organisms over its 48 steps, so the recorded ms/step does not describe a mature plate at the 1100-organism cap. (`tests/engine.test.ts, workbench.md`)
+- **The perf budget is scenario-specific.** The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 670-780 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. No single scenario describes the 1100-organism cap. (`tests/perf.test.ts, tools/perf.ts`)
 <!-- /generated:limits -->
 
 ## 14. Reproducing a published result
