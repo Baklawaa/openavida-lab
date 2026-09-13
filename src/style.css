@@ -44,6 +44,8 @@ kbd { display: inline-flex; justify-content: center; min-width: 18px; padding: 2
 .header-divider { height: 18px; width: 1px; background: var(--line-2); margin: 0 6px; }
 .header-subtitle { font-size: 12px; color: var(--muted); }
 .top > button { font-size: 12px; }
+.lang-select { flex-shrink: 0; font-size: 12px; padding: 5px 6px; }
+@media (max-width: 580px) { .lang-select { font-size: 10px; padding: 4px; max-width: 72px; } }
 .workspace { grid-area: workspace; display: grid; grid-template-rows: 40px minmax(280px, 1fr) 156px; gap: 10px; padding: 12px 20px 12px; min-height: 0; min-width: 0; }
 #app.charts-collapsed .workspace { grid-template-rows: 40px minmax(280px, 1fr) 24px; }
 #app.charts-collapsed .charts { display: none; }

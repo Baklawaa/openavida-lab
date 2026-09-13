@@ -1,4 +1,6 @@
 /** Presentation only: simulation state and event handlers live in app.ts. */
+import { LOCALES, locale, t } from "./i18n/runtime";
+
 export function icon(name: string): string {
   const paths: Record<string, string> = {
     life: '<circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r="2"/><path d="m15 8 1 1m-2 7 1-1M7 15h1"/>',
@@ -39,158 +41,168 @@ export const KIT_COPY: Record<string, { label: string; short: string; descriptio
   mutualist: { label: "Mutualiste", short: "signal ×2 · uptake ×3 · photo ×2", description: "Photosynthétise et porte un récepteur (signal ≥ 1) : il consomme l’exsudat relâché par les phototrophes productifs voisins.", icon: "mutual" },
 };
 
+/** Options of the language picker, with the active locale selected. */
+function languageOptions(): string {
+  const active = locale();
+  return LOCALES.map((code) => {
+    const label = code === "fr" ? t("shell.lang.fr") : t("shell.lang.en");
+    return `<option value="${code}"${code === active ? " selected" : ""}>${label}</option>`;
+  }).join("");
+}
+
 export function createLabLayout(root: HTMLElement) {
   root.innerHTML = `
     <header class="top">
       <a class="brand" href="#" aria-label="OpenAvida Lab">${icon("life")}<span>OpenAvida<span class="brand-lab">LAB</span></span></a>
-      <span class="header-divider"></span><span class="header-subtitle">Évolution artificielle · génome explicite · plaque 128 × 128</span>
+      <span class="header-divider"></span><span class="header-subtitle">${t("shell.subtitle")}</span>
       <div class="spacer"></div>
-      <button id="btn-help" class="icon-button" aria-label="Guide et raccourcis">${icon("help")}</button>
-      <button id="btn-share" class="quiet">${icon("share")}<span>Partager</span></button>
-      <button id="btn-json">${icon("save")}<span>Exporter le monde</span></button>
+      <select id="lang-select" class="lang-select" aria-label="${t("shell.lang.aria")}">${languageOptions()}</select>
+      <button id="btn-help" class="icon-button" aria-label="${t("shell.help.aria")}">${icon("help")}</button>
+      <button id="btn-share" class="quiet">${icon("share")}<span>${t("shell.share")}</span></button>
+      <button id="btn-json">${icon("save")}<span>${t("shell.export")}</span></button>
     </header>
-    <main class="workspace" aria-label="Simulation">
-      <section class="metrics" aria-label="Indicateurs du monde actif">
-        <div class="metric"><span>Population</span><b id="m-pop">0</b><small>organismes</small></div>
-        <div class="metric"><span>Lignées</span><b id="m-lin">0</b><small>vivantes</small></div>
-        <div class="metric violet"><span>Diversité</span><b id="m-h">0.000</b><small>Shannon H′</small></div>
-        <div class="metric amber"><span>Fitness</span><b id="m-fit">0.000</b><small>moyenne</small></div>
+    <main class="workspace" aria-label="${t("main.aria")}">
+      <section class="metrics" aria-label="${t("metrics.aria")}">
+        <div class="metric"><span>${t("metric.population")}</span><b id="m-pop">0</b><small>${t("metric.population.unit")}</small></div>
+        <div class="metric"><span>${t("metric.lineages")}</span><b id="m-lin">0</b><small>${t("metric.lineages.unit")}</small></div>
+        <div class="metric violet"><span>${t("metric.diversity")}</span><b id="m-h">0.000</b><small>Shannon H′</small></div>
+        <div class="metric amber"><span>${t("metric.fitness")}</span><b id="m-fit">0.000</b><small>${t("metric.fitness.unit")}</small></div>
       </section>
-      <section class="world-panel" aria-label="Monde simulé">
+      <section class="world-panel" aria-label="${t("world.aria")}">
         <div class="world-toolbar">
-          <div class="segmented world-switch" aria-label="Choisir le monde">
-            <button id="view-A" data-view="A" class="view active" aria-pressed="true">Monde A</button>
-            <button id="view-B" data-view="B" class="view" aria-pressed="false">Monde B</button>
+          <div class="segmented world-switch" aria-label="${t("world.switch.aria")}">
+            <button id="view-A" data-view="A" class="view active" aria-pressed="true">${t("world.A")}</button>
+            <button id="view-B" data-view="B" class="view" aria-pressed="false">${t("world.B")}</button>
             <button id="view-split" data-view="split" class="view" aria-pressed="false">A / B</button>
           </div>
           <span id="world-size" class="tiny world-size">128 × 128</span>
-          <div class="segmented field-toolbar" role="group" aria-label="Couche affichée">
-            <button id="fm-0" data-fm="0" class="fm active" aria-pressed="true">Ensemble</button>
-            <button id="fm-1" data-fm="1" class="fm" aria-pressed="false"><i class="dot nutrient"></i><span>Nutriments</span></button>
-            <button id="fm-2" data-fm="2" class="fm" aria-pressed="false"><i class="dot toxin"></i><span>Toxines</span></button>
-            <button id="fm-3" data-fm="3" class="fm" aria-pressed="false"><i class="dot temperature"></i><span>Température</span></button>
-            <button id="fm-4" data-fm="4" class="fm" aria-pressed="false"><i class="dot light"></i><span>Lumière</span></button>
-            <button id="fm-5" data-fm="5" class="fm" aria-pressed="false"><i class="dot diversity"></i><span>Exsudat</span></button>
+          <div class="segmented field-toolbar" role="group" aria-label="${t("world.layers.aria")}">
+            <button id="fm-0" data-fm="0" class="fm active" aria-pressed="true">${t("layer.all")}</button>
+            <button id="fm-1" data-fm="1" class="fm" aria-pressed="false"><i class="dot nutrient"></i><span>${t("field.nutrient")}</span></button>
+            <button id="fm-2" data-fm="2" class="fm" aria-pressed="false"><i class="dot toxin"></i><span>${t("field.toxin")}</span></button>
+            <button id="fm-3" data-fm="3" class="fm" aria-pressed="false"><i class="dot temperature"></i><span>${t("field.temperature")}</span></button>
+            <button id="fm-4" data-fm="4" class="fm" aria-pressed="false"><i class="dot light"></i><span>${t("field.light")}</span></button>
+            <button id="fm-5" data-fm="5" class="fm" aria-pressed="false"><i class="dot diversity"></i><span>${t("field.exudate")}</span></button>
           </div>
           <div class="spacer"></div>
-          <span id="run-state" class="run-state"><i></i> En cours</span>
+          <span id="run-state" class="run-state"><i></i> ${t("runstate.playing")}</span>
           <div class="segmented"><button id="view-2d" class="active" aria-pressed="true">2D</button><button id="view-3d" aria-pressed="false">3D</button></div>
-          <button id="btn-focus" class="icon-button" aria-label="Agrandir la visualisation" aria-pressed="false">${icon("expand")}</button>
+          <button id="btn-focus" class="icon-button" aria-label="${t("world.focus.aria")}" aria-pressed="false">${icon("expand")}</button>
         </div>
         <div class="stage">
-          <div class="viz"><canvas id="gl" aria-label="Monde en deux dimensions : cliquez pour utiliser l’outil sélectionné"></canvas><canvas id="gl-trail" aria-hidden="true"></canvas><canvas id="gl3d" aria-label="Monde en trois dimensions : glissez pour tourner, molette pour zoomer"></canvas><div id="mp-cursors"></div></div>
+          <div class="viz"><canvas id="gl" aria-label="${t("stage.2d.aria")}"></canvas><canvas id="gl-trail" aria-hidden="true"></canvas><canvas id="gl3d" aria-label="${t("stage.3d.aria")}"></canvas><div id="mp-cursors"></div></div>
           <div class="stage-label" id="stage-label">MONDE A</div><div class="stage-label stage-label-b" id="stage-label-b" hidden>MONDE B</div>
-          <div class="empty-world" id="empty-world"><span class="empty-icon">${icon("life")}</span><div><h2>Monde vide</h2><p>Kit sélectionné + clic sur une cellule libre, ou injection aléatoire.</p></div><button id="btn-start" class="primary">${icon("plus")}Injecter 24 organismes</button></div>
-          <div class="viz-hud" role="group" aria-label="Outils du monde">
-            <button id="tool-inspect" aria-pressed="false">${icon("inspect")}<span>Inspecter</span><kbd>I</kbd></button>
-            <button id="tool-place" class="active" aria-pressed="true">${icon("plus")}<span>Placer</span><kbd>O</kbd></button>
-            <button id="tool-paint" aria-pressed="false">${icon("paint")}<span>Peindre</span><kbd>P</kbd></button>
+          <div class="empty-world" id="empty-world"><span class="empty-icon">${icon("life")}</span><div><h2>${t("empty.title")}</h2><p>${t("empty.hint")}</p></div><button id="btn-start" class="primary">${icon("plus")}${t("btn.inject")}</button></div>
+          <div class="viz-hud" role="group" aria-label="${t("hud.aria")}">
+            <button id="tool-inspect" aria-pressed="false">${icon("inspect")}<span>${t("tool.inspect")}</span><kbd>I</kbd></button>
+            <button id="tool-place" class="active" aria-pressed="true">${icon("plus")}<span>${t("tool.place")}</span><kbd>O</kbd></button>
+            <button id="tool-paint" aria-pressed="false">${icon("paint")}<span>${t("tool.paint")}</span><kbd>P</kbd></button>
           </div>
-          <div class="stage-notes"><span id="field-legend" class="field-legend"><i class="dot nutrient"></i>Nutriments <i class="dot toxin"></i>Toxines <i class="dot light"></i>Lumière</span><span id="field-note" class="field-note"></span></div>
+          <div class="stage-notes"><span id="field-legend" class="field-legend"><i class="dot nutrient"></i>${t("field.nutrient")} <i class="dot toxin"></i>${t("field.toxin")} <i class="dot light"></i>${t("field.light")}</span><span id="field-note" class="field-note"></span></div>
           <div id="cell-readout" class="cell-readout" hidden></div>
         </div>
         <div class="playback-stack">
         <div class="playback">
-          <button id="btn-pause" class="primary">${icon("pause")}<span>Pause</span></button>
-          <button id="btn-step-once" class="icon-button" aria-label="Avancer d’un pas">${icon("step")}</button>
-          <span class="tick-counter">PAS <b id="m-tick">0</b></span>
-          <span id="view-hint" class="view-hint">Clic sur une cellule libre : place un organisme.</span>
-          <div class="speed-ctl"><label for="speed-top">Vitesse</label><input id="speed-top" type="range" min="0" max="60" step="1" value="2"><b id="spd-lab-top">2 /s</b><button id="btn-slow" class="quiet">×1</button></div>
-          <div class="zoom-ctl"><label for="zoom-top">Vue</label><input id="zoom-top" type="range" min="30" max="100" step="1" value="100"><b id="zoom-lab-top">100%</b></div>
+          <button id="btn-pause" class="primary">${icon("pause")}<span>${t("btn.pause")}</span></button>
+          <button id="btn-step-once" class="icon-button" aria-label="${t("btn.step.aria")}">${icon("step")}</button>
+          <span class="tick-counter">${t("playback.tick")} <b id="m-tick">0</b></span>
+          <span id="view-hint" class="view-hint">${t("playback.hint")}</span>
+          <div class="speed-ctl"><label for="speed-top">${t("playback.speed")}</label><input id="speed-top" type="range" min="0" max="60" step="1" value="2"><b id="spd-lab-top">2 /s</b><button id="btn-slow" class="quiet">×1</button></div>
+          <div class="zoom-ctl"><label for="zoom-top">${t("playback.zoom")}</label><input id="zoom-top" type="range" min="30" max="100" step="1" value="100"><b id="zoom-lab-top">100%</b></div>
         </div>
         <div id="timeline-row">
-          <button type="button" id="btn-timeline-first" class="icon-button" aria-label="Premier instantané">⏮</button>
-          <button type="button" id="btn-timeline-prev" class="icon-button" aria-label="Instantané précédent">◀</button>
+          <button type="button" id="btn-timeline-first" class="icon-button" aria-label="${t("timeline.first.aria")}">⏮</button>
+          <button type="button" id="btn-timeline-prev" class="icon-button" aria-label="${t("timeline.prev.aria")}">◀</button>
           <div class="timeline-track">
-            <input id="timeline-range" type="range" min="0" max="0" value="0" step="1" aria-label="Instantané enregistré">
+            <input id="timeline-range" type="range" min="0" max="0" value="0" step="1" aria-label="${t("timeline.range.aria")}">
             <div id="timeline-marks" aria-hidden="true"></div>
           </div>
-          <button type="button" id="btn-timeline-next" class="icon-button" aria-label="Instantané suivant">▶</button>
-          <button type="button" id="btn-timeline-resume">Reprendre ici</button>
-          <span id="timeline-label" class="tiny">pas 0 (enregistré toutes les 25)</span>
+          <button type="button" id="btn-timeline-next" class="icon-button" aria-label="${t("timeline.next.aria")}">▶</button>
+          <button type="button" id="btn-timeline-resume">${t("timeline.resume")}</button>
+          <span id="timeline-label" class="tiny">${t("timeline.label", { tick: 0, every: 25 })}</span>
           <span id="timeline-budget" class="tiny"></span>
         </div>
         </div>
       </section>
-      <section class="charts-section" aria-label="Évolution dans le temps">
-        <div class="section-heading"><h2>Séries temporelles</h2><span id="chart-world" class="tiny">MONDE A · HISTORIQUE</span><button id="btn-charts" class="quiet" aria-expanded="true">Réduire</button></div>
+      <section class="charts-section" aria-label="${t("charts.aria")}">
+        <div class="section-heading"><h2>${t("charts.title")}</h2><span id="chart-world" class="tiny">${t("charts.world", { world: "A" })}</span><button id="btn-charts" class="quiet" aria-expanded="true">${t("btn.charts.collapse")}</button></div>
         <div class="charts">
-          <article class="chart-card"><div class="chart-heading"><h3>Fitness</h3><span><i class="dot nutrient"></i>Moy. <i class="dot light"></i>Max.</span></div><canvas id="chart-fit" role="img" aria-label="Évolution de la fitness moyenne et maximale"></canvas></article>
-          <article class="chart-card"><div class="chart-heading"><h3>Diversité</h3><span><i class="dot diversity"></i>Shannon H′</span></div><canvas id="chart-shan" role="img" aria-label="Évolution de l’indice de diversité de Shannon"></canvas></article>
-          <article class="chart-card"><div class="chart-heading"><h3>Arbre des lignées</h3><span>Ascendance</span></div><canvas id="chart-phy" role="img" aria-label="Arbre des lignées au fil du temps"></canvas></article>
+          <article class="chart-card"><div class="chart-heading"><h3>${t("chart.fitness")}</h3><span><i class="dot nutrient"></i>${t("chart.mean")} <i class="dot light"></i>${t("chart.max")}</span></div><canvas id="chart-fit" role="img" aria-label="${t("chart.fit.aria")}"></canvas></article>
+          <article class="chart-card"><div class="chart-heading"><h3>${t("chart.diversity")}</h3><span><i class="dot diversity"></i>Shannon H′</span></div><canvas id="chart-shan" role="img" aria-label="${t("chart.shannon.aria")}"></canvas></article>
+          <article class="chart-card"><div class="chart-heading"><h3>${t("chart.lineageTree")}</h3><span>${t("chart.ancestry")}</span></div><canvas id="chart-phy" role="img" aria-label="${t("chart.phy.aria")}"></canvas></article>
         </div>
       </section>
     </main>
-    <aside class="side" aria-label="Outils du laboratoire">
-      <div class="side-tabs" role="tablist" aria-label="Espaces de travail">
-        <button id="tab-organisms" data-panel="organisms" role="tab" aria-controls="panel-organisms" aria-selected="true" class="active">${icon("life")}Organismes</button>
-        <button id="tab-environment" data-panel="environment" role="tab" aria-controls="panel-environment" aria-selected="false" tabindex="-1">${icon("paint")}Milieu</button>
-        <button id="tab-analysis" data-panel="analysis" role="tab" aria-controls="panel-analysis" aria-selected="false" tabindex="-1">${icon("chart")}Analyse</button>
-        <button id="tab-species" data-panel="species" role="tab" aria-controls="panel-species" aria-selected="false" tabindex="-1">${icon("groups")}Espèces</button>
-        <button id="tab-experiment" data-panel="experiment" role="tab" aria-controls="panel-experiment" aria-selected="false" tabindex="-1">${icon("settings")}Expérience</button>
+    <aside class="side" aria-label="${t("side.aria")}">
+      <div class="side-tabs" role="tablist" aria-label="${t("tabs.aria")}">
+        <button id="tab-organisms" data-panel="organisms" role="tab" aria-controls="panel-organisms" aria-selected="true" class="active">${icon("life")}${t("tab.organisms")}</button>
+        <button id="tab-environment" data-panel="environment" role="tab" aria-controls="panel-environment" aria-selected="false" tabindex="-1">${icon("paint")}${t("tab.environment")}</button>
+        <button id="tab-analysis" data-panel="analysis" role="tab" aria-controls="panel-analysis" aria-selected="false" tabindex="-1">${icon("chart")}${t("tab.analysis")}</button>
+        <button id="tab-species" data-panel="species" role="tab" aria-controls="panel-species" aria-selected="false" tabindex="-1">${icon("groups")}${t("tab.species")}</button>
+        <button id="tab-experiment" data-panel="experiment" role="tab" aria-controls="panel-experiment" aria-selected="false" tabindex="-1">${icon("settings")}${t("tab.experiment")}</button>
       </div>
       <div class="side-scroll">
         <div id="panel-organisms" role="tabpanel" aria-labelledby="tab-organisms">
-          <section class="block"><div class="section-heading"><h2>Kits de départ</h2><span class="tag">5 GÉNOMES</span></div><p class="muted" id="place-hint">Sélectionnez un kit, puis cliquez dans le monde.</p><div id="dna-kits" class="kit-grid"></div>
-            <div class="kit-description"><span class="eyebrow">KIT SÉLECTIONNÉ</span><p id="kit-blurb"></p><div id="kit-traits" class="kit-focus"></div></div>
-            <button id="btn-inject" class="primary full">${icon("plus")}Injecter 24 organismes</button>
+          <section class="block"><div class="section-heading"><h2>${t("panel.organisms.kits")}</h2><span class="tag">${t("panel.organisms.kits.tag")}</span></div><p class="muted" id="place-hint">${t("panel.organisms.hint")}</p><div id="dna-kits" class="kit-grid"></div>
+            <div class="kit-description"><span class="eyebrow">${t("panel.organisms.kitSelected")}</span><p id="kit-blurb"></p><div id="kit-traits" class="kit-focus"></div></div>
+            <button id="btn-inject" class="primary full">${icon("plus")}${t("btn.inject")}</button>
           </section>
-          <section class="block dna-editor" id="dna-editor" aria-label="Éditeur d’ADN"></section>
+          <section class="block dna-editor" id="dna-editor" aria-label="${t("panel.dna.aria")}"></section>
         </div>
         <div id="panel-environment" role="tabpanel" aria-labelledby="tab-environment" hidden>
-          <section class="block"><div class="section-heading"><h2>Champs et terrain</h2><span class="tag">PINCEAU</span></div><p class="muted">Cliquez ou glissez dans le monde. En 3D, un clic par touche.</p><div class="brush-grid" id="brushes"></div><div class="range-label"><label for="radius">Rayon du pinceau</label><span><b id="rad-lab">3</b> cellules</span></div><input id="radius" type="range" min="0" max="12" value="3"></section>
-          <section class="block"><h2>Dynamique du milieu</h2><label class="toggle-row" id="opt-terrain"><span>Relief aléatoire<small>Sources, obstacles et zones d’ombre</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-disturb"><span>Événements aléatoires<small>Perturbations au cours de l’expérience</small></span><input type="checkbox"></label></section>
+          <section class="block"><div class="section-heading"><h2>${t("panel.environment.title")}</h2><span class="tag">${t("panel.environment.tag")}</span></div><p class="muted">${t("panel.environment.hint")}</p><div class="brush-grid" id="brushes"></div><div class="range-label"><label for="radius">${t("panel.environment.radius")}</label><span><b id="rad-lab">3</b> ${t("unit.cells")}</span></div><input id="radius" type="range" min="0" max="12" value="3"></section>
+          <section class="block"><h2>${t("panel.environment.dynamics")}</h2><label class="toggle-row" id="opt-terrain"><span>${t("opt.terrain")}<small>${t("opt.terrain.hint")}</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-disturb"><span>${t("opt.disturb")}<small>${t("opt.disturb.hint")}</small></span><input type="checkbox"></label></section>
           <section class="block" id="schedule-block">
-            <div class="section-heading"><h2>Programme</h2><span class="tag">PAS</span></div>
-            <p class="muted">Changement appliqué au pas indiqué, après les perturbations, avant le métabolisme. Liste vide : le monde est inchangé.</p>
+            <div class="section-heading"><h2>${t("panel.schedule.title")}</h2><span class="tag">${t("panel.schedule.tag")}</span></div>
+            <p class="muted">${t("panel.schedule.hint")}</p>
             <div class="goal-row">
-              <input id="sched-at" type="number" min="1" step="1" value="50" aria-label="Pas d’application">
-              <select id="sched-action" aria-label="Action">
-                <option value="scale:nutrient">Échelle nutriments</option>
-                <option value="scale:toxin">Échelle toxines</option>
-                <option value="scale:temperature">Échelle température</option>
-                <option value="scale:light">Échelle lumière</option>
-                <option value="params:mutationRate">Taux de mutation</option>
-                <option value="params:maxPopulation">Population max</option>
-                <option value="params:reproduceEnergy">Seuil de reproduction</option>
-                <option value="paint:toxinBlob">Touche de toxines</option>
-                <option value="paint:nutrientBlob">Touche de nutriments</option>
+              <input id="sched-at" type="number" min="1" step="1" value="50" aria-label="${t("sched.at.aria")}">
+              <select id="sched-action" aria-label="${t("sched.action.aria")}">
+                <option value="scale:nutrient">${t("sched.scale.nutrient")}</option>
+                <option value="scale:toxin">${t("sched.scale.toxin")}</option>
+                <option value="scale:temperature">${t("sched.scale.temperature")}</option>
+                <option value="scale:light">${t("sched.scale.light")}</option>
+                <option value="params:mutationRate">${t("sched.params.mutationRate")}</option>
+                <option value="params:maxPopulation">${t("sched.params.maxPopulation")}</option>
+                <option value="params:reproduceEnergy">${t("sched.params.reproduceEnergy")}</option>
+                <option value="paint:toxinBlob">${t("sched.paint.toxinBlob")}</option>
+                <option value="paint:nutrientBlob">${t("sched.paint.nutrientBlob")}</option>
               </select>
-              <input id="sched-arg" type="number" step="0.05" value="0.5" aria-label="Paramètre">
-              <button type="button" id="btn-sched-add">Ajouter</button>
+              <input id="sched-arg" type="number" step="0.05" value="0.5" aria-label="${t("sched.arg.aria")}">
+              <button type="button" id="btn-sched-add">${t("btn.sched.add")}</button>
             </div>
             <div id="sched-list"></div>
           </section>
-          <section class="block" id="model-panel"><div class="section-heading"><h2>Modèle</h2><span class="tag">PARAMÈTRES</span></div><p class="muted">Chaque paramètre est borné par sa spécification, appliqué au monde choisi et enregistré dans le manifeste. « Profil v1 » restaure les réglages d’avant la mise à niveau.</p><div id="model-form"></div></section>
-          <section class="block info-note">${icon("sun")}<p>Diffusion à 4 voisins à chaque pas, bloquée par les obstacles. Une source émet en continu ; une touche de pinceau est ponctuelle.</p></section>
+          <section class="block" id="model-panel"><div class="section-heading"><h2>${t("panel.model.title")}</h2><span class="tag">${t("panel.model.tag")}</span></div><p class="muted">${t("panel.model.hint")}</p><div id="model-form"></div></section>
+          <section class="block info-note">${icon("sun")}<p>${t("panel.environment.note")}</p></section>
         </div>
         <div id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
-          <section class="block"><div class="section-heading"><h2>Organisme sélectionné</h2><span class="tag" id="selection-tag">AUCUN</span></div><div id="inspect-meta" class="muted">Outil Inspecter, puis clic sur un organisme.</div><div id="inspect-phenotype"></div><div class="row inspect-actions" id="inspect-actions" hidden><button id="btn-edit-selected">${icon("dna")}<span>Modifier cet ADN</span></button><button id="btn-ancestry">${icon("chart")}<span>Évolution</span></button></div><details class="inspect-detail"><summary>Génome et gènes</summary><div id="inspect-genome"></div><div id="browser-wrap"><canvas id="gbrowser"></canvas></div><div id="inspect-genes"></div></details><details class="inspect-detail"><summary>Métabolisme et comportement</summary><div id="inspect-pathways"></div><div id="inspect-brain"></div></details></section>
-          <section class="block"><div class="section-heading"><h2>Explorateur</h2><span class="tag">TOUS LES ORGANISMES</span></div><p class="muted">Vivants et morts, groupés par espèce, filtres et tris précis, branche d’évolution, enregistrement local.</p><button id="btn-explorer" class="primary full">${icon("inspect")}Ouvrir l’explorateur</button></section>
+          <section class="block"><div class="section-heading"><h2>${t("panel.analysis.selected")}</h2><span class="tag" id="selection-tag">${t("tag.none")}</span></div><div id="inspect-meta" class="muted">${t("panel.analysis.hint")}</div><div id="inspect-phenotype"></div><div class="row inspect-actions" id="inspect-actions" hidden><button id="btn-edit-selected">${icon("dna")}<span>${t("btn.editSelected")}</span></button><button id="btn-ancestry">${icon("chart")}<span>${t("btn.ancestry")}</span></button></div><details class="inspect-detail"><summary>${t("panel.analysis.genomeGenes")}</summary><div id="inspect-genome"></div><div id="browser-wrap"><canvas id="gbrowser"></canvas></div><div id="inspect-genes"></div></details><details class="inspect-detail"><summary>${t("panel.analysis.metabolism")}</summary><div id="inspect-pathways"></div><div id="inspect-brain"></div></details></section>
+          <section class="block"><div class="section-heading"><h2>${t("panel.explorer.title")}</h2><span class="tag">${t("panel.explorer.tag")}</span></div><p class="muted">${t("panel.explorer.hint")}</p><button id="btn-explorer" class="primary full">${icon("inspect")}${t("btn.explorer")}</button></section>
           <section class="block">
-            <div class="section-heading"><h2>Événements</h2><span class="tag" id="event-count">0</span></div>
+            <div class="section-heading"><h2>${t("panel.events.title")}</h2><span class="tag" id="event-count">0</span></div>
             <div id="event-log" class="feed"></div>
           </section>
-          <section class="block"><div class="section-heading"><h2>Recherche</h2><span class="tag">MESURES</span></div><div id="research-body"></div></section>
-          <section class="block"><h2>Classement par fitness</h2><div id="leaderboard" class="feed"></div></section>
-          <section class="block"><h2>Journal des décès</h2><div id="death-tally" class="death-tally"></div><div id="death-log" class="feed"></div></section>
-          <section class="block"><details><summary>Table codon → trait</summary><p class="muted">ORF = ATG … TAA/TAG/TGA, lecture dans tous les cadres. phénotype[trait] = squash(basal + Σ deltas). La couleur n’entre pas dans la fitness.</p><div class="mapping-legend" id="legend"></div></details></section>
+          <section class="block"><div class="section-heading"><h2>${t("panel.research.title")}</h2><span class="tag">${t("panel.research.tag")}</span></div><div id="research-body"></div></section>
+          <section class="block"><h2>${t("panel.leaderboard.title")}</h2><div id="leaderboard" class="feed"></div></section>
+          <section class="block"><h2>${t("panel.deaths.title")}</h2><div id="death-tally" class="death-tally"></div><div id="death-log" class="feed"></div></section>
+          <section class="block"><details><summary>${t("panel.codon.title")}</summary><p class="muted">${t("panel.codon.hint")}</p><div class="mapping-legend" id="legend"></div></details></section>
         </div>
         <div id="panel-species" role="tabpanel" aria-labelledby="tab-species" hidden></div>
         <div id="panel-experiment" role="tabpanel" aria-labelledby="tab-experiment" hidden>
           <div id="panel-goals"></div>
-          <section class="block"><h2>Points de restauration</h2><p class="muted">État complet du monde actif : organismes, champs, lignées, historique.</p><div class="row"><button id="btn-snap">${icon("save")}Mémoriser</button><button id="btn-restore" disabled>Restaurer</button></div><p id="snapshot-info" class="micro">Aucun état mémorisé dans cette session.</p></section>
-          <section class="block"><h2>Mondes A et B</h2><p class="muted">Mêmes paramètres, graines différentes. Sélecteur A / B au-dessus du monde.</p><div class="row"><button id="btn-step-a">+1 pas A</button><button id="btn-step-b">+1 pas B</button><button id="btn-step-both">+1 pas A et B</button></div></section>
-          <section class="block"><h2>Nouvelle expérience</h2><label class="tiny" for="seed">Graine aléatoire</label><div class="row"><input id="seed" type="number"><button id="btn-reseed">Réinitialiser A et B</button></div><p class="micro">Remplace A et B par deux mondes vides.</p><button id="btn-bottle" class="danger">Goulot d’étranglement : garder 10 %</button></section>
-          <section class="block"><h2>Données de l’expérience</h2><div class="row"><button id="btn-csv">Métriques CSV</button><button id="btn-phylo">Lignées CSV</button><button id="btn-events">Événements JSONL</button><button id="btn-manifest">Manifeste de la course</button><button id="btn-import">Importer un monde JSON</button></div><input id="import-file" type="file" accept="application/json,.json" hidden><label class="toggle-row" id="opt-events"><span>Journal d’événements<small>Naissances, morts, repas, exsudat, recombinaisons — borné, pour l’analyse externe</small></span><input type="checkbox"></label></section>
-          <section class="block"><details><summary>Fonctions expérimentales</summary><label class="toggle-row" id="opt-view3d"><span>Visualisation 3D</span><input type="checkbox"></label><label class="toggle-row" id="opt-brains"><span>Comportements<small>Politique de décision intégrée</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-llm"><span>Adaptateur LLM<small>Politique intégrée si aucun adaptateur</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-mp"><span>Session partagée<small>Entre les onglets de ce navigateur</small></span><input type="checkbox"></label><div id="mp-panel" class="stack"><label for="mp-room">Salon</label><input id="mp-room" type="text" value="lab"><label for="mp-role">Rôle</label><select id="mp-role"><option value="host">Hôte</option><option value="experimenter">Expérimentateur</option><option value="spectator">Observateur</option></select><div class="row"><button id="btn-mp-host">Créer un salon</button><button id="btn-mp-join">Rejoindre</button></div><div id="mp-peers" class="muted"></div></div></details></section>
-          <section class="block diagnostics"><span>Fixation <b id="m-fix">—</b></span><span>Extinctions <b id="m-ex">0</b></span><span>Calcul / pas <b id="m-ms">—</b></span></section>
+          <section class="block"><h2>${t("panel.restore.title")}</h2><p class="muted">${t("panel.restore.hint")}</p><div class="row"><button id="btn-snap">${icon("save")}${t("btn.snap")}</button><button id="btn-restore" disabled>${t("btn.restore")}</button></div><p id="snapshot-info" class="micro">${t("snapshot.none")}</p></section>
+          <section class="block"><h2>${t("panel.worlds.title")}</h2><p class="muted">${t("panel.worlds.hint")}</p><div class="row"><button id="btn-step-a">${t("btn.step.a")}</button><button id="btn-step-b">${t("btn.step.b")}</button><button id="btn-step-both">${t("btn.step.both")}</button></div></section>
+          <section class="block"><h2>${t("panel.newRun.title")}</h2><label class="tiny" for="seed">${t("seed.label")}</label><div class="row"><input id="seed" type="number"><button id="btn-reseed">${t("btn.reseed")}</button></div><p class="micro">${t("panel.newRun.hint")}</p><button id="btn-bottle" class="danger">${t("btn.bottle")}</button></section>
+          <section class="block"><h2>${t("panel.data.title")}</h2><div class="row"><button id="btn-csv">${t("btn.csv")}</button><button id="btn-phylo">${t("btn.phylo")}</button><button id="btn-events">${t("btn.events")}</button><button id="btn-manifest">${t("btn.manifest")}</button><button id="btn-import">${t("btn.import")}</button></div><input id="import-file" type="file" accept="application/json,.json" hidden><label class="toggle-row" id="opt-events"><span>${t("opt.events")}<small>${t("opt.events.hint")}</small></span><input type="checkbox"></label></section>
+          <section class="block"><details><summary>${t("panel.experimental")}</summary><label class="toggle-row" id="opt-view3d"><span>${t("opt.view3d")}</span><input type="checkbox"></label><label class="toggle-row" id="opt-brains"><span>${t("opt.brains")}<small>${t("opt.brains.hint")}</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-llm"><span>${t("opt.llm")}<small>${t("opt.llm.hint")}</small></span><input type="checkbox"></label><label class="toggle-row" id="opt-mp"><span>${t("opt.mp")}<small>${t("opt.mp.hint")}</small></span><input type="checkbox"></label><div id="mp-panel" class="stack"><label for="mp-room">${t("mp.room")}</label><input id="mp-room" type="text" value="lab"><label for="mp-role">${t("mp.role")}</label><select id="mp-role"><option value="host">${t("mp.role.host")}</option><option value="experimenter">${t("mp.role.experimenter")}</option><option value="spectator">${t("mp.role.spectator")}</option></select><div class="row"><button id="btn-mp-host">${t("btn.mp.host")}</button><button id="btn-mp-join">${t("btn.mp.join")}</button></div><div id="mp-peers" class="muted"></div></div></details></section>
+          <section class="block diagnostics"><span>${t("diag.fixation")} <b id="m-fix">—</b></span><span>${t("diag.extinctions")} <b id="m-ex">0</b></span><span>${t("diag.ms")} <b id="m-ms">—</b></span></section>
         </div>
       </div>
     </aside>
-    <footer class="status-bar"><span id="status-line" role="status" aria-live="polite">Prêt.</span><span id="m-seed" class="mono"></span><span class="keyboard-hint"><kbd>Espace</kbd> pause / lecture</span></footer>
-    <dialog id="help-dialog"><form method="dialog"><button class="close-dialog" aria-label="Fermer le guide">×</button></form><span class="eyebrow">GUIDE</span><h2>Protocole de base</h2><ol><li><b>Population.</b> Kit ou génome édité, placé cellule par cellule ou injecté (24 organismes).</li><li><b>Milieu.</b> Champs de nutriments, toxines, température et lumière ; sources, obstacles, ombre.</li><li><b>Mesures.</b> Inspection d’un organisme (génome, phénotype, métabolisme), fitness, diversité de Shannon, lignées.</li></ol><div class="shortcut-grid"><span><kbd>Espace</kbd> Pause / lecture</span><span><kbd>I</kbd> Inspecter</span><span><kbd>O</kbd> Placer</span><span><kbd>P</kbd> Peindre</span><span><kbd>1–5</kbd> Couches du milieu</span><span><kbd>S</kbd> Mémoriser</span></div><p class="muted">3D : glisser pour tourner, molette pour zoomer. A / B affiche deux mondes en 2D ; les indicateurs suivent le dernier monde cliqué.</p></dialog>
-    <dialog id="explorer-dialog" class="explorer-dialog" aria-label="Explorateur des organismes et des lignées"></dialog>
+    <footer class="status-bar"><span id="status-line" role="status" aria-live="polite">${t("status.ready")}</span><span id="m-seed" class="mono"></span><span class="keyboard-hint"><kbd>Espace</kbd> ${t("footer.keyboard")}</span></footer>
+    <dialog id="help-dialog"><form method="dialog"><button class="close-dialog" aria-label="${t("guide.close.aria")}">×</button></form><span class="eyebrow">${t("guide.eyebrow")}</span><h2>${t("guide.title")}</h2><ol><li>${t("guide.step1")}</li><li>${t("guide.step2")}</li><li>${t("guide.step3")}</li></ol><div class="shortcut-grid"><span><kbd>Espace</kbd> ${t("guide.pause")}</span><span><kbd>I</kbd> ${t("guide.inspect")}</span><span><kbd>O</kbd> ${t("guide.place")}</span><span><kbd>P</kbd> ${t("guide.paint")}</span><span><kbd>1–5</kbd> ${t("guide.layers")}</span><span><kbd>S</kbd> ${t("guide.snap")}</span></div><p class="muted">${t("guide.footer")}</p></dialog>
+    <dialog id="explorer-dialog" class="explorer-dialog" aria-label="${t("explorer.dialog.aria")}"></dialog>
   `;
   const get = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   root.querySelectorAll<HTMLButtonElement>("button:not([type])").forEach(b => b.type = b.closest("form") ? "submit" : "button");

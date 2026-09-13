@@ -505,3 +505,16 @@ Research-grade upgrade, stage 7 of the approved plan. **No model change: the per
 - `src/app.ts` exposes two probe fields used by the gates (`__openavidaParams(side)`, `neutralSubstitutions`, `historyRows`), and `src/vite-env.d.ts` declares them.
 - `node tools/gates.mjs` now runs eight verifiers: interface, exudate, research, history, copy, worker, determinism, launch.
 
+
+## Upgrade Stage 8.1 — the locale runtime and the shell (2026-09-14)
+
+Localisation, first chunk of the approved plan. **No model change: the perf hash stays `e953dcdc`.**
+
+- **Runtime** (`src/ui/i18n/runtime.ts`): one catalog per locale, one active locale per page. `resolveLocale` is a pure function with the documented precedence — `?lang=` → stored preference → `<html lang>` → browser languages → **French** — and the runtime resolves lazily on the first `t()` call so a test can pin the locale before anything renders. `t()` interpolates `{name}` placeholders and falls back to French, then to the key itself; `tn()` covers count-dependent grammar; the typed accessors (`helpFor`, `paramLabel`, `traitLabel`, …) give the rest of the interface a checked API instead of raw key strings.
+- **Catalogs**: `src/ui/i18n/fr.shell.ts` and `en.shell.ts` hold 185 keys for the header, metrics, world toolbar, stage, playback, chart cards, tab strip, every panel heading and the guide dialog. `fr.ts` derives `MessageKey` from the French catalog so a key cannot be invented; `en.ts` is checked against it.
+- **The shell is catalog-driven.** `src/ui/layout.ts` renders from `t()`; the only copy change is the new language picker (`#lang-select` in the header). `tests/fixtures/ui-copy.fr.json` confirms it: the *only* difference in the French rendering is the picker's two option labels.
+- **Switching** stores the preference, rewrites `?lang=` and reloads, so every panel is rebuilt from the catalog rather than patched in place; `<html lang>` follows the locale.
+- **`tests/i18n.test.ts`** (10 tests): no key defined twice, every French key translated with no empty message, the two locales are kept apart except for cognates and the language names, interpolation and plural selection, the `resolveLocale` truth table, `<html lang>` following `setLocale`, and the **lint**: comments stripped, then every string literal of `src/**` scanned for accents and for a French stop-word list. A shrinking `PENDING_MIGRATION` list names the files still to migrate and the test fails if an entry has become clean, so the list cannot be forgotten.
+- **`tools/verify-i18n.mjs`** renders the same scripted state in both locales and requires every migrated panel to change language, no French left in the English copy, the picker to round-trip, and the English header not to overflow at 390 px. It carries the same shrinking discipline (pending buckets, and a pending flag for the help catalog).
+- GATES: `npm run typecheck` ok (both configs); `npx vitest run` 271/271; `node tools/gates.mjs` nine verifiers OK; baseline unchanged `e953dcdc`.
+

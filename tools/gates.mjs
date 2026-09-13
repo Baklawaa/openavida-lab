@@ -25,6 +25,7 @@ const TOOLS = [
   "tools/verify-research.mjs",
   "tools/verify-history.mjs",
   "tools/verify-copy.mjs",
+  "tools/verify-i18n.mjs",
   "tools/verify-worker.mjs",
   "tools/verify-determinism.mjs",
   "tools/launch.mjs",

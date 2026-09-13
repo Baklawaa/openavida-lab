@@ -66,6 +66,7 @@ import { CONTROL_HELP, attachControlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
+import { applyDocumentLang, locale, switchLocale, type Locale } from "./ui/i18n/runtime";
 import { ModelPanel } from "./ui/modelPanel";
 import { DEFAULT_OVERLAY_ALPHA, describeExudate, EXUDATE_OVERLAY_ALPHA, normalizeOverlay } from "./render/overlay";
 import { researchHtml } from "./ui/researchCard";
@@ -143,6 +144,15 @@ export function mount(root: HTMLElement): void {
   if (state.flags.view3d) state.surface = "3d";
 
   const { viz, stage, canvas, canvas3d, hud, cursors, side, cFit, cShan, cPhy } = createLabLayout(root);
+  // The shell was rendered in the active locale; mirror it onto <html lang> and
+  // let the picker switch (it stores the choice, rewrites ?lang= and reloads, so
+  // every panel is rebuilt from the catalog rather than patched in place).
+  applyDocumentLang();
+  const langSelect = root.querySelector<HTMLSelectElement>("#lang-select");
+  if (langSelect) {
+    langSelect.value = locale();
+    langSelect.addEventListener("change", () => switchLocale(langSelect.value as Locale));
+  }
   const trailCanvas = root.querySelector<HTMLCanvasElement>("#gl-trail")!;
   type Panel = "organisms" | "environment" | "analysis" | "species" | "experiment";
   const PANELS: readonly Panel[] = ["organisms", "environment", "analysis", "species", "experiment"];
