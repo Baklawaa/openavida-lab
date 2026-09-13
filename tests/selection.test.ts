@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  LINEAGE_TOP_N,
   World,
   fixationVsDrift,
   molecularClock,
@@ -49,6 +50,23 @@ describe("selection and drift", () => {
     const off = new World({ width: 12, height: 12, startPopulation: 12, seed: 3, recordTraitDistribution: false });
     for (let i = 0; i < 5; i++) off.step();
     expect(off.history.at(-1)!.traitDist).toBeUndefined();
+  });
+
+  it("stores a bounded per-lineage series on every history row", () => {
+    const w = new World({ width: 24, height: 24, startPopulation: 40, seed: 6, mutationRate: 0.4 });
+    for (let i = 0; i < 30; i++) w.step();
+    const row = w.history.at(-1)!;
+    expect(row.lineageTop).toBeDefined();
+    expect(row.lineageTop!.length).toBeGreaterThan(0);
+    expect(row.lineageTop!.length).toBeLessThanOrEqual(LINEAGE_TOP_N);
+    // Counts descend, then ids ascend: the ordering the card relies on.
+    for (let i = 1; i < row.lineageTop!.length; i++) {
+      const [prevId, prevCount] = row.lineageTop![i - 1]!;
+      const [id, count] = row.lineageTop![i]!;
+      expect(prevCount > count || (prevCount === count && prevId < id)).toBe(true);
+    }
+    // Every stored lineage is alive and matches the world's own count.
+    for (const [id, count] of row.lineageTop!) expect(w.lineages.get(id)!.count).toBe(count);
   });
 
   it("summarises a trait distribution and a molecular clock", () => {

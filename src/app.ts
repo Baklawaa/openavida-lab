@@ -67,6 +67,7 @@ import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
 import { ModelPanel } from "./ui/modelPanel";
+import { DEFAULT_OVERLAY_ALPHA, describeExudate, EXUDATE_OVERLAY_ALPHA, normalizeOverlay } from "./render/overlay";
 import { researchHtml } from "./ui/researchCard";
 import { BRUSH_LABEL, BRUSH_ORDER, DEATH_LABEL, FIELD_LABEL, SCHED_PARAM_LABEL } from "./ui/labels";
 
@@ -712,6 +713,8 @@ export function mount(root: HTMLElement): void {
       species.refresh();
       goals.refresh();
       updatePlayback();
+      const note = document.getElementById("field-note");
+      if (note) note.textContent = renderer.fieldMode === 5 ? describeExudate(w) : "";
       state.lastUi = now;
     }
     const gl = state.surface === "3d" && view3d ? view3d.gl : renderer.gl;
@@ -1506,20 +1509,13 @@ export function mount(root: HTMLElement): void {
     }
   }
 
-  const exudateLayer = { data: new Float32Array(0), w: 0, h: 0 };
-  /** Normalised (0–1) exudate field for the layer overlay, in a reused buffer. */
+  const exudateLayer = { data: new Float32Array(0) };
+  /** Normalised exudate field for the layer overlay, in a reused buffer. */
   function exudateOverlay(w: World): Float32Array {
     const n = w.w * w.h;
     if (exudateLayer.data.length !== n) exudateLayer.data = new Float32Array(n);
-    exudateLayer.w = w.w;
-    exudateLayer.h = w.h;
-    const out = exudateLayer.data;
-    const src = w.fields.exudate;
-    let max = 0;
-    for (let i = 0; i < n; i++) if (src[i]! > max) max = src[i]!;
-    const scale = max > 0 ? 1 / max : 0;
-    for (let i = 0; i < n; i++) out[i] = src[i]! * scale;
-    return out;
+    normalizeOverlay(w.fields.exudate, exudateLayer.data);
+    return exudateLayer.data;
   }
 
   let lastFrame = performance.now();
@@ -1554,10 +1550,13 @@ export function mount(root: HTMLElement): void {
       renderer.heatSize = [shown.w, shown.h];
       if (renderer.fieldMode === 5) {
         // Exudate layer: the fifth field normalised to its own maximum, drawn
-        // through the same R8 overlay path as the strain heat map.
+        // through the same R8 overlay path as the strain heat map, at the
+        // overlay alpha and gamma that make a thin field readable.
         renderer.heatStrain = exudateOverlay(shown);
         renderer.heatColor = [0.72, 0.45, 1];
+        renderer.heatAlpha = EXUDATE_OVERLAY_ALPHA;
       } else {
+        renderer.heatAlpha = DEFAULT_OVERLAY_ALPHA;
         const heatId = shown.heatStrainId;
         renderer.heatStrain = heatId === null ? null : shown.heat.normalized(heatId);
         const strain = heatId !== null ? shown.strains.get(heatId) : undefined;

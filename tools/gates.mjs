@@ -21,6 +21,7 @@ const base = `http://127.0.0.1:${port}/`;
 
 const TOOLS = [
   "tools/verify-interface.mjs",
+  "tools/verify-exudate.mjs",
   "tools/verify-worker.mjs",
   "tools/verify-determinism.mjs",
   "tools/launch.mjs",

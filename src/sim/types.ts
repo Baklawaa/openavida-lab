@@ -193,6 +193,9 @@ export interface ExtinctionRecord {
   peakCount: number;
 }
 
+/** Living lineages kept per history row for the lineage-level selection readout. */
+export const LINEAGE_TOP_N = 5;
+
 export interface MetricsSample {
   tick: number;
   population: number;
@@ -209,6 +212,12 @@ export interface MetricsSample {
   strategies?: Record<string, number>;
   /** Per strain: [cx, cy, spread, temperature, nutrient], 2-decimal. */
   strainTracks?: Record<string, [number, number, number, number, number]>;
+  /**
+   * Up to LINEAGE_TOP_N living lineages as [id, count], by count desc then id.
+   * Bounded on purpose: it is enough to estimate selection between lineages
+   * inside a single strain, without storing every lineage on every tick.
+   */
+  lineageTop?: ReadonlyArray<[number, number]>;
   /** Hill numbers over living lineages (q = 1 and 2), sample-size aware. */
   hill1?: number;
   hill2?: number;

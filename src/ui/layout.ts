@@ -86,7 +86,7 @@ export function createLabLayout(root: HTMLElement) {
             <button id="tool-place" class="active" aria-pressed="true">${icon("plus")}<span>Placer</span><kbd>O</kbd></button>
             <button id="tool-paint" aria-pressed="false">${icon("paint")}<span>Peindre</span><kbd>P</kbd></button>
           </div>
-          <span id="field-legend" class="field-legend"><i class="dot nutrient"></i>Nutriments <i class="dot toxin"></i>Toxines <i class="dot light"></i>Lumière</span>
+          <div class="stage-notes"><span id="field-legend" class="field-legend"><i class="dot nutrient"></i>Nutriments <i class="dot toxin"></i>Toxines <i class="dot light"></i>Lumière</span><span id="field-note" class="field-note"></span></div>
           <div id="cell-readout" class="cell-readout" hidden></div>
         </div>
         <div class="playback-stack">

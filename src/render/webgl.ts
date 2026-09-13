@@ -97,13 +97,14 @@ uniform sampler2D uHeat;
 uniform vec2 uRes;
 uniform vec4 uCrop;
 uniform vec3 uColor;
+uniform float uAlpha;
 out vec4 fragColor;
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 local = vec2(uv.x, 1.0 - uv.y);
   vec2 tuv = vec2(mix(uCrop.x, uCrop.z, local.x), mix(uCrop.y, uCrop.w, local.y));
   float h = texture(uHeat, tuv).r;
-  fragColor = vec4(uColor, h * 0.42);
+  fragColor = vec4(uColor, h * uAlpha);
 }
 `;
 
@@ -180,6 +181,8 @@ function hsl(h: number, s: number, l: number): [number, number, number] {
   return [f(0), f(8), f(4)];
 }
 
+import { overlayByte } from "./overlay";
+
 export function hexRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
@@ -239,6 +242,8 @@ export class LabRenderer {
   heatStrain: Float32Array | null = null;
   heatSize: [number, number] = [0, 0];
   heatColor: [number, number, number] = [0.2, 0.85, 0.7];
+  /** Overlay opacity; the exudate layer raises it (see render/overlay.ts). */
+  heatAlpha = 0.42;
   private cropA: [number, number, number, number] = [0, 0, 1, 1];
   private cropB: [number, number, number, number] = [0, 0, 1, 1];
 
@@ -414,7 +419,7 @@ export class LabRenderer {
     const gl = this.gl;
     const n = world.w * world.h;
     if (this.heatBytes.length !== n) this.heatBytes = new Uint8Array(n);
-    for (let i = 0; i < n; i++) this.heatBytes[i] = Math.max(0, Math.min(255, Math.round(map[i]! * 255)));
+    for (let i = 0; i < n; i++) this.heatBytes[i] = overlayByte(map[i]!);
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D, this.heatTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -425,6 +430,7 @@ export class LabRenderer {
     gl.uniform2f(gl.getUniformLocation(this.heatProg, "uRes"), this.canvas.width, this.canvas.height);
     gl.uniform4f(gl.getUniformLocation(this.heatProg, "uCrop"), ...this.cropA);
     gl.uniform3f(gl.getUniformLocation(this.heatProg, "uColor"), ...this.heatColor);
+    gl.uniform1f(gl.getUniformLocation(this.heatProg, "uAlpha"), this.heatAlpha);
     gl.uniform1i(gl.getUniformLocation(this.heatProg, "uHeat"), 4);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.disable(gl.BLEND);

@@ -45,6 +45,7 @@ import {
   DEATH_LOG_KEEP,
   DEATH_LOG_MAX,
   DEFAULT_PARAMS,
+  LINEAGE_TOP_N,
   RESEARCH_LOG_KEEP,
   RESEARCH_LOG_MAX,
   SNAPSHOT_VERSION,
@@ -864,6 +865,12 @@ export class World {
     m.hill1 = hill1;
     m.hill2 = hill2;
     m.evenness = shannonEvenness(livingCounts);
+    const topLineages = [...this.lineages.values()]
+      .filter((l) => l.count > 0)
+      .sort((a, b) => b.count - a.count || a.id - b.id)
+      .slice(0, LINEAGE_TOP_N)
+      .map((l) => [l.id, l.count] as [number, number]);
+    if (topLineages.length) m.lineageTop = topLineages;
     m.meanOffspringPerAdult = this.meanOffspringPerAdult();
     if (this.params.recordTraitDistribution) m.traitDist = traitDistribution(this.organisms);
     this.history.push(m);

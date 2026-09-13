@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Timeline, World, estimateSnapshotBytes, founderPhototroph, placeOrganismAt } from "../src/sim/index";
+import { Timeline, World, founderPhototroph, placeOrganismAt } from "../src/sim/index";
 
 describe("Timeline", () => {
   it("records on the cadence and keeps tick 0", () => {
@@ -15,10 +15,27 @@ describe("Timeline", () => {
   });
 
   it("evicts the oldest after the first when the byte budget is exceeded", () => {
-    const w = new World({ width: 8, height: 8, seed: 1, startPopulation: 0 });
-    placeOrganismAt(w, 2, 2, founderPhototroph());
-    const one = estimateSnapshotBytes(w.organisms.length, 64);
-    const tl = new Timeline({ every: 1, budgetBytes: Math.floor(one * 2.4) });
+    const build = () => {
+      const world = new World({ width: 8, height: 8, seed: 1, startPopulation: 0 });
+      placeOrganismAt(world, 2, 2, founderPhototroph());
+      return world;
+    };
+    // Entries grow as the run accumulates history (each one embeds the whole
+    // history), so the budget is derived from a measured run instead of from a
+    // fixed estimate: one byte short of holding everything forces exactly one
+    // eviction of the oldest entry after tick 0.
+    const probeWorld = build();
+    const probe = new Timeline({ every: 1 });
+    probe.record(probeWorld);
+    for (let i = 0; i < 5; i++) {
+      probeWorld.step();
+      probe.record(probeWorld);
+    }
+    const total = probe.usedBytes();
+    const biggest = Math.max(...probe.entries().map((e) => e.bytes));
+
+    const w = build();
+    const tl = new Timeline({ every: 1, budgetBytes: total - 1 });
     tl.record(w);
     for (let i = 0; i < 5; i++) {
       w.step();
@@ -28,7 +45,7 @@ describe("Timeline", () => {
     expect(ticks[0]).toBe(0);
     expect(ticks.length).toBeGreaterThanOrEqual(2);
     expect(ticks.length).toBeLessThan(6);
-    expect(tl.usedBytes()).toBeLessThanOrEqual(tl.budgetBytes + one);
+    expect(tl.usedBytes()).toBeLessThanOrEqual(tl.budgetBytes + biggest);
   });
 
   it("nearest picks the closest tick, lower on a tie", () => {

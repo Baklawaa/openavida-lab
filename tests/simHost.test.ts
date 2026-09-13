@@ -66,6 +66,9 @@ describe("SimHost: shared op application and frames", () => {
     expect(mirror.hashState()).toBe(src.hashState());
     expect(mirror.tick).toBe(src.tick);
     expect(mirror.history.length).toBe(src.history.length);
+    // The bounded per-lineage series used by the selection readout crosses the
+    // worker boundary inside the history rows.
+    expect(mirror.history.at(-1)?.lineageTop).toEqual(src.history.at(-1)?.lineageTop);
     expect(mirror.strains.size).toBe(src.strains.size);
     expect(mirror.innovations.length).toBe(src.innovations.length);
     expect(mirror.lineages.size).toBe(src.lineages.size);

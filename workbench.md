@@ -441,3 +441,26 @@ tsc ok; vitest **221/221**; build ok; `node tools/gates.mjs` → all four browse
 - **Wider typecheck.** `tsconfig.tools.json` (extends the base, adds node types) now typechecks `tests/` and `tools/` too; `npm run typecheck` runs both. It immediately found **5 latent fixture bugs** — test `TrialResult`/`TrialSummary` literals missing `finalHash`, `successRateCI` and `medianTicksCI` added in Stages 3–4 — all fixed.
 - **Visual check found and fixed a real bug.** The exudate legend was long enough to overlap the paint HUD on the plate; it is now the same shape as the other layers ("Exsudat — faible → élevé"), verified by a bounding-box probe (`legendOverlapsHud: false`) and by screenshot. The violet exudate layer renders around productive phototrophs; page errors: none.
 - GATES: tsc ok on both configs; vitest **231/231**; build ok; browser gates all OK; dev server running on http://127.0.0.1:5174/ (HTTP 200).
+
+## Follow-up fixes from the visual check (2026-09-13)
+
+Two "not bugs" turned out to be defects once looked at, plus three further bugs surfaced while fixing them. **No model change: the perf hash stays `185d6460`.**
+
+### Exudate layer legibility
+- `FS_HEAT` hard-coded `h * 0.42` alpha and `drawHeat` quantised the normalised field linearly, so a cell at 2 % of the peak rounded to 5/255 and vanished. The shader now takes `uAlpha` and the byte conversion goes through a 1024-entry gamma LUT (`render/overlay.ts`, gamma 0.5) — a 2 % cell becomes 36/255 — while the exudate layer raises alpha to 0.62.
+- New pure module `src/render/overlay.ts`: `normalizeOverlay`, `overlayByte`, `describeExudate`, the two alphas and the gamma, all unit tested.
+- The plate now states what the layer holds: "56 producteurs · 2626 cellules éclairées · max 0.079 · total 19.65", refreshed on the 250 ms UI cadence, in a `#field-note` under `#field-legend`. First placement overlapped the paint HUD at 1440×900 (caught by the new probe's bounding-box assertion), so the notes column moved above the HUD band.
+
+### Selection readout in a single-strain run
+- `MetricsSample.lineageTop` stores up to `LINEAGE_TOP_N = 5` living lineages `[id, count]` per history row (derived, no RNG; carried through snapshots and worker frames by the existing shallow history copies).
+- `researchCard.selectionRows` keeps strains as the primary grouping and falls back to lineages inside a single strain, ranking candidates by trajectory length so it reports the lineages that actually have a fittable series. Verified in the running app: "SÉLECTION PAR LIGNÉE (souche unique) · Lignée 3 — 44 % — s = 0.0022 / pas · Lignée 2 — 5 % — s = −0.0055 / pas".
+- When nothing can be fitted the card names the reason (population clonale unique / historique trop court / fréquences fixées / aucun organisme vivant) instead of printing "—".
+
+### Bugs found while testing
+1. `lineageSeries` broke at the first row lacking an entry, and tick 0 of an empty world has no organisms and therefore no series — so every lineage looked empty in a live run. Rows before a lineage existed are now skipped; a gap after it was tracked still ends the series. Regression test added.
+2. The timeline eviction test derived its budget from a fixed estimate while entries embed the whole history and grow every tick; it now measures a real run. Its failure exposed that `traitDist` stored full float precision in every history row (~1.2 kB/row); values are rounded to three decimals, cutting the growth to ~1.0 kB/row.
+3. `MetricsSample` was not exported from the sim barrel; it is now public API.
+
+### Verification
+- `npm run typecheck` (src + tests/tools), `npm test` **241/241**, `node tools/gates.mjs` → all five browser checks including the new `tools/verify-exudate.mjs`, baseline `185d6460`.
+- `tools/verify-exudate.mjs` measures the plate: violet mean −5.45 without the layer, −2.18 with it (delta 3.27, threshold 0.4), note naming 56 producers, no page errors, notes clear of the HUD.

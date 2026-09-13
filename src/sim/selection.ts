@@ -64,12 +64,15 @@ export function traitDistribution(organisms: readonly Organism[]): Partial<Recor
     const m = values.reduce((s, v) => s + v, 0) / n;
     let ss = 0;
     for (const v of values) ss += (v - m) ** 2;
+    // Rounded to three decimals: this lands in every history row, which the
+    // timeline embeds in every snapshot, so full float precision is pure waste.
+    const r3 = (v: number) => Math.round(v * 1000) / 1000;
     out[trait] = {
-      mean: m,
-      sd: n > 1 ? Math.sqrt(ss / (n - 1)) : 0,
-      q05: values[Math.floor(0.05 * (n - 1))]!,
-      q50: values[Math.floor(0.5 * (n - 1))]!,
-      q95: values[Math.floor(0.95 * (n - 1))]!,
+      mean: r3(m),
+      sd: r3(n > 1 ? Math.sqrt(ss / (n - 1)) : 0),
+      q05: r3(values[Math.floor(0.05 * (n - 1))]!),
+      q50: r3(values[Math.floor(0.5 * (n - 1))]!),
+      q95: r3(values[Math.floor(0.95 * (n - 1))]!),
     };
   }
   return out;
