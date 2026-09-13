@@ -1,140 +1,48 @@
 import { drawFitness, drawPhylogeny, drawShannon, phylogenyHitAt, type PhylogenyHit } from "./render/charts";
-import { GenomeBrowser, genesHtml, phenotypeTableHtml } from "./render/genomeBrowser";
+import { GenomeBrowser } from "./render/genomeBrowser";
 import { DnaEditor } from "./ui/dnaEditor";
 import { Explorer } from "./ui/explorer";
 import { SpeciesPanel } from "./ui/speciesPanel";
 import { GoalPanel } from "./ui/goalPanel";
 import { WorkerHost } from "./ui/workerHost";
-import { LabRenderer, type FieldMode, type ViewMode } from "./render/webgl";
+import { LabRenderer, type ViewMode } from "./render/webgl";
 import { View3D } from "./render/view3d";
 import {
   DualWorld,
   InlineHost,
   World,
-  bodySize,
   applyRecipe,
-  buildShareURL,
   canDriveClock,
   canMutateWorld,
-  handleIncoming,
   decodeGenome,
-  encodeSnapshot,
-  exportEventsJSONL,
-  exportJSON,
-  exportMetricsCSV,
-  exportPhylogenyCSV,
-  CAUSE_COLOR,
-  CAUSE_LABEL,
-  EVENT_COLOR,
   DNA_KITS,
-  dnaSnippet,
   flagsFromQuery,
-  flagsToQuery,
-  founderHeterotroph,
   genomeForKit,
-  inspectBiochem,
   mappingLegend,
-  pathwaysHtml,
-  RoomSession,
-  strongestLiving,
-  tallyDeaths,
-  tracesHtml,
   parseShareURL,
-  parseWorldBytes,
   recipeFromQuery,
-  peerColor,
-  provenanceOf,
-  takeSnapshot,
-  toGenomeTrack,
-  worldFromSnapshot,
+  strongestLiving,
   type BrushKind,
-  type Recipe,
-  type DeathCause,
   type FeatureFlags,
-  type FieldName,
-  type PeerRole,
-  type RoomOp,
-  type ScheduledOp,
+  type Recipe,
   type Side,
   type SimHost,
-  type SimParams,
   type StepSide,
-  type WorldSnapshot,
 } from "./sim/index";
-import { shouldWriteEditor, type EditorSyncReason } from "./ui/editorSync";
-import { formatSpeed, ticksDue } from "./ui/speed";
+import { ticksDue } from "./ui/speed";
 import { attachControlHelp, controlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
-import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
 import { applyDocumentLang, locale, switchLocale, tDynamic, type Locale } from "./ui/i18n/runtime";
 import { ModelPanel } from "./ui/modelPanel";
 import { DEFAULT_OVERLAY_ALPHA, describeExudate, EXUDATE_OVERLAY_ALPHA, normalizeOverlay } from "./render/overlay";
-import { researchHtml } from "./ui/researchCard";
-import { BRUSH_LABEL, BRUSH_ORDER, DEATH_LABEL, FIELD_LABEL, SCHED_PARAM_LABEL } from "./ui/labels";
-
-const BRUSHES: { id: BrushKind; label: string }[] = BRUSH_ORDER.map((id) => ({
-  id,
-  label: BRUSH_LABEL[id],
-}));
-
-
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string> = {},
-  html = "",
-): HTMLElementTagNameMap[K] {
-  const n = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") n.className = v;
-    else n.setAttribute(k, v);
-  }
-  if (html) n.innerHTML = html;
-  return n;
-}
-
-function saveBlob(filename: string, blob: Blob): void {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function download(filename: string, text: string, mime: string): void {
-  saveBlob(filename, new Blob([text], { type: mime }));
-}
-
-/** Binary twin of download: the .oav container is an ArrayBuffer, not text. */
-function downloadBytes(filename: string, bytes: ArrayBuffer, mime: string): void {
-  saveBlob(filename, new Blob([bytes], { type: mime }));
-}
-
-/**
- * Sentence of one world event. The sim stores structured fields only
- * (kind, tick, ids); the copy lives in the locale catalog.
- */
-function eventText(w: World, e: World["events"][number]): string {
-  switch (e.kind) {
-    case "lineage-dominant":
-      return tDynamic("sim.event.lineage-dominant", { lineage: e.lineageId ?? 0 });
-    case "lineage-collapse":
-      return tDynamic("sim.event.lineage-collapse", { lineage: e.lineageId ?? 0 });
-    case "first-predation":
-      return tDynamic("sim.event.first-predation");
-    case "innovation-sweep":
-      return tDynamic("sim.event.innovation-sweep", { innovation: e.innovationId ?? 0 });
-    case "strain-extinct": {
-      const id = e.strainId ?? 0;
-      return tDynamic("sim.event.strain-extinct", { name: w.strains.get(id)?.name ?? `Strain ${id}` });
-    }
-    case "population-crash":
-      return tDynamic("sim.event.population-crash");
-    case "population-boom":
-      return tDynamic("sim.event.population-boom");
-  }
-}
+import { el, type LabContext, type LabState } from "./ui/lab/context";
+import { createExports } from "./ui/lab/exports";
+import { createExperimental } from "./ui/lab/experimental";
+import { createFeeds } from "./ui/lab/feeds";
+import { createSchedulePanel } from "./ui/lab/schedulePanel";
+import { createTimelineBar } from "./ui/lab/timelineBar";
+import { createWorldControls } from "./ui/lab/worldControls";
 
 export function mount(root: HTMLElement): void {
   const q = typeof location !== "undefined" ? location.search : "";
@@ -154,7 +62,7 @@ export function mount(root: HTMLElement): void {
           })(),
         );
   const dual = host.dual;
-  const state = {
+  const state: LabState = {
     view: "A" as ViewMode,
     paused: false,
     speed: 2,
@@ -165,12 +73,12 @@ export function mount(root: HTMLElement): void {
     tool: "place" as LabTool,
     kit: "phototroph",
     selectedId: -1,
-    snapshot: null as WorldSnapshot | null,
+    snapshot: null,
     lastUi: 0,
     flags,
     surface: "2d" as "2d" | "3d",
-    room: null as RoomSession | null,
-    roomPost: null as ((op: RoomOp) => void) | null,
+    room: null,
+    roomPost: null,
     roomClose: null as (() => void) | null,
     preview: null as World | null,
     previewTick: null as number | null,
@@ -188,55 +96,6 @@ export function mount(root: HTMLElement): void {
     langSelect.addEventListener("change", () => switchLocale(langSelect.value as Locale));
   }
   const trailCanvas = root.querySelector<HTMLCanvasElement>("#gl-trail")!;
-  type Panel = "organisms" | "environment" | "analysis" | "species" | "experiment";
-  const PANELS: readonly Panel[] = ["organisms", "environment", "analysis", "species", "experiment"];
-  const openTab = (panel: Panel) => {
-    if (panel === "experiment" || panel === "species") openPanel(panel);
-    else setTool(panel === "environment" ? "paint" : panel === "analysis" ? "inspect" : "place");
-  };
-  function openPanel(panel: Panel, focus = false): void {
-    root.querySelectorAll<HTMLElement>("[role=tabpanel]").forEach(p => p.hidden = p.id !== "panel-" + panel);
-    root.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach(b => {
-      const active = b.dataset.panel === panel;
-      b.classList.toggle("active", active);
-      b.setAttribute("aria-selected", String(active));
-      b.tabIndex = active ? 0 : -1;
-      if (active && focus) b.focus();
-    });
-    root.querySelector(".side-scroll")!.scrollTop = 0;
-    requestAnimationFrame(layout);
-  }
-  root.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach(b => {
-    b.addEventListener("click", () => openTab(b.dataset.panel as Panel));
-    b.addEventListener("keydown", ev => {
-      const n = PANELS.length;
-      const index = PANELS.indexOf(b.dataset.panel as Panel);
-      const next = ev.key === "ArrowRight" ? (index + 1) % n : ev.key === "ArrowLeft" ? (index + n - 1) % n : ev.key === "Home" ? 0 : ev.key === "End" ? n - 1 : -1;
-      if (next >= 0) {
-        ev.preventDefault();
-        const panel = PANELS[next]!;
-        openTab(panel);
-        root.querySelector<HTMLButtonElement>("#tab-" + panel)!.focus();
-      }
-    });
-  });
-  const helpDialog = root.querySelector<HTMLDialogElement>("#help-dialog")!;
-  root.querySelector("#btn-help")!.addEventListener("click", () => helpDialog.showModal());
-  root.querySelector(".brand")!.addEventListener("click", ev => { ev.preventDefault(); openPanel("organisms"); });
-  root.querySelector("#btn-focus")!.addEventListener("click", () => {
-    const focused = root.classList.toggle("focus-mode");
-    root.querySelector("#btn-focus")!.setAttribute("aria-pressed", String(focused));
-    root.querySelector("#btn-focus")!.setAttribute("aria-label", focused ? tDynamic("app.focus.restore") : tDynamic("app.focus.enlarge"));
-    layout();
-  });
-  side.addEventListener("toggle", () => requestAnimationFrame(layout), true);
-
-  const brushRow = root.querySelector("#brushes")!;
-  for (const b of BRUSHES) {
-    const btn = el("button", { type: "button", id: "brush-" + b.id, "data-brush": b.id }, b.label);
-    if (b.id === state.brush) btn.classList.add("active");
-    brushRow.append(btn);
-  }
   const kitRow = root.querySelector("#dna-kits")!;
   const showKit = (id: string) => {
     state.kit = id;
@@ -277,26 +136,7 @@ export function mount(root: HTMLElement): void {
     view3d.resize(r.width, r.height);
     return view3d;
   }
-  function setSurface(which: "2d" | "3d"): void {
-    state.surface = which;
-    state.flags.view3d = which === "3d";
-    canvas.classList.toggle("off", which === "3d");
-    canvas3d.classList.toggle("on", which === "3d");
-    root.querySelector("#view-2d")!.classList.toggle("active", which === "2d");
-    root.querySelector("#view-3d")!.classList.toggle("active", which === "3d");
-    root.querySelector("#view-2d")!.setAttribute("aria-pressed", String(which === "2d"));
-    root.querySelector("#view-3d")!.setAttribute("aria-pressed", String(which === "3d"));
-    (root.querySelector("#zoom-top") as HTMLInputElement).disabled = which === "3d";
-    root.querySelector("#view-hint")!.textContent = which === "3d" ? tDynamic("app.view.hint3d") : root.querySelector("#place-hint")!.textContent;
-    if (which === "3d" && state.view === "split") setView(dual.active);
-    (root.querySelector("#opt-view3d input") as HTMLInputElement).checked = which === "3d";
-    if (which === "3d") {
-      const v = ensure3d();
-      const r = viz.getBoundingClientRect();
-      v.resize(r.width, r.height);
-    }
-    layout();
-  }
+
   const gbCanvas = root.querySelector("#gbrowser") as HTMLCanvasElement;
   const browser = new GenomeBrowser(gbCanvas);
   (root.querySelector("#seed") as HTMLInputElement).value = String(dual.a.params.seed);
@@ -310,47 +150,62 @@ export function mount(root: HTMLElement): void {
     (root.querySelector("#status-line") as HTMLElement).textContent = msg;
   }
 
-  function emitOp(op: RoomOp): void {
-    if (!state.room || !state.roomPost) return;
-    if (op.kind === "cursor" || op.kind === "hello" || op.kind === "bye" || op.kind === "role" || op.kind === "pause") {
-      state.roomPost(op);
-      return;
-    }
-    if (state.room.isHost) {
-      state.roomPost({ kind: "snapshot", snap: current().snapshot() });
-      return;
-    }
-    state.roomPost(op);
-  }
+  // The context every lab module works through. Fields are filled in as the
+  // services they name are created, so a constructor callback can close over the
+  // context before its neighbours exist; the factories just below also bind the
+  // callbacks one module has to reach in another.
+  const ctx = {} as LabContext;
+  ctx.root = root;
+  ctx.state = state;
+  ctx.dual = dual;
+  ctx.host = host;
+  ctx.canvas = canvas;
+  ctx.canvas3d = canvas3d;
+  ctx.viz = viz;
+  ctx.stage = stage;
+  ctx.hud = hud;
+  ctx.cursors = cursors;
+  ctx.side = side;
+  ctx.current = current;
+  ctx.viewWorld = viewWorld;
+  ctx.sideOf = sideOf;
+  ctx.stepWhich = stepWhich;
+  ctx.status = status;
+  ctx.renderer = renderer;
+  ctx.view3d = () => view3d;
+  ctx.ensure3d = ensure3d;
+  ctx.layout = layout;
+  ctx.refreshMetrics = refreshMetrics;
+  ctx.drawCharts = drawCharts;
+  ctx.browser = browser;
+  ctx.setTool = setTool;
+  ctx.tagStrain = tagStrain;
+  ctx.loadSeqIntoBuilder = loadSeqIntoBuilder;
 
-  function emitCursor(x: number, y: number): void {
-    if (!state.room) return;
-    const op = state.room.setCursor(x, y);
-    if (op) emitOp(op);
-  }
-
-  function paintPeers(): void {
-    const host = root.querySelector("#mp-peers")!;
-    if (!state.room) {
-      host.textContent = tDynamic("app.mp.enable");
-      cursors.innerHTML = "";
-      return;
-    }
-    const rows = [...state.room.peers.values()].map((p) => `${p.name} (${p.role})`);
-    host.textContent = rows.join(" · ") || "no peers";
-    cursors.innerHTML = "";
-    const w = current();
-    for (const p of state.room.peers.values()) {
-      if (p.id === state.room.selfId) continue;
-      const pos = renderer.gridToCanvas(p.x, p.y, w);
-      const d = el("div", { class: "mp-cursor" });
-      d.style.left = `${pos.x}px`;
-      d.style.top = `${pos.y}px`;
-      d.style.borderColor = p.color;
-      d.title = p.name;
-      cursors.append(d);
-    }
-  }
+  const worldControls = createWorldControls(ctx);
+  ctx.openPanel = worldControls.openPanel;
+  ctx.openTab = worldControls.openTab;
+  ctx.setView = worldControls.setView;
+  ctx.setField = worldControls.setField;
+  ctx.setSurface = worldControls.setSurface;
+  ctx.setSpeed = worldControls.setSpeed;
+  ctx.updatePlayback = worldControls.updatePlayback;
+  ctx.setChartsCollapsed = worldControls.setChartsCollapsed;
+  const feeds = createFeeds(ctx);
+  ctx.paintFeeds = feeds.paintFeeds;
+  ctx.selectOrganism = feeds.selectOrganism;
+  const timelineBar = createTimelineBar(ctx);
+  ctx.refreshTimeline = timelineBar.refresh;
+  ctx.previewTick = timelineBar.preview;
+  const schedulePanel = createSchedulePanel(ctx);
+  ctx.refreshScheduleList = schedulePanel.refresh;
+  createExports(ctx);
+  const experimental = createExperimental(ctx);
+  ctx.emitOp = experimental.emitOp;
+  ctx.emitCursor = experimental.emitCursor;
+  ctx.paintPeers = experimental.paintPeers;
+  ctx.setBrains = experimental.setBrains;
+  ctx.joinRoom = experimental.joinRoom;
 
   const dna = new DnaEditor(root.querySelector<HTMLElement>("#dna-editor")!, {
     status,
@@ -364,7 +219,7 @@ export function mount(root: HTMLElement): void {
         return;
       }
       host.apply({ kind: "replaceGenome", which: sideOf(current()), orgId: state.selectedId, genome: seq });
-      selectOrganism(current(), state.selectedId, "apply");
+      ctx.selectOrganism(current(), state.selectedId, "apply");
       status(tDynamic("app.dna.applied"));
     },
     onPlace: () => {
@@ -385,6 +240,7 @@ export function mount(root: HTMLElement): void {
         : tDynamic("app.dna.envCenter", { x: Math.floor(w.w / 2), y: Math.floor(w.h / 2) });
     },
   });
+  ctx.dna = dna;
   const editorGenome = (): string => dna.sequence || genomeForKit(state.kit);
   let explorerRef: Explorer | null = null;
   const goals = new GoalPanel(root.querySelector<HTMLElement>("#panel-goals")!, {
@@ -395,31 +251,31 @@ export function mount(root: HTMLElement): void {
     restoreInto: (target, snap) => {
       if (target === "B") {
         host.apply({ kind: "restore", which: "B", snapshot: snap });
-        setView("B");
+        ctx.setView("B");
       } else {
         host.apply({ kind: "restore", which: sideOf(current()), snapshot: snap });
-        selectOrganism(current(), -1);
+        ctx.selectOrganism(current(), -1);
       }
-      paintFeeds();
+      ctx.paintFeeds();
       refreshMetrics();
     },
     replayInto: (snap) => {
       host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
-      setView("B");
+      ctx.setView("B");
       // A replay is meant to be watched: start playing at once (observation speed if the clock was stopped).
-      if (state.speed <= 0) setSpeed(2);
+      if (state.speed <= 0) ctx.setSpeed(2);
       state.paused = false;
-      updatePlayback();
-      paintFeeds();
+      ctx.updatePlayback();
+      ctx.paintFeeds();
       refreshMetrics();
     },
     // A catalog is read, not run: load the state into B, keep it stopped, and open the explorer on it.
     openCatalog: (snap) => {
       host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
       state.paused = true;
-      updatePlayback();
-      setView("B");
-      paintFeeds();
+      ctx.updatePlayback();
+      ctx.setView("B");
+      ctx.paintFeeds();
       refreshMetrics();
       explorer.open({ tab: "organisms" });
     },
@@ -428,12 +284,13 @@ export function mount(root: HTMLElement): void {
       const next = applyRecipe(recipe);
       const which: Side = target === "B" ? "B" : sideOf(current());
       host.apply({ kind: "replaceWorld", which, snapshot: next.snapshot(), recording: next.recording });
-      if (target === "B") setView("B");
-      else selectOrganism(current(), -1);
-      paintFeeds();
+      if (target === "B") ctx.setView("B");
+      else ctx.selectOrganism(current(), -1);
+      ctx.paintFeeds();
       refreshMetrics();
     },
   });
+  ctx.goals = goals;
   if (sharedRecipe) {
     status(tDynamic(sharedRecipe.ops.length > 1 ? "app.recipe.loaded.many" : "app.recipe.loaded.one", { count: sharedRecipe.ops.length }));
   }
@@ -455,7 +312,7 @@ export function mount(root: HTMLElement): void {
       tagStrain(current(), seq);
       const placed = host.apply({ kind: "inject", which: sideOf(current()), genome: seq, count: n }).count ?? 0;
       status(tDynamic("app.inject.count", { n: placed, world: dual.active }));
-      paintFeeds();
+      ctx.paintFeeds();
       refreshMetrics();
     },
     defineStrain: (genome, name) => host.apply({ kind: "defineStrain", which: sideOf(current()), genome, name, manual: true }).strain!,
@@ -475,13 +332,14 @@ export function mount(root: HTMLElement): void {
         return;
       }
       dna.load(inn.genome, { diffAgainst: inn.parentGenome ?? "" });
-      openTab("organisms");
+      ctx.openTab("organisms");
       root.querySelector("#dna-editor")?.scrollIntoView({ block: "nearest" });
       (root.querySelector("#dna-strip-section") as HTMLDetailsElement | null)?.setAttribute("open", "");
       status(tDynamic("app.mutation.loaded", { tick: inn.tick, kind: inn.kind }));
     },
   });
 
+  ctx.species = species;
   const explorer = new Explorer(root.querySelector<HTMLDialogElement>("#explorer-dialog")!, {
     status,
     world: () => viewWorld(),
@@ -489,7 +347,7 @@ export function mount(root: HTMLElement): void {
     store: goals.store,
     selectOrganism: (id) => {
       setTool("inspect");
-      selectOrganism(viewWorld(), id, "select");
+      ctx.selectOrganism(viewWorld(), id, "select");
       refreshMetrics();
     },
     highlightLineage: (id) => {
@@ -510,78 +368,18 @@ export function mount(root: HTMLElement): void {
     restoreInto: (_target, snap) => {
       host.apply({ kind: "replaceWorld", which: "B", snapshot: snap, recording: null });
       state.paused = true;
-      updatePlayback();
-      setView("B");
-      paintFeeds();
+      ctx.updatePlayback();
+      ctx.setView("B");
+      ctx.paintFeeds();
       refreshMetrics();
     },
   });
   explorerRef = explorer;
+  ctx.explorer = explorer;
 
   function loadSeqIntoBuilder(seq: string): void {
     dna.load(seq);
     (root.querySelector("#dna-builder") as HTMLDetailsElement).open = true;
-  }
-
-  function paintFeeds(): void {
-    const w = viewWorld();
-    const board = root.querySelector("#leaderboard")!;
-    const top = strongestLiving(w.organisms, 8);
-    if (top.length === 0) {
-      board.innerHTML = tDynamic("app.leaderboard.empty");
-    } else {
-      board.innerHTML = top
-        .map((o, i) => {
-          const ph = o.ph;
-          return `<button type="button" class="feed-row" data-org="${o.id}">
-            <div class="feed-head"><b>#${i + 1}</b> ${tDynamic("app.leaderboard.head", { fitness: o.fitness.toFixed(3), energy: o.energy.toFixed(2) })}</div>
-            <div class="muted">${tDynamic("app.leaderboard.traits", { lineage: o.lineageId, light: ph.photo.toFixed(2), uptake: ph.uptake.toFixed(2) })}</div>
-            <div class="dna">${dnaSnippet(o.genome)}</div>
-            <span class="use-dna" data-use="${o.id}">${tDynamic("app.leaderboard.useDna")}</span>
-          </button>`;
-        })
-        .join("");
-    }
-    const research = root.querySelector("#research-body");
-    if (research) research.innerHTML = researchHtml(w);
-    const eventLog = root.querySelector("#event-log")!;
-    const recentEvents = w.events.slice(-40).reverse();
-    root.querySelector("#event-count")!.textContent = String(w.events.length);
-    if (recentEvents.length === 0) {
-      eventLog.innerHTML = tDynamic("app.events.empty");
-    } else {
-      eventLog.innerHTML = recentEvents
-        .map((e) => {
-          const color = EVENT_COLOR[e.kind];
-          return `<button type="button" class="feed-row event-row" data-tick="${e.tick}" data-kind="${e.kind}" data-lineage="${e.lineageId ?? ""}" data-strain="${e.strainId ?? ""}">
-            <div class="feed-head" style="color:${color}">${eventText(w, e)}</div>
-            <div class="muted">${tDynamic("app.events.tick", { tick: e.tick })}</div>
-          </button>`;
-        })
-        .join("");
-    }
-    const tally = tallyDeaths(w.deaths);
-    const tallyEl = root.querySelector("#death-tally")!;
-    const causes = Object.keys(CAUSE_LABEL) as DeathCause[];
-    const parts = causes
-      .filter((k) => (tally[k] ?? 0) > 0)
-      .map((k) => `<span style="color:${CAUSE_COLOR[k]}">${tDynamic("app.deaths.tally", { label: DEATH_LABEL[k], count: tally[k] ?? 0 })}</span>`);
-    tallyEl.innerHTML = parts.length ? parts.join(" · ") : tDynamic("app.deaths.none");
-    const log = root.querySelector("#death-log")!;
-    const recent = w.deaths.slice(-16).reverse();
-    if (recent.length === 0) {
-      log.innerHTML = tDynamic("app.deaths.empty");
-    } else {
-      log.innerHTML = recent
-        .map((d) => {
-          return `<button type="button" class="feed-row" data-genome="${d.genome}">
-            <div class="feed-head" style="color:${CAUSE_COLOR[d.cause]}">${DEATH_LABEL[d.cause]}</div>
-            <div class="muted">${tDynamic("app.deaths.row", { tick: d.tick, org: d.orgId, lineage: d.lineageId, fitness: d.fitness.toFixed(3) })}</div>
-            <div class="dna">${dnaSnippet(d.genome)}</div>
-          </button>`;
-        })
-        .join("");
-    }
   }
 
   function setTool(tool: LabTool): void {
@@ -596,56 +394,12 @@ export function mount(root: HTMLElement): void {
     root.querySelector("#place-hint")!.textContent = hint;
     root.querySelector("#view-hint")!.textContent = state.surface === "3d" ? tDynamic("app.view.hint3d") : hint;
     canvas.style.cursor = tool === "inspect" ? "crosshair" : "cell";
-    openPanel(tool === "paint" ? "environment" : tool === "inspect" ? "analysis" : "organisms");
+    ctx.openPanel(tool === "paint" ? "environment" : tool === "inspect" ? "analysis" : "organisms");
   }
 
   function selectKit(id: string): void {
     setTool("place");
     showKit(id);
-  }
-
-  function selectOrganism(world: World, id: number, reason: EditorSyncReason = "select"): void {
-    state.selectedId = id;
-    renderer.selectedId = id;
-    renderer.selectedWorld = world === dual.b ? "B" : "A";
-    if (view3d) view3d.selectedId = id;
-    const org = world.organisms.find((o) => o.id === id) ?? null;
-    const meta = root.querySelector("#inspect-meta")!;
-    const gEl = root.querySelector("#inspect-genome")!;
-    const pEl = root.querySelector("#inspect-phenotype")!;
-    const genesEl = root.querySelector("#inspect-genes")!;
-    const pwEl = root.querySelector("#inspect-pathways")!;
-    const brEl = root.querySelector("#inspect-brain")!;
-    const actions = root.querySelector("#inspect-actions") as HTMLElement;
-    if (!org) {
-      if (reason === "select" || reason === "peek") {
-        root.querySelector("#selection-tag")!.textContent = tDynamic("app.inspect.none");
-        actions.hidden = true;
-        meta.textContent = tDynamic("app.inspect.clickOrganism");
-        gEl.textContent = "";
-        pEl.innerHTML = "";
-        genesEl.innerHTML = "";
-        pwEl.innerHTML = "";
-        brEl.innerHTML = "";
-        browser.clear();
-      }
-      return;
-    }
-    root.querySelector("#selection-tag")!.textContent = tDynamic("app.inspect.number", { id: org.id });
-    actions.hidden = false;
-    meta.innerHTML = `<div class="selection-metrics"><span>${tDynamic("app.inspect.energy", { value: org.energy.toFixed(2) })}</span><span>${tDynamic("app.inspect.fitness", { value: org.fitness.toFixed(3) })}</span></div><div class="selection-info">${tDynamic("app.inspect.identity", { lineage: org.lineageId, x: org.x, y: org.y, parent: org.parentId < 0 ? tDynamic("app.inspect.founder") : org.parentId })}</div><div class="selection-info">${tDynamic("app.inspect.body", { mass: (org.mass * 100).toFixed(0), size: bodySize(org).toFixed(2), genome: org.ph.size.toFixed(2), age: org.age })}</div>`;
-    if (reason === "refresh") return;
-    const decoded = decodeGenome(org.genome);
-    const track = toGenomeTrack(decoded);
-    gEl.textContent = org.genome;
-    pEl.innerHTML = phenotypeTableHtml(org.ph);
-    genesEl.innerHTML = genesHtml(track);
-    const env = world.fields.sample(org.x, org.y);
-    pwEl.innerHTML = pathwaysHtml(inspectBiochem(decoded, env, org));
-    brEl.innerHTML = tracesHtml(world.brain?.traces ?? [], org.id);
-    if (shouldWriteEditor(reason)) dna.load(org.genome);
-    browser.setSequence(org.genome);
-    if (view3d) view3d.selectedId = id;
   }
 
   /** Rows drawn by the last phylogeny pass, in CSS pixels: what a click or hover on #chart-phy resolves against. */
@@ -702,15 +456,6 @@ export function mount(root: HTMLElement): void {
     if (!(root.querySelector("#panel-species") as HTMLElement).hidden) species.layout();
     if (!(root.querySelector("#panel-experiment") as HTMLElement).hidden) goals.layout();
   }
-  const chartsBtn = root.querySelector<HTMLButtonElement>("#btn-charts")!;
-  function setChartsCollapsed(collapsed: boolean): void {
-    root.classList.toggle("charts-collapsed", collapsed);
-    chartsBtn.textContent = collapsed ? tDynamic("app.charts.show") : tDynamic("app.charts.hide");
-    chartsBtn.setAttribute("aria-expanded", String(!collapsed));
-    try { localStorage.setItem("openavida.charts", collapsed ? "0" : "1"); } catch { /* storage unavailable */ }
-    layout();
-  }
-  chartsBtn.addEventListener("click", () => setChartsCollapsed(!root.classList.contains("charts-collapsed")));
 
   function refreshMetrics(): void {
     const live = current();
@@ -743,20 +488,20 @@ export function mount(root: HTMLElement): void {
     if (state.selectedId >= 0) {
       const org = w.organisms.find((o) => o.id === state.selectedId);
       if (!org) {
-        selectOrganism(w, -1);
+        ctx.selectOrganism(w, -1);
         root.querySelector("#inspect-meta")!.textContent = tDynamic("app.inspect.dead");
       }
     }
-    refreshTimeline();
-    refreshScheduleList();
+    ctx.refreshTimeline();
+    ctx.refreshScheduleList();
     const now = performance.now();
     if (now - state.lastUi > 250) {
       drawCharts();
-      paintFeeds();
-      if (state.selectedId >= 0) selectOrganism(w, state.selectedId, "refresh");
+      ctx.paintFeeds();
+      if (state.selectedId >= 0) ctx.selectOrganism(w, state.selectedId, "refresh");
       species.refresh();
       goals.refresh();
-      updatePlayback();
+      ctx.updatePlayback();
       const note = document.getElementById("field-note");
       if (note) {
         const stats = renderer.fieldMode === 5 ? describeExudate(w) : null;
@@ -823,7 +568,7 @@ export function mount(root: HTMLElement): void {
     const org = world.nearestOrganism(grid.x, grid.y, 6);
     if (!org) return false;
     dual.active = sidePick;
-    selectOrganism(world, org.id);
+    ctx.selectOrganism(world, org.id);
     refreshMetrics();
     return true;
   };
@@ -835,7 +580,7 @@ export function mount(root: HTMLElement): void {
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
     if (grid) {
       host.apply({ kind: "paint", which: sidePick, x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
-      emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
+      ctx.emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
     }
   }
 
@@ -846,9 +591,9 @@ export function mount(root: HTMLElement): void {
     if (!grid) return;
     if (dual.active !== sidePick) {
       dual.active = sidePick;
-      selectOrganism(world, -1);
+      ctx.selectOrganism(world, -1);
     }
-    emitCursor(grid.x, grid.y);
+    ctx.emitCursor(grid.x, grid.y);
     const action = pointerAction({
       tool: state.tool,
       paintMode: state.paintMode,
@@ -863,7 +608,7 @@ export function mount(root: HTMLElement): void {
       }
       state.painting = true;
       host.apply({ kind: "paint", which: sidePick, x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
-      emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
+      ctx.emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
       return;
     }
     if (!down) return;
@@ -877,16 +622,16 @@ export function mount(root: HTMLElement): void {
       const child = host.apply({ kind: "place", which: sidePick, x: grid.x, y: grid.y, genome: seq }).child ?? null;
       if (child) {
         dual.active = sidePick;
-        selectOrganism(world, child.id, "peek");
+        ctx.selectOrganism(world, child.id, "peek");
         status(tDynamic("app.place.done", { x: grid.x, y: grid.y }));
-        emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
-        paintFeeds();
+        ctx.emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
+        ctx.paintFeeds();
         refreshMetrics();
       } else {
         const occ = world.organismAt(grid.x, grid.y);
         if (occ) {
           dual.active = sidePick;
-          selectOrganism(world, occ.id, "peek");
+          ctx.selectOrganism(world, occ.id, "peek");
           refreshMetrics();
         } else status(tDynamic("app.place.blocked"));
       }
@@ -895,7 +640,7 @@ export function mount(root: HTMLElement): void {
     const org = world.nearestOrganism(grid.x, grid.y, 4);
     if (org) {
       dual.active = sidePick;
-      selectOrganism(world, org.id);
+      ctx.selectOrganism(world, org.id);
       refreshMetrics();
     }
   }
@@ -909,7 +654,7 @@ export function mount(root: HTMLElement): void {
     const world = sidePick === "B" ? dual.b : dual.a;
     const grid = renderer.canvasToGrid(ev.clientX, ev.clientY, world);
     if (grid) {
-      emitCursor(grid.x, grid.y);
+      ctx.emitCursor(grid.x, grid.y);
       const f = world.fields.sample(grid.x, grid.y);
       const readout = root.querySelector<HTMLElement>("#cell-readout")!;
       readout.hidden = false;
@@ -939,7 +684,7 @@ export function mount(root: HTMLElement): void {
     if (!view3d) return;
     view3d.pointerMove(ev);
     const g = view3d.pick(ev.clientX, ev.clientY, current());
-    if (g) emitCursor(g.x, g.y);
+    if (g) ctx.emitCursor(g.x, g.y);
   });
   canvas3d.addEventListener("pointerup", (ev) => {
     if (!view3d) return;
@@ -955,16 +700,16 @@ export function mount(root: HTMLElement): void {
       tagStrain(world, seq);
       const child = host.apply({ kind: "place", which: sideOf(world), x: grid.x, y: grid.y, genome: seq }).child ?? null;
       if (child) {
-        selectOrganism(world, child.id, "peek");
-        emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
+        ctx.selectOrganism(world, child.id, "peek");
+        ctx.emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
         refreshMetrics();
       }
     } else if (state.tool === "paint") {
       if (state.room && !canMutateWorld(state.room.self.role)) return;
       host.apply({ kind: "paint", which: sideOf(world), x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
-      emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
+      ctx.emitOp({ kind: "paint", x: grid.x, y: grid.y, radius: state.radius, brush: state.brush });
     } else if (org) {
-      selectOrganism(world, org.id, state.tool === "inspect" ? "select" : "peek");
+      ctx.selectOrganism(world, org.id, state.tool === "inspect" ? "select" : "peek");
       refreshMetrics();
     }
   });
@@ -974,161 +719,6 @@ export function mount(root: HTMLElement): void {
   }, { passive: false });
   canvas3d.addEventListener("contextmenu", (ev) => ev.preventDefault());
 
-  root.querySelector("#brushes")!.addEventListener("click", (ev) => {
-    const t = ev.target as HTMLElement;
-    const id = t.getAttribute("data-brush") as BrushKind | null;
-    if (!id) return;
-    state.brush = id;
-    root.querySelectorAll("[data-brush]").forEach((b) => {
-      b.classList.toggle("active", b.getAttribute("data-brush") === id);
-      b.setAttribute("aria-pressed", String(b.getAttribute("data-brush") === id));
-    });
-    setTool("paint");
-  });
-  (root.querySelector("#radius") as HTMLInputElement).addEventListener("input", (ev) => {
-    state.radius = Number((ev.target as HTMLInputElement).value);
-    (root.querySelector("#rad-lab") as HTMLElement).textContent = String(state.radius);
-  });
-  const speedTop = root.querySelector("#speed-top") as HTMLInputElement;
-  function updatePlayback(): void {
-    const paused = state.paused || state.speed <= 0;
-    const button = root.querySelector<HTMLElement>("#btn-pause")!;
-    if (button.dataset.paused !== String(paused)) {
-      button.innerHTML = `${icon(paused ? "play" : "pause")}<span>${tDynamic(paused ? "btn.play" : "btn.pause")}</span>`;
-      button.setAttribute("aria-label", paused ? tDynamic("app.playback.resumeAria") : tDynamic("app.playback.pauseAria"));
-      button.dataset.paused = String(paused);
-    }
-    const label = root.querySelector("#run-state")!;
-    const text = !canDriveClock(state.room) ? tDynamic("app.playback.followed") : paused ? tDynamic("app.playback.paused") : tDynamic("app.playback.running");
-    if (label.textContent !== text) label.innerHTML = `<i></i>${text}`;
-    label.classList.toggle("paused", paused);
-  }
-  const setSpeed = (n: number) => {
-    state.speed = Math.max(0, Math.min(60, n));
-    state.paused = state.speed <= 0;
-    speedTop.value = String(state.speed);
-    root.querySelector("#spd-lab-top")!.textContent = formatSpeed(state.speed);
-    updatePlayback();
-  };
-  speedTop.addEventListener("input", () => setSpeed(Number(speedTop.value)));
-  const zoomTop = root.querySelector("#zoom-top") as HTMLInputElement;
-  zoomTop.addEventListener("input", () => {
-    const pct = Math.max(30, Math.min(100, Number(zoomTop.value)));
-    renderer.zoom = pct / 100;
-    root.querySelector("#zoom-lab-top")!.textContent = `${pct}%`;
-  });
-  root.querySelector("#btn-pause")!.addEventListener("click", () => {
-    if (state.speed <= 0) setSpeed(2);
-    else state.paused = !state.paused;
-    if (!state.paused) {
-      state.preview = null;
-      state.previewTick = null;
-    }
-    updatePlayback();
-  });
-  const timelineRange = root.querySelector<HTMLInputElement>("#timeline-range")!;
-  const timelineMarks = root.querySelector("#timeline-marks")!;
-  const timelineLabel = root.querySelector("#timeline-label")!;
-  const timelineBudget = root.querySelector("#timeline-budget")!;
-  function timelineEntries(): Array<{ tick: number; population: number; bytes: number }> {
-    return current().timelineMeta?.entries ?? [];
-  }
-  function refreshTimeline(): void {
-    const meta = current().timelineMeta;
-    const entries = meta?.entries ?? [];
-    const every = meta?.every ?? 25;
-    const ticks = entries.map((e) => e.tick);
-    const min = ticks.length ? ticks[0]! : 0;
-    const max = ticks.length ? ticks[ticks.length - 1]! : 0;
-    timelineRange.min = String(min);
-    timelineRange.max = String(Math.max(min, max));
-    if (document.activeElement !== timelineRange) {
-      timelineRange.value = String(state.previewTick ?? viewWorld().tick);
-    }
-    const span = Math.max(1, max - min);
-    timelineMarks.innerHTML = ticks.map((t) => `<i style="left:${((t - min) / span) * 100}%"></i>`).join("");
-    const shown = state.previewTick ?? viewWorld().tick;
-    timelineLabel.textContent = tDynamic("app.timeline.label", { tick: shown, every });
-    if (meta) {
-      const usedMo = meta.used / (1024 * 1024);
-      const capMo = meta.budget / (1024 * 1024);
-      const size = usedMo < 0.1
-        ? tDynamic("app.timeline.kb", { kb: Math.round(meta.used / 1024) })
-        : tDynamic("app.timeline.mb", { mb: usedMo.toFixed(1) });
-      timelineBudget.textContent = tDynamic(entries.length > 1 ? "app.timeline.budget.many" : "app.timeline.budget.one", { count: entries.length, size, cap: capMo.toFixed(0) });
-    } else timelineBudget.textContent = "";
-  }
-  async function previewTick(tick: number): Promise<void> {
-    state.paused = true;
-    updatePlayback();
-    const entries = timelineEntries();
-    if (!entries.length) return;
-    let nearest = entries[0]!;
-    let best = Math.abs(nearest.tick - tick);
-    for (const e of entries) {
-      const d = Math.abs(e.tick - tick);
-      if (d < best || (d === best && e.tick < nearest.tick)) {
-        nearest = e;
-        best = d;
-      }
-    }
-    state.previewTick = nearest.tick;
-    timelineRange.value = String(nearest.tick);
-    const snap = await host.snapshotAt(sideOf(current()), nearest.tick);
-    if (!snap || state.previewTick !== nearest.tick) return;
-    state.preview = worldFromSnapshot(snap);
-    refreshMetrics();
-  }
-  timelineRange.addEventListener("input", () => {
-    void previewTick(Number(timelineRange.value));
-  });
-  root.querySelector("#btn-timeline-first")!.addEventListener("click", () => {
-    const entries = timelineEntries();
-    if (entries[0]) void previewTick(entries[0].tick);
-  });
-  root.querySelector("#btn-timeline-prev")!.addEventListener("click", () => {
-    const entries = timelineEntries();
-    const cur = state.previewTick ?? viewWorld().tick;
-    const prev = [...entries].reverse().find((e) => e.tick < cur);
-    if (prev) void previewTick(prev.tick);
-  });
-  root.querySelector("#btn-timeline-next")!.addEventListener("click", () => {
-    const entries = timelineEntries();
-    const cur = state.previewTick ?? viewWorld().tick;
-    const next = entries.find((e) => e.tick > cur);
-    if (next) void previewTick(next.tick);
-  });
-  root.querySelector("#btn-timeline-resume")!.addEventListener("click", async () => {
-    const tick = state.previewTick ?? Number(timelineRange.value);
-    const snap = state.preview?.snapshot() ?? (await host.snapshotAt(sideOf(current()), tick));
-    if (!snap) {
-      status(tDynamic("app.timeline.none"));
-      return;
-    }
-    const which = sideOf(current());
-    host.apply({ kind: "restore", which, snapshot: snap });
-    host.apply({ kind: "timeline", which, trimAfter: snap.tick });
-    state.preview = null;
-    state.previewTick = null;
-    state.paused = true;
-    selectOrganism(current(), -1);
-    updatePlayback();
-    paintFeeds();
-    refreshMetrics();
-    status(tDynamic("app.timeline.resumed", { world: which, tick: snap.tick }));
-  });
-  const terrainBox = root.querySelector("#opt-terrain input") as HTMLInputElement;
-  const disturbBox = root.querySelector("#opt-disturb input") as HTMLInputElement;
-  terrainBox.checked = dual.a.randomTerrain;
-  disturbBox.checked = dual.a.disturbances;
-  terrainBox.addEventListener("change", () => {
-    host.apply({ kind: "terrainPreset", on: terrainBox.checked });
-    status(terrainBox.checked ? tDynamic("app.terrain.on") : tDynamic("app.terrain.off"));
-  });
-  disturbBox.addEventListener("change", () => {
-    host.apply({ kind: "disturbances", on: disturbBox.checked });
-    status(disturbBox.checked ? tDynamic("app.disturb.on") : tDynamic("app.disturb.off"));
-  });
   // Model parameters: the form is generated from PARAM_SPEC (see modelPanel.ts).
   let model: ModelPanel | null = null;
   model = new ModelPanel(root.querySelector<HTMLElement>("#model-form")!, {
@@ -1137,379 +727,12 @@ export function mount(root: HTMLElement): void {
     apply: (patch, target) => {
       const sides: Side[] = target === "both" ? ["A", "B"] : [target];
       for (const side of sides) host.apply({ kind: "setParams", which: side, params: patch });
-      paintFeeds();
+      ctx.paintFeeds();
       refreshMetrics();
     },
   });
-  const schedAt = root.querySelector<HTMLInputElement>("#sched-at")!;
-  const schedAction = root.querySelector<HTMLSelectElement>("#sched-action")!;
-  const schedArg = root.querySelector<HTMLInputElement>("#sched-arg")!;
-  const schedList = root.querySelector<HTMLElement>("#sched-list")!;
-  function describeSched(item: ScheduledOp): string {
-    const op = item.op;
-    if (op.type === "scale") return tDynamic("app.schedule.scale", { k: op.k, field: FIELD_LABEL[op.field] ?? op.field });
-    if (op.type === "params") {
-      const e = Object.entries(op.params)[0];
-      return e ? `${SCHED_PARAM_LABEL[e[0]] ?? e[0]} → ${e[1]}` : tDynamic("app.schedule.params");
-    }
-    if (op.type === "paint") return tDynamic("app.schedule.paint", { brush: op.brush, radius: op.radius });
-    if (op.type === "inject") return tDynamic("app.schedule.inject", { count: op.count });
-    if (op.type === "place") return tDynamic("app.schedule.place", { x: op.x, y: op.y });
-    if (op.type === "strain") return tDynamic("app.schedule.strain", { name: op.name });
-    return op.type;
-  }
-  let schedListKey = "";
-  function refreshScheduleList(): void {
-    const list = current().schedule;
-    const key = list.map((s) => `${s.at}:${s.op.type}`).join("|");
-    if (key === schedListKey) return;
-    schedListKey = key;
-    if (!list.length) {
-      schedList.innerHTML = tDynamic("app.schedule.empty");
-      return;
-    }
-    schedList.innerHTML = list
-      .map((s, i) => `<div class="sched-row"><span class="mono">${tDynamic("app.schedule.step", { tick: s.at })}</span><span>${describeSched(s)}</span><button type="button" class="quiet" data-sched-i="${i}" aria-label="${tDynamic("app.schedule.remove")}">×</button></div>`)
-      .join("");
-  }
-  root.querySelector("#btn-sched-add")!.addEventListener("click", () => {
-    const at = Math.max(0, Math.round(Number(schedAt.value) || 0));
-    const [kind, key] = schedAction.value.split(":");
-    const arg = Number(schedArg.value);
-    if (!kind || !key || !Number.isFinite(arg)) {
-      status(tDynamic("app.schedule.incomplete"));
-      return;
-    }
-    const w = current();
-    let op: ScheduledOp["op"];
-    if (kind === "scale") op = { type: "scale", field: key as FieldName, k: arg };
-    else if (kind === "params") {
-      if (key === "mutationRate") op = { type: "params", params: { mutationRate: Math.max(0, Math.min(1, arg)) } };
-      else if (key === "maxPopulation") op = { type: "params", params: { maxPopulation: Math.max(16, Math.round(arg)) } };
-      else op = { type: "params", params: { reproduceEnergy: Math.max(0.05, arg) } };
-    } else {
-      op = { type: "paint", x: Math.floor(w.w / 2), y: Math.floor(w.h / 2), radius: 4, brush: key as BrushKind, amount: arg };
-    }
-    host.apply({ kind: "schedule", which: sideOf(w), schedule: [...w.schedule, { at, op }] });
-    schedListKey = "";
-    refreshScheduleList();
-    drawCharts();
-    status(tDynamic("app.schedule.added", { op: describeSched({ at, op }), tick: at }));
-  });
-  schedList.addEventListener("click", (ev) => {
-    const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-sched-i]");
-    if (!btn) return;
-    const i = Number(btn.dataset.schedI);
-    const w = current();
-    const next = w.schedule.filter((_, k) => k !== i);
-    host.apply({ kind: "schedule", which: sideOf(w), schedule: next });
-    schedListKey = "";
-    refreshScheduleList();
-    drawCharts();
-  });
-  refreshScheduleList();
-  const box3d = root.querySelector("#opt-view3d input") as HTMLInputElement;
-  const boxBrains = root.querySelector("#opt-brains input") as HTMLInputElement;
-  const boxLlm = root.querySelector("#opt-llm input") as HTMLInputElement;
-  const boxMp = root.querySelector("#opt-mp input") as HTMLInputElement;
-  box3d.checked = state.flags.view3d;
-  boxBrains.checked = state.flags.brains;
-  boxLlm.checked = state.flags.llmBrains;
-  boxMp.checked = state.flags.multiplayer;
-  function setBrains(on: boolean): void {
-    state.flags.brains = on;
-    boxBrains.checked = on;
-    host.apply({ kind: "brains", on, llm: state.flags.llmBrains });
-    status(on ? (state.flags.llmBrains ? "LLM brains on (fallback baseline if no adapter)" : "baseline brains on") : "brains off — phase-1 movement");
-  }
-  box3d.addEventListener("change", () => setSurface(box3d.checked ? "3d" : "2d"));
-  boxBrains.addEventListener("change", () => setBrains(boxBrains.checked));
-  boxLlm.addEventListener("change", () => {
-    state.flags.llmBrains = boxLlm.checked;
-    if (state.flags.brains) setBrains(true);
-  });
-  function joinRoom(asHost: boolean): void {
-    state.roomClose?.();
-    const roomId = (root.querySelector("#mp-room") as HTMLInputElement).value.trim() || "lab";
-    const role = (root.querySelector("#mp-role") as HTMLSelectElement).value as PeerRole;
-    const self = makeSelf(asHost ? "host" : "peer", state.room?.peers.size ?? 0);
-    self.role = asHost ? "host" : role === "host" ? "experimenter" : role;
-    self.color = peerColor(asHost ? 0 : 1);
-    state.room = new RoomSession(self, { claimHost: asHost });
-    state.flags.multiplayer = true;
-    boxMp.checked = true;
-    const ch = openRoomChannel(roomId, state.room, (op) => {
-      if (!state.room) return;
-      handleIncoming(state.room, op, current(), (reply) => state.roomPost?.(reply));
-      paintPeers();
-    });
-    state.roomPost = ch.post;
-    state.roomClose = ch.close;
-    paintPeers();
-    status(asHost ? `hosting room ${roomId}` : `joined room ${roomId} as ${self.role}`);
-  }
-  boxMp.addEventListener("change", () => {
-    state.flags.multiplayer = boxMp.checked;
-    if (boxMp.checked) joinRoom(true);
-    else {
-      state.roomClose?.();
-      state.room = null;
-      state.roomPost = null;
-      paintPeers();
-      status("multiplayer off");
-    }
-  });
-  root.querySelector("#btn-mp-host")!.addEventListener("click", () => joinRoom(true));
-  root.querySelector("#btn-mp-join")!.addEventListener("click", () => joinRoom(false));
-  root.querySelector("#btn-slow")!.addEventListener("click", () => setSpeed(2));
-  root.querySelector("#btn-step-once")!.addEventListener("click", () => {
-    state.paused = true;
-    state.preview = null;
-    state.previewTick = null;
-    updatePlayback();
-    host.step(stepWhich(), 1);
-    paintFeeds();
-    refreshMetrics();
-  });
-  function setView(view: ViewMode): void {
-    state.view = view;
-    renderer.view = view;
-    model?.refresh();
-    dual.active = view === "B" ? "B" : "A";
-    // The highlighted lineage belongs to the world we are leaving.
-    renderer.highlightLineage = -1;
-    state.selectedId = -1;
-    selectOrganism(current(), -1);
-    if (view === "split" && state.surface === "3d") setSurface("2d");
-    root.querySelectorAll<HTMLElement>(".view").forEach(b => {
-      const active = b.dataset.view === view;
-      b.classList.toggle("active", active);
-      b.setAttribute("aria-pressed", String(active));
-    });
-    layout();
-    refreshMetrics();
-  }
-  root.querySelectorAll<HTMLElement>(".view").forEach(b => b.addEventListener("click", () => setView(b.dataset.view as ViewMode)));
-  function setField(mode: FieldMode): void {
-    renderer.fieldMode = mode;
-    // 3D has no exudate plane of its own; layer 5 falls back to the composite there.
-    if (view3d) view3d.fieldMode = (mode === 5 ? 0 : mode) as FieldMode;
-    root.querySelectorAll<HTMLElement>(".fm").forEach(b => {
-      const active = Number(b.dataset.fm) === mode;
-      b.classList.toggle("active", active);
-      b.setAttribute("aria-pressed", String(active));
-    });
-    const legends = [
-      tDynamic("app.legend.all"),
-      tDynamic("app.legend.nutrient"),
-      tDynamic("app.legend.toxin"),
-      tDynamic("app.legend.temperature"),
-      tDynamic("app.legend.light"),
-      tDynamic("app.legend.exudate"),
-    ];
-    root.querySelector("#field-legend")!.innerHTML = legends[mode]!;
-  }
-  root.querySelectorAll<HTMLElement>(".fm").forEach(b => b.addEventListener("click", () => setField(Number(b.dataset.fm) as FieldMode)));
-  for (const [id, which] of [["#btn-step-a", "A"], ["#btn-step-b", "B"], ["#btn-step-both", "both"]] as const) {
-    root.querySelector(id)!.addEventListener("click", () => {
-      state.paused = true;
-      host.step(which, 1);
-      refreshMetrics();
-    });
-  }
-  root.querySelector("#btn-snap")!.addEventListener("click", () => {
-    state.snapshot = takeSnapshot(current());
-    (root.querySelector("#btn-restore") as HTMLButtonElement).disabled = false;
-    root.querySelector("#snapshot-info")!.textContent = tDynamic("app.snapshot.info", { world: dual.active, tick: current().tick, count: current().organisms.length });
-    status(tDynamic("app.snapshot.saved"));
-  });
-  root.querySelector("#btn-restore")!.addEventListener("click", () => {
-    if (!state.snapshot) {
-      status("no snapshot");
-      return;
-    }
-    host.apply({ kind: "restore", which: sideOf(current()), snapshot: state.snapshot });
-    selectOrganism(current(), -1);
-    status(tDynamic("app.snapshot.restored", { tick: current().tick }));
-    refreshMetrics();
-  });
-  root.querySelector("#btn-bottle")!.addEventListener("click", () => {
-    const n = host.apply({ kind: "bottleneck", which: sideOf(current()), keep: 0.1 }).count ?? 0;
-    status(tDynamic("app.bottleneck.done", { n }));
-    paintFeeds();
-    refreshMetrics();
-  });
-  root.querySelector("#btn-reseed")!.addEventListener("click", () => {
-    const seed = Number((root.querySelector("#seed") as HTMLInputElement).value) >>> 0 || 1;
-    const p: SimParams = { ...current().params, seed };
-    host.apply({ kind: "reseed", params: p, seedB: (seed ^ 0x9e3779b9) >>> 0 || 1 });
-    renderer.highlightLineage = -1;
-    state.selectedId = -1;
-    selectOrganism(current(), -1);
-    status(tDynamic("app.reseed.done", { seed }));
-    refreshMetrics();
-  });
-  root.querySelector("#btn-share")!.addEventListener("click", async () => {
-    const url = (() => {
-      const base = buildShareURL(current().params);
-      const f = flagsToQuery(state.flags);
-      if (!f) return base;
-      return base + (base.includes("?") ? "&" : "?") + f;
-    })();
-    try {
-      await navigator.clipboard.writeText(url);
-      status(tDynamic("app.share.copied"));
-    } catch {
-      status(url);
-    }
-    history.replaceState(null, "", "?" + url.split("?")[1]);
-  });
-  root.querySelector("#btn-json")!.addEventListener("click", () => {
-    download(`openavida-t${current().tick}.json`, exportJSON(current()), "application/json");
-  });
-  root.querySelector("#btn-oav")!.addEventListener("click", () => {
-    downloadBytes(`openavida-t${current().tick}.oav`, encodeSnapshot(current().snapshot()), "application/octet-stream");
-  });
-  root.querySelector("#btn-csv")!.addEventListener("click", () => {
-    download(`openavida-metrics-t${current().tick}.csv`, exportMetricsCSV(current().history, provenanceOf(current())), "text/csv");
-  });
-  root.querySelector("#btn-phylo")!.addEventListener("click", () => {
-    download(`openavida-phylo-t${current().tick}.csv`, exportPhylogenyCSV(current()), "text/csv");
-  });
-  root.querySelector("#btn-manifest")!.addEventListener("click", () => {
-    const manifest = goals.manifest();
-    if (!manifest) {
-      status(tDynamic("app.manifest.none"));
-      return;
-    }
-    download("openavida-manifest.json", JSON.stringify(manifest, null, 2), "application/json");
-    status(tDynamic("app.manifest.exported", { name: manifest.name, replicates: manifest.run.replicates, digest: manifest.paramsDigest }));
-  });
-  root.querySelector("#btn-events")!.addEventListener("click", () => {
-    const w = current();
-    if (w.eventLog.length === 0) {
-      status(tDynamic("app.eventsExport.empty"));
-      return;
-    }
-    download(`openavida-events-t${w.tick}.jsonl`, exportEventsJSONL(w, provenanceOf(w)), "application/x-ndjson");
-    status(tDynamic("app.eventsExport.done", { count: w.eventLog.length }));
-  });
-  const eventsBox = root.querySelector("#opt-events input") as HTMLInputElement;
-  eventsBox.checked = dual.a.params.recordEvents;
-  eventsBox.addEventListener("change", () => {
-    host.apply({ kind: "setParams", which: sideOf(current()), params: { recordEvents: eventsBox.checked } });
-    status(eventsBox.checked
-      ? tDynamic("app.eventsLog.on")
-      : tDynamic("app.eventsLog.off"));
-  });
-  root.querySelector("#btn-import")!.addEventListener("click", () => {
-    (root.querySelector("#import-file") as HTMLInputElement).click();
-  });
-  (root.querySelector("#import-file") as HTMLInputElement).addEventListener("change", async (ev) => {
-    const file = (ev.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    try {
-      // One import path for both world files: parseWorldBytes sniffs OAV2 vs JSON.
-      const bytes = await file.arrayBuffer();
-      host.apply({ kind: "restore", which: sideOf(current()), snapshot: parseWorldBytes(bytes) });
-      selectOrganism(current(), -1);
-      status(tDynamic("app.import.done"));
-      refreshMetrics();
-    } catch {
-      status(tDynamic("app.import.failed"));
-    } finally {
-      (ev.target as HTMLInputElement).value = "";
-    }
-  });
 
-  root.querySelector("#btn-edit-selected")!.addEventListener("click", () => {
-    const org = current().organisms.find((o) => o.id === state.selectedId);
-    if (!org) {
-      status(tDynamic("app.inspect.gone"));
-      return;
-    }
-    loadSeqIntoBuilder(org.genome);
-    setTool("place");
-    root.querySelector("#dna-editor")!.scrollIntoView({ block: "start", behavior: "smooth" });
-    status(tDynamic("app.dna.opened", { id: org.id }));
-  });
-  root.querySelector("#btn-explorer")!.addEventListener("click", () => explorer.open({ tab: "organisms" }));
-  root.querySelector("#btn-ancestry")!.addEventListener("click", () => {
-    if (state.selectedId >= 0) explorer.open({ organismId: state.selectedId });
-    else status(tDynamic("app.inspect.selectFirst"));
-  });
-  root.querySelector("#event-log")!.addEventListener("click", (ev) => {
-    const row = (ev.target as HTMLElement).closest<HTMLElement>(".event-row");
-    if (!row) return;
-    const tick = Number(row.dataset.tick);
-    const lineageId = Number(row.dataset.lineage);
-    const strainId = Number(row.dataset.strain);
-    if (Number.isFinite(tick)) void previewTick(tick);
-    if (Number.isFinite(lineageId) && lineageId > 0) explorer.open({ lineageId });
-    else if (Number.isFinite(strainId) && strainId > 0) explorer.open({ filter: { strainId }, tab: "organisms" });
-  });
-  root.querySelector("#leaderboard")!.addEventListener("click", (ev) => {
-    const t = ev.target as HTMLElement;
-    const use = t.closest("[data-use]") as HTMLElement | null;
-    if (use) {
-      const id = Number(use.getAttribute("data-use"));
-      const org = current().organisms.find((o) => o.id === id);
-      if (org) {
-        loadSeqIntoBuilder(org.genome);
-        setTool("place");
-        status(tDynamic("app.dna.loaded", { id }));
-      }
-      return;
-    }
-    const row = t.closest("[data-org]") as HTMLElement | null;
-    if (!row) return;
-    const id = Number(row.getAttribute("data-org"));
-    selectOrganism(current(), id, "select");
-    refreshMetrics();
-  });
-  root.querySelector("#death-log")!.addEventListener("click", (ev) => {
-    const row = (ev.target as HTMLElement).closest("[data-genome]") as HTMLElement | null;
-    if (!row) return;
-    const seq = row.getAttribute("data-genome") ?? "";
-    if (!seq) return;
-    loadSeqIntoBuilder(seq);
-    setTool("place");
-    status(tDynamic("app.dna.loadedGeneric"));
-  });
-  root.querySelector("#btn-start")!.addEventListener("click", () => (root.querySelector("#btn-inject") as HTMLButtonElement).click());
-  root.querySelector("#btn-inject")!.addEventListener("click", () => {
-    const seq = dna.sequence || founderHeterotroph();
-    tagStrain(current(), seq);
-    const n = host.apply({ kind: "inject", which: sideOf(current()), genome: seq, count: 24 }).count ?? 0;
-    status(tDynamic("app.inject.added", { n, world: dual.active }));
-    paintFeeds();
-    refreshMetrics();
-  });
-
-  window.addEventListener("keydown", (ev) => {
-    if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLSelectElement || (ev.target instanceof HTMLElement && (ev.target.isContentEditable || ev.target.closest("[data-own-keys]"))) || ev.metaKey || ev.ctrlKey || ev.altKey || helpDialog.open || explorer.isOpen) return;
-    if (ev.code === "Space" && !(ev.target instanceof HTMLElement && ev.target.closest("button, summary, a"))) {
-      ev.preventDefault();
-      (root.querySelector("#btn-pause") as HTMLElement).click();
-    }
-    if (ev.key === "[") setSpeed(state.speed - 1);
-    if (ev.key === "]") setSpeed(state.speed + 1);
-    if (ev.key.toLowerCase() === "s") (root.querySelector("#btn-snap") as HTMLElement).click();
-    if (ev.key.toLowerCase() === "i") setTool("inspect");
-    if (ev.key.toLowerCase() === "o") setTool("place");
-    if (ev.key.toLowerCase() === "p") setTool("paint");
-    if (/^[1-6]$/.test(ev.key)) setField((Number(ev.key) - 1) as FieldMode);
-    if (ev.key === "Escape" && root.classList.contains("focus-mode")) (root.querySelector("#btn-focus") as HTMLElement).click();
-  });
-
-  window.addEventListener("resize", layout);
-  new ResizeObserver(() => layout()).observe(stage);
-
-  hud.querySelector("#tool-inspect")!.addEventListener("click", () => setTool("inspect"));
-  hud.querySelector("#tool-paint")!.addEventListener("click", () => setTool("paint"));
-  hud.querySelector("#tool-place")!.addEventListener("click", () => setTool("place"));
-  root.querySelector("#view-2d")!.addEventListener("click", () => setSurface("2d"));
-  root.querySelector("#view-3d")!.addEventListener("click", () => setSurface("3d"));
+  ctx.model = model;
 
   window.__openavidaMutate = async (n = 40) => {
     const which = sideOf(current());
@@ -1519,7 +742,7 @@ export function mount(root: HTMLElement): void {
     host.step(which, steps);
     host.apply({ kind: "setParams", which, params: { mutationRate: prev } });
     await host.flush();
-    paintFeeds();
+    ctx.paintFeeds();
     refreshMetrics();
     species.refresh(true);
     return current().innovations.length;
@@ -1536,7 +759,7 @@ export function mount(root: HTMLElement): void {
     tagStrain(w, editorGenome());
     const child = host.apply({ kind: "place", which: sideOf(w), x, y, genome: editorGenome() }).child ?? null;
     if (!child) return false;
-    selectOrganism(w, child.id, "peek");
+    ctx.selectOrganism(w, child.id, "peek");
     refreshMetrics();
     return true;
   };
@@ -1661,14 +884,14 @@ export function mount(root: HTMLElement): void {
 
   let chartsPref = "1";
   try { chartsPref = localStorage.getItem("openavida.charts") ?? "1"; } catch { /* storage unavailable */ }
-  setChartsCollapsed(chartsPref === "0");
+  ctx.setChartsCollapsed(chartsPref === "0");
   browser.clear();
   showKit(state.kit);
   setTool("place");
-  paintPeers();
-  if (state.flags.view3d) setSurface("3d");
-  else setSurface("2d");
-  if (state.flags.brains) setBrains(true);
-  if (state.flags.multiplayer) joinRoom(true);
+  ctx.paintPeers();
+  if (state.flags.view3d) ctx.setSurface("3d");
+  else ctx.setSurface("2d");
+  if (state.flags.brains) ctx.setBrains(true);
+  if (state.flags.multiplayer) ctx.joinRoom(true);
   requestAnimationFrame(loop);
 }

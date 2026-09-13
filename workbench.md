@@ -564,3 +564,23 @@ Second wave, two subagents on disjoint files. **No model change: the perf hash s
 - One design correction the gate caught: the `.oav` export button started in the header and pushed the 360 px layout into overflow; it moved into the Expérience data row next to the import, which is also where a world file belongs. `verify-interface`'s five responsive widths pass again.
 - GATES: typecheck ok (both configs); vitest **288/288** (65 files); build ok; ten browser verifier runs OK; baseline unchanged `e953dcdc`.
 
+
+## Upgrade Stage 10b — `app.ts` split behind a shared context (2026-09-14)
+
+Third wave, one subagent. **No model change, and the rendered interface did not move: the copy goldens stayed byte-identical without regeneration.**
+
+- **`src/app.ts` 1674 → 897 lines.** The wiring now lives behind a documented `LabContext` (`src/ui/lab/context.ts`, 193 lines) that carries the mutable state and the closures the modules need; each module exports one factory and imports only the context, so the graph stays acyclic and `mount(root)` remains the single export `src/main.ts` uses.
+  | Module | Lines | Owns |
+  | --- | --- | --- |
+  | `lab/worldControls.ts` | 307 | view A/B/split, 2D/3D, field layers, tools, speed, zoom, charts, focus, keys, tab strip |
+  | `lab/feeds.ts` | 238 | `paintFeeds` (leaderboard, event feed, death log, inspect panel), inject/start handlers |
+  | `lab/context.ts` | 193 | state + services contract, `el()` |
+  | `lab/experimental.ts` | 122 | 3D, brains, LLM, multiplayer room and cursors |
+  | `lab/timelineBar.ts` | 117 | snapshot range, marks, budget, preview, resume |
+  | `lab/exports.ts` | 113 | share link, JSON, .oav, CSV, phylogeny, events, manifest, import |
+  | `lab/schedulePanel.ts` | 91 | the programmed-change list |
+- **Proof it is a move, not a rewrite.** The new `app.ts` was produced from the exact previous text by deleting the moved ranges and adapting call sites; the comment multiset lost nothing; a throwaway differential harness mounted the old and new versions in two happy-dom windows, ran 52 identical interactions (inject, snapshot/restore, bottle, view/tool/layer switches, speed/zoom/charts, terrain, schedule add/remove, steps, tabs, keys, focus, dialogs, exports, reseed) and compared `body.innerHTML` — identical at mount (140 015 chars) and after the script (161 241 chars), with the same root class, status line, `<html lang>`, error list and `window.__openavida` JSON. The harnesses were removed before the report.
+- **Probes unchanged**: `window.__openavida` (including `neutralSubstitutions`, `historyRows`, `researchEvents`) plus the seven other `__openavida*` hooks, all still live; verified by a smoke run and by the browser gates.
+- Three blocks stayed in `app.ts` for a good reason: `setTool`/`selectKit`/`showKit` (the pointer test asserts they are called there), `drawCharts` and the lineage-tree hit testing.
+- GATES: typecheck ok (both configs); vitest **288/288** (65 files); build ok; ten browser verifier runs OK; copy FR and EN byte-identical; baseline unchanged `e953dcdc`.
+
