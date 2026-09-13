@@ -12,6 +12,8 @@ npm run dev
 
 Open http://127.0.0.1:5174
 
+`npm run verify` is the local equivalent of CI: typecheck, unit suite, production build, then the browser gates (the last step launches the system Chrome), including the `dist/` size budget.
+
 ## Documentation
 
 - [docs/README.md](docs/README.md) — the documentation index: what each page covers, and who it is written for.
@@ -33,6 +35,8 @@ The interface keeps playback, field layers, world selection, and the 2D/3D view 
 - **Analyse**: organism inspection, traits, genome, metabolism, rankings, the death log, a research card (selection coefficients, neutral drift and the molecular clock, realised fitness, trait distributions), and an event log (lineage dominance/collapse, first predation, innovation sweep, strain extinction, population crash/boom) that opens the explorer and the nearest timeline snapshot.
 - **Espèces**: per-group analysis. Strains (founding genome, inherited by all descendants) or strategies (phenotype class). Population per group over time, mean traits, centroid and local environment, drift from the founder, key innovations (mutations whose lineage spread, with the environment they appeared in), deaths by cause. In strain mode, Trajectoires plots each strain's centroid path on a world-aspect map (vents as markers) and mean local temperature over time; each card reports displacement of the centre from the founder. Define named strains from the editor to compare 2–3 genomes in one environment; optionally color the plate (2D and 3D) by strain. Each strain card can overlay a 200-step occupancy heat map; the selected organism draws a 120-step trail.
 - **Expérience**: local presets, goal-directed multi-replicate runs, a run journal that keeps finished runs with notes, intervals, effect sizes and overlaid curves, restore points, independent A/B steps, reset, data import/export, and experimental features.
+
+The status bar shows the engine that produced the run next to the seed (`engine 2.2.0 · rév. 4`), and its tooltip carries the full provenance: version, model revision, hash algorithm and the parameter digest of the world the page opened.
 
 ## Presets and goal runs
 

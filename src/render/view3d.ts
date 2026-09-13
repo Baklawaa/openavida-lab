@@ -1,10 +1,12 @@
 /**
  * WebGL2 3D continuum view of the same World the 2D plate draws.
- * Height = nutrient + light; toxin tints magenta; organisms are lit columns.
+ * Height = nutrient + light; toxin tints magenta; organisms are lit columns;
+ * layer 5 tints the terrain violet with the exudate plane the plate overlays.
  */
 import { bodySize } from "../sim/body";
 import type { World } from "../sim/world";
 import { TERRAIN } from "../sim/types";
+import { normalizeOverlay, overlayByte } from "./overlay";
 import { hexRgb, organismRgb } from "./webgl";
 
 const VS_TERRAIN = `#version 300 es
@@ -15,13 +17,14 @@ uniform mat4 uView;
 uniform vec2 uWorld;
 uniform sampler2D uFields;
 uniform sampler2D uPlate;
+uniform sampler2D uExudate;
 uniform int uMode;
 out vec3 vCol;
 out vec3 vN;
 out float vTox;
 out vec3 vWorld;
 
-vec3 fieldColor(vec4 f) {
+vec3 fieldColor(vec4 f, float exu) {
   vec3 bg = vec3(0.04, 0.08, 0.12);
   vec3 nut = vec3(0.12, 0.95, 0.82) * pow(max(f.r, 0.0), 0.55);
   vec3 tox = vec3(0.98, 0.18, 0.58) * pow(max(f.g, 0.0), 0.55);
@@ -33,7 +36,14 @@ vec3 fieldColor(vec4 f) {
   if (uMode == 2) return bg + tox * 2.2;
   if (uMode == 3) return bg + tmp * 2.2;
   if (uMode == 4) return bg + lit * 2.4;
-  return bg + nut * 1.6 + tox * 1.3 + tmp + lit;
+  vec3 col = bg + nut * 1.6 + tox * 1.3 + tmp + lit;
+  // Layer 5: the same violet the 2D overlay paints (see app.ts heatColor),
+  // mixed by the normalised exudate itself, so a cell that holds none keeps the
+  // composite colour exactly and a strong patch reads strong rather than as a
+  // flat wash. Baked into a lit surface there is no separate blend pass, so the
+  // field is the weight directly instead of the 2D layer's blend alpha.
+  if (uMode == 5) col = mix(col, vec3(0.72, 0.45, 1.0), exu);
+  return col;
 }
 
 float heightAt(vec2 uv) {
@@ -42,6 +52,9 @@ float heightAt(vec2 uv) {
   float h = f.r * 0.85 + f.a * 0.35;
   h += f.g * 0.25;
   if (p.a > 0.8 && p.r < 0.08) h += 0.55;
+  // Layer 5 lifts its own plane a little, so a strong patch also reads in the
+  // silhouette instead of only in the colour.
+  if (uMode == 5) h += texture(uExudate, uv).r * 0.25;
   return h;
 }
 
@@ -49,13 +62,15 @@ void main() {
   vec2 uv = aUv;
   vec4 f = texture(uFields, uv);
   float h = heightAt(uv);
+  float exu = 0.0;
+  if (uMode == 5) exu = texture(uExudate, uv).r;
   vec3 pos = vec3(uv.x * uWorld.x, h * 10.0, uv.y * uWorld.y);
   float eps = 1.0 / max(uWorld.x, uWorld.y);
   float hx = heightAt(uv + vec2(eps, 0.0)) * 10.0;
   float hz = heightAt(uv + vec2(0.0, eps)) * 10.0;
   vec3 n = normalize(vec3(-(hx - h * 10.0), 2.0 * eps * uWorld.x, -(hz - h * 10.0)));
   vN = n;
-  vCol = fieldColor(f);
+  vCol = fieldColor(f, exu);
   vTox = f.g;
   vWorld = pos;
   gl_Position = uMVP * vec4(pos, 1.0);
@@ -206,12 +221,16 @@ export class View3D {
   private orgProg: WebGLProgram;
   private fieldTex: WebGLTexture;
   private plateTex: WebGLTexture;
+  private exudateTex: WebGLTexture;
   private terrainVao: WebGLVertexArrayObject;
   private terrainCount = 0;
   private cubeVao: WebGLVertexArrayObject;
   private instBuf: WebGLBuffer;
   private rgba = new Uint8Array(4);
   private plate = new Uint8Array(4);
+  /** Reused normalised exudate plane and its byte copy (layer 5 only). */
+  private exudatePlane = new Float32Array(0);
+  private exudateBytes = new Uint8Array(0);
   private gridN = 96;
 
   yaw = 0.62;
@@ -240,6 +259,7 @@ export class View3D {
     this.orgProg = program(gl, VS_ORG, FS_ORG);
     this.fieldTex = this.makeTex();
     this.plateTex = this.makeTex();
+    this.exudateTex = this.makeTex();
     this.terrainVao = this.buildGrid(this.gridN);
     this.cubeVao = this.buildCube();
     this.instBuf = gl.createBuffer()!;
@@ -358,6 +378,19 @@ export class View3D {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, world.w, world.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.rgba);
     gl.bindTexture(gl.TEXTURE_2D, this.plateTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, world.w, world.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, plate);
+    // Layer 5 is the only mode that reads the plane, so every other mode keeps
+    // its old upload cost; both buffers below are reused frame to frame and the
+    // normalisation and gamma are the ones the 2D overlay uses, so the two
+    // layers mean the same thing.
+    if (this.fieldMode === 5) {
+      if (this.exudatePlane.length !== n) this.exudatePlane = new Float32Array(n);
+      if (this.exudateBytes.length !== n) this.exudateBytes = new Uint8Array(n);
+      normalizeOverlay(world.fields.exudate, this.exudatePlane);
+      for (let i = 0; i < n; i++) this.exudateBytes[i] = overlayByte(this.exudatePlane[i]!);
+      gl.bindTexture(gl.TEXTURE_2D, this.exudateTex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, world.w, world.h, 0, gl.RED, gl.UNSIGNED_BYTE, this.exudateBytes);
+    }
   }
 
   draw(world: World): void {
@@ -382,6 +415,9 @@ export class View3D {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.plateTex);
     gl.uniform1i(gl.getUniformLocation(this.terrainProg, "uPlate"), 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.exudateTex);
+    gl.uniform1i(gl.getUniformLocation(this.terrainProg, "uExudate"), 2);
     gl.bindVertexArray(this.terrainVao);
     gl.drawElements(gl.TRIANGLES, this.terrainCount, gl.UNSIGNED_INT, 0);
 

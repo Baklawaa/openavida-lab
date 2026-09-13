@@ -197,6 +197,9 @@ export const SHELL_EN = {
   /* footer ------------------------------------------------------------------ */
   "status.ready": "Ready.",
   "footer.keyboard": "pause / play",
+  // See fr.shell.ts: short provenance line plus the full-detail tooltip.
+  "shell.engine": "engine {version} · rev. {revision}",
+  "shell.engine.title": "OpenAvida engine {version}, revision {revision}, hash {algo}, parameters digest {digest}",
 
   /* guide dialog ------------------------------------------------------------ */
   "guide.close.aria": "Close the guide",

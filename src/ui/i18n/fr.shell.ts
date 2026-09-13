@@ -202,6 +202,11 @@ export const SHELL_FR = {
   /* footer ------------------------------------------------------------------ */
   "status.ready": "Prêt.",
   "footer.keyboard": "pause / lecture",
+  // Provenance of the run next to the seed: the short line stays in the status
+  // bar, the title carries the full detail a report or manifest can be matched
+  // against. "engine" is the product word, as in the export comment line.
+  "shell.engine": "engine {version} · rév. {revision}",
+  "shell.engine.title": "Moteur OpenAvida {version}, révision {revision}, hachage {algo}, empreinte des paramètres {digest}",
 
   /* guide dialog ------------------------------------------------------------ */
   "guide.close.aria": "Fermer le guide",

@@ -636,3 +636,13 @@ Scaling note recorded for honesty: the node harness reports ~5 ms/step for the s
 - Goldens: regenerated deliberately for exactly two new strings (the guide's reduced-motion line and the manifest-import tooltip) — 223 controls covered now.
 - GATES: typecheck ok (both configs); vitest **330/330** (68 files); build ok; **eleven** browser verifier runs OK; baseline unchanged `e953dcdc`.
 
+
+## Upgrade Stage 12c/12e — release hygiene and the 3D exudate plane (2026-09-14)
+
+Final wave, two subagents on disjoint files. **No model change: the perf hash stays `e953dcdc`.**
+
+- **12c Release hygiene.** The status bar now carries the engine identity beside the seed ("engine 2.2.0 · rév. 4"), and I made its tooltip live: it re-renders the engine version, revision, hash algorithm and the **active world's params digest** on the UI cadence, so it follows parameter edits, reseeds and the A/B switch rather than freezing at page load. `tools/gates.mjs` measures `dist/` after the build and fails above a 4 MB budget (measured today: **2.77 MB**). CI gains `concurrency` with cancel-in-progress, uploads `scratch/` when a gate fails, and both jobs keep their structure; `npm run verify` (typecheck + tests + build + gates) is documented as the local equivalent.
+- **12e The 3D exudate plane** — the last documented feature gap is closed. The 3D terrain shader gained an exudate sampler backed by a reused R8 texture, fed each frame (only in layer 5) through `normalizeOverlay` + `overlayByte`, the same normalisation and gamma LUT the 2D overlay uses; mode 5 mixes the surface toward the same violet the 2D layer uses, weighted by the normalised field, with a small height lift, and a zero-exudate cell keeps the composite colour exactly. The steady state allocates nothing. Verified pixel-wise: **3D modes 0–4 hash identical before and after**, mode 5 changes, 2D unchanged; `verify-exudate` gained a 3D case (delta 0.768 against a 0.4 bar, field note intact, no page errors) and the false limit is gone from `docs/model.md`.
+- Two robustness fixes I made while verifying: the reduced-motion assertion no longer measures a fixed wall-clock window (it waits for the clock, then bounds the rate), because it flaked once under the load of a build plus eleven verifiers in sequence; and the gates now print the dist measurement on every run.
+- GATES: typecheck ok (both configs); vitest **330/330** (68 files); build ok; `dist` 2.77 MB / 4.00 MB budget; **eleven** browser verifier runs OK; baseline unchanged `e953dcdc`.
+

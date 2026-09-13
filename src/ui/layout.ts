@@ -1,5 +1,9 @@
 /** Presentation only: simulation state and event handlers live in app.ts. */
+import { engineInfo, paramsDigest } from "../sim/engine";
 import { DNA_KITS } from "../sim/kits";
+import { recipeFromQuery } from "../sim/recipe";
+import { parseShareURL } from "../sim/serialize";
+import type { SimParams } from "../sim/types";
 import { LOCALES, kitDescription, kitLabel, kitShort, locale, t } from "./i18n/runtime";
 
 export function icon(name: string): string {
@@ -63,6 +67,16 @@ export const KIT_COPY: Record<string, KitCopy> = Object.fromEntries(
   ]),
 );
 
+/**
+ * Parameters the opening world is built from: a shared recipe payload wins over
+ * the plain query, exactly as app.mount() picks them, so the footer's digest
+ * describes the run the page actually starts rather than the default profile.
+ */
+function openingParams(): SimParams {
+  const search = typeof location !== "undefined" ? location.search : "";
+  return recipeFromQuery(search)?.params ?? parseShareURL(search);
+}
+
 /** Options of the language picker, with the active locale selected. */
 function languageOptions(): string {
   const active = locale();
@@ -73,6 +87,16 @@ function languageOptions(): string {
 }
 
 export function createLabLayout(root: HTMLElement) {
+  // Provenance of the run this page opens: the identity is static (one build),
+  // the digest is the opening world's, so the footer can be read next to a
+  // saved manifest without trusting a hand-typed version.
+  const engine = engineInfo();
+  const engineTitle = t("shell.engine.title", {
+    version: engine.version,
+    revision: engine.revision,
+    algo: engine.hashAlgo,
+    digest: paramsDigest(openingParams()),
+  });
   root.innerHTML = `
     <header class="top">
       <a class="brand" href="#" aria-label="OpenAvida Lab">${icon("life")}<span>OpenAvida<span class="brand-lab">LAB</span></span></a>
@@ -222,7 +246,7 @@ export function createLabLayout(root: HTMLElement) {
         </div>
       </div>
     </aside>
-    <footer class="status-bar"><span id="status-line" role="status" aria-live="polite">${t("status.ready")}</span><span id="m-seed" class="mono"></span><span class="keyboard-hint"><kbd>Espace</kbd> ${t("footer.keyboard")}</span></footer>
+    <footer class="status-bar"><span id="status-line" role="status" aria-live="polite">${t("status.ready")}</span><span id="m-seed" class="mono"></span><span id="m-engine" class="mono" title="${engineTitle}">${t("shell.engine", { version: engine.version, revision: engine.revision })}</span><span class="keyboard-hint"><kbd>Espace</kbd> ${t("footer.keyboard")}</span></footer>
     <dialog id="help-dialog"><form method="dialog"><button class="close-dialog" aria-label="${t("guide.close.aria")}">×</button></form><span class="eyebrow">${t("guide.eyebrow")}</span><h2>${t("guide.title")}</h2><ol><li>${t("guide.step1")}</li><li>${t("guide.step2")}</li><li>${t("guide.step3")}</li></ol><div class="shortcut-grid"><span><kbd>Espace</kbd> ${t("guide.pause")}</span><span><kbd>I</kbd> ${t("guide.inspect")}</span><span><kbd>O</kbd> ${t("guide.place")}</span><span><kbd>P</kbd> ${t("guide.paint")}</span><span><kbd>1–5</kbd> ${t("guide.layers")}</span><span><kbd>S</kbd> ${t("guide.snap")}</span></div><p class="muted">${t("guide.footer")}</p><p class="muted" id="guide-reduced-motion">${t("guide.reducedMotion")}</p></dialog>
     <dialog id="explorer-dialog" class="explorer-dialog" aria-label="${t("explorer.dialog.aria")}"></dialog>
   `;

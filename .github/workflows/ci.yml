@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# A newer run on the same ref supersedes the one before it: cancelling the
+# stale run keeps the queue short and the latest commit the one that reports.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit:
     name: typecheck, tests, build
@@ -15,9 +21,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      # Same sequence as `npm run verify`, split before the browser gates so a
+      # unit failure skips the slow job.
+      - run: npm run typecheck && npm test && npm run build
 
   gates:
     name: browser gates
@@ -33,3 +39,12 @@ jobs:
       # The verifiers launch the system Chrome (channel: "chrome"), which the
       # GitHub-hosted runner images ship.
       - run: npm run gates
+      # A failed gate leaves screenshots and logs under scratch/; keep them
+      # briefly so the run can be diagnosed from the artifact.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gates-scratch
+          path: scratch/
+          retention-days: 3
+          if-no-files-found: ignore

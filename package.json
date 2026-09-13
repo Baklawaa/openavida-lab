@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "gates": "node tools/gates.mjs",
+    "verify": "npm run typecheck && npm test && npm run build && node tools/gates.mjs",
     "sim": "node tools/build-cli.mjs && node dist-cli/openavida.mjs",
     "reproduce": "node tools/verify-reproduce.mjs",
     "launch": "node tools/launch.mjs"

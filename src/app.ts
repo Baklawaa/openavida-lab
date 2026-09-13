@@ -16,10 +16,12 @@ import {
   canMutateWorld,
   decodeGenome,
   DNA_KITS,
+  engineInfo,
   flagsFromQuery,
   genomeForKit,
   mappingLegend,
   parseShareURL,
+  paramsDigest,
   recipeFromQuery,
   strongestLiving,
   type BrushKind,
@@ -94,6 +96,8 @@ export function mount(root: HTMLElement): void {
   if (state.flags.view3d) state.surface = "3d";
 
   const { viz, stage, canvas, canvas3d, hud, cursors, side, cFit, cShan, cPhy } = createLabLayout(root);
+  /** Engine identity, read once: the footer tooltip reports the running build. */
+  const info = engineInfo();
   // The shell was rendered in the active locale; mirror it onto <html lang> and
   // let the picker switch (it stores the choice, rewrites ?lang= and reloads, so
   // every panel is rebuilt from the catalog rather than patched in place).
@@ -166,6 +170,12 @@ export function mount(root: HTMLElement): void {
   function setText(id: string, value: string): void {
     const node = document.getElementById(id);
     if (node && node.textContent !== value) node.textContent = value;
+  }
+
+  /** Attribute counterpart of setText: the provenance tooltip is rewritten per frame. */
+  function setAttr(id: string, name: string, value: string): void {
+    const node = document.getElementById(id);
+    if (node && node.getAttribute(name) !== value) node.setAttribute(name, value);
   }
 
   /** Same for the boolean `hidden` flag, which refreshMetrics rewrites per frame. */
@@ -524,6 +534,18 @@ export function mount(root: HTMLElement): void {
     setText("m-ex", String(w.extinctions.length));
     setText("m-ms", `${w.lastStepMs.toFixed(2)}ms`);
     setText("m-seed", `seed 0x${w.params.seed.toString(16)} · ${w.w}×${w.h} · ${state.view}`);
+    // Provenance follows the world that produced the numbers: the visible line is
+    // static (it is the engine build), the tooltip carries the live digest.
+    setAttr(
+      "m-engine",
+      "title",
+      tDynamic("shell.engine.title", {
+        version: info.version,
+        revision: info.revision,
+        hashAlgo: info.hashAlgo,
+        digest: paramsDigest(w.params),
+      }),
+    );
     if (state.selectedId >= 0) {
       const org = w.organisms.find((o) => o.id === state.selectedId);
       if (!org) {
@@ -918,7 +940,12 @@ export function mount(root: HTMLElement): void {
     // the plate. lastUi is 0 until the first refresh: the first frame paints.
     if (reducedMotion && state.lastUi !== 0 && now - state.lastUi <= UI_CADENCE_MS) return;
     if (state.surface === "3d") {
-      ensure3d().draw(viewWorld());
+      const view = ensure3d();
+      // View3D reads the exudate plane straight from the world it is handed, so
+      // the only thing to pass along is the layer: syncing it here makes layer 5
+      // tint in 3D too, instead of the toolbar's composite fallback.
+      view.fieldMode = renderer.fieldMode;
+      view.draw(viewWorld());
     } else {
       const side = sideOf(current());
       const shown = viewWorld();

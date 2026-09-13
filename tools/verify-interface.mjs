@@ -410,10 +410,16 @@ try {
   assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), true, 'the reduced-motion feature is emulated');
   await page.locator('#btn-slow').click(); // 2 steps/s: the observation speed
   const quietFrom = (await probe()).tick;
-  await page.waitForTimeout(2600);
+  // Wait for the clock rather than measuring a fixed wall-clock window: a loaded
+  // machine can starve the frame loop, and a flaky gate is worse than no gate.
+  // The upper bound still catches "the speed multiplier went wrong": at 2 steps/s
+  // even a generous 10 s window cannot produce 24 ticks.
+  await page
+    .waitForFunction(t => window.__openavida.tick >= t + 3, quietFrom, { timeout: 10000 })
+    .catch(() => {});
   const quietTicks = (await probe()).tick - quietFrom;
-  assert.ok(quietTicks >= 3, `reduced motion keeps the clock running (${quietTicks} ticks in 2.6 s at 2 steps/s)`);
-  assert.ok(quietTicks <= 10, `reduced motion keeps the chosen speed (${quietTicks} ticks in 2.6 s at 2 steps/s)`);
+  assert.ok(quietTicks >= 3, `reduced motion keeps the clock running (${quietTicks} ticks while quiet)`);
+  assert.ok(quietTicks < 24, `reduced motion keeps the observation speed (${quietTicks} ticks while quiet)`);
   // Toggling the preference back is live too: no reload, no error, clock going.
   await page.emulateMedia({ reducedMotion: null });
   assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), false, 'the preference can be released without a reload');

@@ -359,11 +359,6 @@ export const LIMITS: readonly LimitEntry[] = [
     source: "src/ui/modelPanel.ts LEGACY_V1_PROFILE",
   },
   {
-    gap: "The 3D view has no exudate plane",
-    detail: "Layer 5 falls back to the composite rendering in 3D; the exudate layer is a 2D overlay.",
-    source: "src/render/view3d.ts, src/app.ts",
-  },
-  {
     gap: "Nutrient inflow is a source term",
     detail: "nutrientInflow injects nutrient from outside the modelled system, so total field mass is only conserved when it is zero. The validation tests zero it deliberately, and the parameter is bounded at 0.2 per tick.",
     source: "src/sim/fields.ts applyVentsAndDecay, tests/validation.test.ts",
