@@ -102,7 +102,8 @@ describe("detectEvents", () => {
     const a = detectEvents(prev, world, EMPTY_EVENT_FLAGS);
     const extinct = a.events.filter((e) => e.kind === "strain-extinct" && e.strainId === 1);
     expect(extinct).toHaveLength(1);
-    expect(extinct[0]!.text).toMatch(/Alpha/);
+    // The sentence is rendered by the interface: the event carries the strain id.
+    expect(extinct[0]!.strainId).toBe(1);
   });
 
   it("emits population-crash and population-boom when the 20-step window crosses the threshold", () => {

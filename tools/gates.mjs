@@ -20,15 +20,18 @@ const skipBuild = argv.includes("--skip-build");
 const base = `http://127.0.0.1:${port}/`;
 
 const TOOLS = [
-  "tools/verify-interface.mjs",
-  "tools/verify-exudate.mjs",
-  "tools/verify-research.mjs",
-  "tools/verify-history.mjs",
-  "tools/verify-copy.mjs",
-  "tools/verify-i18n.mjs",
-  "tools/verify-worker.mjs",
-  "tools/verify-determinism.mjs",
-  "tools/launch.mjs",
+  ["tools/verify-interface.mjs"],
+  ["tools/verify-exudate.mjs"],
+  ["tools/verify-research.mjs"],
+  ["tools/verify-history.mjs"],
+  // Interface copy is pinned in both locales: French must never move silently,
+  // and English must stay a translation of it.
+  ["tools/verify-copy.mjs"],
+  ["tools/verify-copy.mjs", "--en"],
+  ["tools/verify-i18n.mjs"],
+  ["tools/verify-worker.mjs"],
+  ["tools/verify-determinism.mjs"],
+  ["tools/launch.mjs"],
 ];
 
 function run(cmd, args) {
@@ -72,10 +75,11 @@ try {
     console.error("gates: preview server did not answer in time");
     process.exit(1);
   }
-  for (const tool of TOOLS) {
-    const code = await run("node", [tool, base]);
-    console.log(`gates: ${tool} ${code === 0 ? "OK" : "FAILED"}`);
-    if (code !== 0) failed.push(tool);
+  for (const [tool, ...extra] of TOOLS) {
+    const code = await run("node", [tool, base, ...extra]);
+    const label = [tool, ...extra].join(" ");
+    console.log(`gates: ${label} ${code === 0 ? "OK" : "FAILED"}`);
+    if (code !== 0) failed.push(label);
   }
 } finally {
   server?.kill("SIGTERM");

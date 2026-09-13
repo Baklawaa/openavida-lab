@@ -68,20 +68,25 @@ export type CatalogSort =
   | "oldest"
   | `trait:${TraitName}`;
 
-export const CATALOG_SORTS: Array<{ id: CatalogSort; label: string }> = [
-  { id: "died-fastest", label: "Morts le plus vite (âge au décès croissant)" },
-  { id: "died-slowest", label: "Morts le plus tard (âge au décès décroissant)" },
-  { id: "longest-lived", label: "Plus longue vie" },
-  { id: "youngest", label: "Plus jeunes" },
-  { id: "best-fitness", label: "Meilleure fitness" },
-  { id: "worst-fitness", label: "Pire fitness" },
-  { id: "most-kills", label: "Plus de proies tuées" },
-  { id: "most-births", label: "Plus de descendants directs" },
-  { id: "most-mass", label: "Plus forte corpulence" },
-  { id: "most-energy", label: "Plus d’énergie (vivants)" },
-  { id: "newest", label: "Nés le plus récemment" },
-  { id: "oldest", label: "Nés le plus tôt" },
-  ...TRAIT_NAMES.filter((t) => t !== "hue").map((t) => ({ id: `trait:${t}` as CatalogSort, label: `Trait maximal : ${t}` })),
+/**
+ * Sort presets, in menu order. Ids only: the interface renders each label from
+ * the locale catalog (`sim.sort.<id>`, and `sim.sort.trait` for the trait
+ * presets, whose id is `trait:<trait>`).
+ */
+export const CATALOG_SORTS: Array<{ id: CatalogSort }> = [
+  { id: "died-fastest" },
+  { id: "died-slowest" },
+  { id: "longest-lived" },
+  { id: "youngest" },
+  { id: "best-fitness" },
+  { id: "worst-fitness" },
+  { id: "most-kills" },
+  { id: "most-births" },
+  { id: "most-mass" },
+  { id: "most-energy" },
+  { id: "newest" },
+  { id: "oldest" },
+  ...TRAIT_NAMES.filter((t) => t !== "hue").map((t) => ({ id: `trait:${t}` as CatalogSort })),
 ];
 
 const phenotypeCache = new Map<string, Phenotype>();
@@ -222,12 +227,12 @@ export function groupCatalog(entries: readonly CatalogEntry[], mode: GroupMode):
 }
 
 /** Quick "records": the organism that is the extreme of each preset (null when the catalog is empty). */
-export function catalogRecords(entries: readonly CatalogEntry[]): Array<{ sort: CatalogSort; label: string; entry: CatalogEntry }> {
-  const out: Array<{ sort: CatalogSort; label: string; entry: CatalogEntry }> = [];
+export function catalogRecords(entries: readonly CatalogEntry[]): Array<{ sort: CatalogSort; entry: CatalogEntry }> {
+  const out: Array<{ sort: CatalogSort; entry: CatalogEntry }> = [];
   for (const s of CATALOG_SORTS) {
     const pool = s.id === "died-fastest" || s.id === "died-slowest" ? entries.filter((e) => !e.alive) : s.id === "most-energy" ? entries.filter((e) => e.alive) : entries;
     const top = sortCatalog(pool, s.id)[0];
-    if (top) out.push({ sort: s.id, label: s.label, entry: top });
+    if (top) out.push({ sort: s.id, entry: top });
   }
   return out;
 }

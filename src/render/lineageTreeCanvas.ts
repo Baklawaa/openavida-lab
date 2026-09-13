@@ -5,6 +5,7 @@
  * bright trunk; the biggest phenotype change of each lineage is written at
  * its birth when there is room.
  */
+import { tDynamic } from "../ui/i18n/runtime";
 import type { TreeLayout, TreeNode } from "./lineageTreeLayout";
 
 export interface TreeViewOptions {
@@ -139,7 +140,7 @@ export class LineageTreeView {
       ctx.fillStyle = "#91a2a7";
       ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Choisissez une lignée ou un organisme pour dessiner son arbre.", W / 2, H / 2);
+      ctx.fillText(tDynamic("render.tree.empty"), W / 2, H / 2);
       ctx.textAlign = "left";
       return;
     }
@@ -259,7 +260,7 @@ export class LineageTreeView {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = "#a2dfbd";
-      ctx.fillText("maintenant", xNow, 10);
+      ctx.fillText(tDynamic("render.tree.now"), xNow, 10);
     }
     ctx.textAlign = "left";
   }
@@ -363,9 +364,13 @@ export class LineageTreeView {
   }
 
   private showTip(n: TreeNode, clientX: number, clientY: number): void {
-    const state = n.count > 0 ? `${n.count} vivant${n.count > 1 ? "s" : ""}` : n.extinct ? `éteinte au pas ${n.t1}` : "sans membre";
-    const change = n.changes.length ? `<br>${n.changes.map((c) => `${this.opts.changeLabel({ ...n, change: c })}`).join(" · ")}` : n.parentId >= 0 || n.depth > 0 ? "<br>mutation sans effet notable" : "<br>génome fondateur";
-    this.tip.innerHTML = `<b>Lignée n° ${n.id}</b> · ${this.opts.strainName(n.strainId)}<br>pas ${n.t0} → ${n.t1} · ${state} · max ${n.peak}${change}<br><span class="tiny">clic : détails · double-clic : centrer l’arbre</span>`;
+    const state = n.count > 0
+      ? tDynamic(n.count > 1 ? "render.tree.state.alive.many" : "render.tree.state.alive.one", { count: n.count })
+      : n.extinct ? tDynamic("render.tree.state.extinct", { tick: n.t1 }) : tDynamic("render.tree.state.empty");
+    const change = n.changes.length ? `<br>${n.changes.map((c) => `${this.opts.changeLabel({ ...n, change: c })}`).join(" · ")}` : n.parentId >= 0 || n.depth > 0 ? `<br>${tDynamic("render.tree.change.silent")}` : `<br>${tDynamic("render.tree.change.founder")}`;
+    const head = tDynamic("render.tree.tip.head", { id: n.id, strain: this.opts.strainName(n.strainId) });
+    const body = tDynamic("render.tree.tip.body", { from: n.t0, to: n.t1, state, peak: n.peak });
+    this.tip.innerHTML = `${head}<br>${body}${change}<br><span class="tiny">${tDynamic("render.tree.tip.hint")}</span>`;
     this.tip.hidden = false;
     const x = Math.min(clientX + 14, window.innerWidth - 320);
     const y = Math.min(clientY + 14, window.innerHeight - 110);

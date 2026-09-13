@@ -1,0 +1,904 @@
+{
+  "text": {
+    "header": "OpenAvidaLAB Artificial evolution · explicit genome · # × # plate FrançaisEnglish Share Export world",
+    "metrics": "Population#organisms Lineages#alive Diversity#Shannon H′ Fitness#mean",
+    "toolbar": "World A World B A / B # × # Combined Nutrient Toxin Temperature Light Exudate Paused #D#D",
+    "stage": "WORLD AB · # organisms Empty worldPick a kit and click a free cell, or inject at random.Inject # organisms InspectI PlaceO PaintP Nutrient Toxin Light",
+    "playback": "Resume STEP # Click a free cell: places an organism with the editor genome. Speed# /s×# View#% ⏮ ◀ ▶ Resume here step # (recorded every #) # snapshots · # MB / # MB",
+    "charts": "Time seriesWORLD A · HISTORYCollapse FitnessMean Max DiversityShannon H′ Lineage treeAncestry",
+    "tabs": "Organisms Environment Analysis Species Experiment",
+    "panel.organisms": "Starter kits# GENOMESClick a free cell: places an organism with the editor genome.Phototrophphoto ×# · size ×# · resist ×#✓Heterotrophuptake ×# · motility ×# · fecundity ×#✓Resistantresist ×# · uptake ×# · tpref ×#✓Predatoraggression ×# · motility ×# · uptake ×#✓Mutualistsignal ×# · uptake ×# · photo ×#✓ SELECTED KITEnergy gain proportional to the local light field. Depends on light, not on nutrient.Light # · Uptake # · Resist. # Inject # organisms DNA editor# BASES · # GENES ACGT sequence decoded live: ORF (ATG … stop) → codons → trait deltas → phenotype. Undo Redo Revert Copy selection Clear Genes VISUAL Photosynthesis #codons − + ↑ ↓ × Turns local light into energy. Photosynthesis +# bases #–# · DDYYDD Mutability #codons − + ↑ ↓ × Multiplies the mutation rate of this organism's births (# to #). Mutability +#Size +# bases #–# · PP Resistance #codon − + ↑ ↓ × Reduces the damage caused by toxins. Resistance +# bases #–# · S ADD A GENEUptakePhotosynthesisResistanceTemperatureMotilityPredationCooperationColourReproductionSizeMutability Base-by-base sequence ACGT #ATGGACDGATDTACYTATYGACDGATDTAACC#ATGCCAPCCCPTAACC#ATGAGCSTAA Click a base to select it. Double-click: the whole codon. Drag or Shift + click: a range. INSERT AFTER THE SELECTIONStart / stopUptakePhotosynthesisResistanceTemperatureMotilityPredationCooperationColourReproductionSizeMutability ATGstartTAAstopTAGstopTGAstop Landscape Open to evaluate codon substitutions in the genes, against the local environment. Best substitutions Worst substitutions PHENOTYPEidentical to the loaded genome Uptake # = Photosynthesis # = Resistance # = Temperature # = Motility # = Predation # = Cooperation # = Colour # = Reproduction # = Size # = Mutability # = Apply to the selection Place in the world Raw sequence and mutations ADVANCED ACGT sequence Point mutationInsertion / deletionDuplicate Founder genome PhototrophHeterotrophResistantPredatorMutualistLoad",
+    "panel.environment": "Fields and terrainBRUSHClick or drag in the world. In #D, one click per stroke.NutrientToxinHeatLightBarrierEraserNutrient ventToxin ventHeat ventShadeRemove lifeBrush radius# cells Environment dynamicsRandom terrainSources, barriers and shaded areasRandom eventsDisturbances during the experiment ScheduleSTEPS Change applied at the given step, after disturbances and before metabolism. An empty list leaves the world unchanged. Nutrient scale Toxin scale Temperature scale Light scale Mutation rate Population cap Reproduction threshold Toxin brush Nutrient brush Add ModelPARAMETERSEvery parameter is bounded by its specification, applied to the chosen world and recorded in the manifest. “Profile v#” restores the settings from before the upgrade.WorldWidthPlate width in cells.cellsHeightPlate height in cells.cellsSeedMaster seed of the mulberry# stream. All simulation randomness derives from it.Starting populationFounders placed at construction (kits first, then random genomes). Capped by maxPopulation.organismsMaximum populationHard ceiling on living organisms; a soft density-dependent fecundity gate applies below it.organismsRandom terrainSeed vents, walls and shade at construction.Random eventsEnable stochastic toxin pulses, droughts and crashes during the run.Toxin pulse hazardPer-tick hazard of a random toxin pulse when disturbances are enabled (default #/#).per tickDrought hazardPer-tick hazard of a nutrient drought when disturbances are enabled (default #/#).per tickCrash hazardPer-tick hazard of a population crash when disturbances are enabled (default #/#).per tickTrait distributionsStore mean, sd and quantiles of every trait on each history sample (analysis without re-simulation).Event logRecord every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring).Dilution rateChemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. # = closed batch world.per tickInflow nutrientNutrient concentration the inflow restores when dilutionRate > #.concentrationMetabolismDiffusionJacobi diffusion coefficient for nutrient, toxin and temperature (# = no mixing).per tickNutrient recyclingUniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay.per tickNutrient decayFractional loss of the nutrient field per tick.per tickToxin decayFractional loss of the toxin field per tick.per tickThermal decayRelaxation of the temperature field towards # per tick.per tickLight decayFractional loss of the light field per tick before solar recharge.per tickReproduction thresholdBase energy a cell must hold to divide; scaled by the fecundity trait.energyMaximum ageHard age ceiling. With senescenceRate > # most deaths happen well before it.stepsPredation thresholdMinimum aggression for an organism to be a predator at all.aggressionMeals per stepMaximum prey a predator can eat in one tick across all phases; density-independent attack limit.preyLight diffusionDiffusion of the light field. # keeps light where the solar recharge and shade put it.per tickSenescenceScale of the age-dependent mortality hazard (# - exp(-rate (age/maxAge)^#)). # = hard maxAge cutoff only.riskEcologyKin thresholdMinimum aggression gap required for a kill. # allows cannibalism of identical phenotypes.aggressionExudate and chemistryExudate leakShare of the photosynthetic surplus a phototroph leaks into the exudate field.fractionExudate decayFractional loss of the exudate field per tick.per tickExudate diffusionDiffusion of the exudate field; how far a leak travels from its producer.per tickEvolutionMutation rateProbability that a birth draws a mutation; scaled per organism by the mutator trait.per birthPoint weightRelative weight of single-base substitutions among mutations.relativeIndel weightRelative weight of insertions and deletions (# to # bases) among mutations.relativeDuplication weightRelative weight of tandem duplications among mutations.relativeRecombinationProbability that a birth takes a single-point crossover with a nearby neighbour (sex and horizontal transfer share this operator).per birthRecombination radiusChebyshev radius within which a recombination partner is drawn.cellsCis regulationAmplify a gene by the codons upstream of its ATG (cis-regulatory layer). Off restores the purely additive decoder.Genome upkeepMaintenance cost per genome base per tick, so longer genomes are not free.energy/base/stepReplication costEnergy charged per genome base at division, on top of the daughter's share.energy/base A and B World A World B Apply Defaults Profile v# Four-neighbour diffusion every step, blocked by barriers. A vent emits continuously; a brush stroke is one-off.",
+    "panel.analysis": "Selected organismNONEInspect tool, then click an organism.Edit this DNAEvolutionGenome and genesMetabolism and behaviour ExplorerEVERY ORGANISMLiving and dead, grouped by species, precise filters and sorts, evolutionary branch, local records.Open the explorer Events# Lineage # exceeds #% of the population. Step # ResearchMEASUREMENTS SELECTION BY LINEAGE (single strain)Lineage # % of the populations = -# / stepLineage # % of the populations = -# / stepSingle strain: selection is estimated between lineages (the # most populated are kept at each step; only those with at least two measurements are listed). Positive = lineage growing. NEUTRAL DRIFT# neutral substitution(s) · clock # / # steps / lineage REALISED FITNESS# descendants per dead adult · fixation rate # % TRAIT DISTRIBUTIONuptake # ± #photo # ± #resist # ± #size # ± #mutator # ± # Fitness ranking ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGCCGATTACTATGACGATTAACCAT…# Edit this DNA ## Fitness # · Energy # Lineage # · Light # · Uptake # ATGGACGATTACTATGACGATTAACCAT…# Edit this DNA Death logNot enough food or light: # Not enough food or light Step # · No. # · Lineage # · Fitness # ATGGACGATTACTATGACGATTAACCAT…# Not enough food or light Step # · No. # · Lineage # · Fitness # ATGGACGATTACTATGACGATTAACCAT…# Not enough food or light Step # · No. # · Lineage # · Fitness # ATGGACGATTACTATGACGATTAACCAT…# Codon → trait tableORF = ATG … TAA/TAG/TGA, read in every frame. phenotype[trait] = squash(basal + Σ deltas). Hue never enters fitness.AAA K → aggression +#AAC N → uptake +#AAG K → aggression +#AAT N → uptake +#ACA T → tpref -#ACC T → tpref +#ACG T → tpref -#ACT T → tpref +#AGA R → aggression +#AGC S → resist +#AGG R → aggression +#AGT S → resist +#ATA I → uptake +#ATC I → uptake +#ATG M → uptake +#ATT I → uptake +#CAA Q → signal +#CAC H → signal +#CAG Q → signal +#CAT H → signal +#CCA P → size +#CCC P → size +#CCG P → size +#CCT P → size +#CGA R → aggression +#CGC R → aggression +#CGG R → aggression +#CGT R → aggression +#CTA L → size +#CTC L → size +#CTG L → size +#CTT L → size +#GAA E → uptake +#GAC D → photo +#GAG E → uptake +#GAT D → photo +#GCA A → fecundity +#GCC A → fecundity +#GCG A → fecundity +#GCT A → fecundity +#GGA G → motility +#GGC G → motility +#GGG G → motility +#GGT G → motility +#GTA V → motility +#GTC V → motility +#GTG V → motility +#GTT V → motility +#TAC Y → photo +#TAT Y → photo +#TCA S → resist +#TCC S → resist +#TCG S → resist +#TCT S → resist +#TGC C → resist +#TGG W → hue +#TGT C → resist +#TTA L → size +#TTC F → hue +#TTG L → size +#TTT F → hue +#",
+    "panel.species": "Groups# GROUPS Strains Strategies Colour the world by strain A strain = a founding genome. Descendants, mutants included, keep the label. Group counts Trajectories Map · centre of mass Mean local temperature Define a strain Names the genome currently in the editor. Every organism placed or injected with that genome carries the label; compare # or # strains in the same environment that way. Create from the editor",
+    "panel.experiment": "PresetsLOCAL Complete state of the active world (fields, terrain, organisms, strains, history), kept in this browser. Serves as the start state for goal-directed experiments. Save the current state No preset saved. Recipe# ACTION Replayable sequence: parameters plus paint, place, inject, define a strain, step. Encoded in ?recipe= (base#url). Beyond # characters the link keeps the parameters only. Record actions Copy the recipe link Export .json Import .json Replay in B Goal-directed experimentMULTI-SIMULATION From a start state, n replicates with different seeds run in the background. Each stops when every goal is met, at extinction, when the remaining goals are unreachable, or at the end of the budget. # · START STATE Active world # · GOAL Pick a template goal…Toxin adaptation: # % of organisms in the toxic zone (≥ #), # stepsMean resistance ≥ #Colonisation of a hot zone (T ≥ #) by # %Shift to photosynthesis: mean photo ≥ #Population size ≥ #Diversity H′ ≥ # Measure PopulationLiving lineagesDiversity H′Mean fitnessShare of organisms where nutrient ≥ thresholdShare of organisms where toxin ≥ thresholdShare of organisms where temperature ≥ thresholdShare of organisms where light ≥ thresholdShare of organisms where exudate ≥ thresholdUptake (mean)Uptake (max)Photosynthesis (mean)Photosynthesis (max)Resistance (mean)Resistance (max)Temperature (mean)Temperature (max)Motility (mean)Motility (max)Predation (mean)Predation (max)Cooperation (mean)Cooperation (max)Reproduction (mean)Reproduction (max)Size (mean)Size (max)Mutability (mean)Mutability (max) Field threshold: an organism counts when its cell reaches this value Condition ≥≤ heldsteps Goal: share of organisms where toxin ≥ # ≥ # for # steps. + Add a goal Up to # goals. The run stops when every goal is met, the world is empty, or the remaining goals are unreachable. The chart plots the first one. # · RUN PARAMETERS Replicates Max steps per replicate Mutation rate Population cap Seed of the #st replicate Disturbances Replicates get the seeds seed, seed + #, seed + #, … They appear in the results table and in the CSV seed column. Run the replicatesStopCSV Check determinism # · RESULTS HTML reportKeep the run Measure per replicate SortSucceeded, fastest firstSucceeded, slowest firstFailed, fastest first (early extinction / impossibility)Failed, slowest firstFinal value, highest firstFinal population, highest firstLaunch order RUN JOURNAL Kept runs stay in the browser. Tick two to four to compare success rate, median and effect against the reference (the first one ticked). “Manifest” exports the run for the headless runner. No run kept. Start a goal-directed experiment, then “Keep the run”. Curves of the kept runs # · REPLAY A REPLICATE IN WORLD B Paste the seed of a replicate (table above, or the seed column of the CSV). World B is rebuilt from the start state of the last run, with this seed and the run parameters, then playback starts: the simulation reproduces the replicate step by step. Clicking again restarts from the beginning. “Catalogue at the end” replays the replicate without rendering it up to its last step, then opens the organism explorer on that final state. Replay in BCatalogue at the end SweepPARAMETER Repeats the goal over a linear grid of one variable (e.g. toxin scale). Seeds run on from one value to the next. Variable Mutation rateMaximum populationReproduction energy thresholdToxin scaleNutrient scaleTemperature scaleLight scale From To Points Replicates / value Run the sweepSweep CSV Steps to the goal vs value TournamentSTRAINS Every pair of # to # contestants (strains of the active world or saved organisms) is injected at equal counts into the start state. After the step budget, the larger share wins; a gap ≤ # % = a draw. Self-pairings are excluded. Replicates / pair Max steps Run the tournamentCSV Restore pointsComplete state of the active world: organisms, fields, lineages, history.RememberRestoreNo state remembered in this session. Worlds A and BSame parameters, different seeds. The A / B switch sits above the world.+# step A+# step B+# step A and B New experimentRandom seedReset A and BReplaces A and B with two empty worlds.Bottleneck: keep # % Experiment dataMetrics CSVLineages CSVEvents JSONLRun manifestImport a world JSONEvent logBirths, deaths, meals, exudate, recombinations — bounded, for external analysis Experimental features#D visualisationBehavioursBuilt-in decision policyLLM adapterBuilt-in policy when no adapter is configuredShared sessionBetween the tabs of this browserRoomRoleHostExperimenterSpectatorCreate a roomJoinTurn on the shared session to open a room. Fixation #%Extinctions #Compute / step #ms",
+    "footer": "# organisms added to world A.seed #hex · #×# · AEspace pause / play",
+    "help": "×GUIDEBasic protocolPopulation. A kit or an edited genome, placed cell by cell or injected (# organisms).Environment. Nutrient, toxin, temperature and light fields; vents, barriers, shade.Measurements. Organism inspection (genome, phenotype, metabolism), fitness, Shannon diversity, lineages.Espace Pause / playI InspectO PlaceP Paint#–# Environment layersS Remember#D: drag to rotate, wheel to zoom. A / B shows two worlds in #D; the metrics follow the last world you clicked."
+  },
+  "helps": {
+    "btn-share": {
+      "title": "Copy a configuration link: seed, parameters and options. To keep the organisms and the current state, export the world as JSON.",
+      "help": "Copy a configuration link: seed, parameters and options. To keep the organisms and the current state, export the world as JSON."
+    },
+    "btn-json": {
+      "title": "Download a complete world as JSON: organisms, fields, lineages and history. Re-importable from Experiment.",
+      "help": "Download a complete world as JSON: organisms, fields, lineages and history. Re-importable from Experiment."
+    },
+    "view-A": {
+      "title": "Show world A. The metrics and the actions concern this world.",
+      "help": "Show world A. The metrics and the actions concern this world."
+    },
+    "view-B": {
+      "title": "Show world B, an independent experiment with another seed.",
+      "help": "Show world B, an independent experiment with another seed."
+    },
+    "view-split": {
+      "title": "Compare worlds A and B side by side in #D. Click a world to show its metrics and act on it.",
+      "help": "Compare worlds A and B side by side in #D. Click a world to show its metrics and act on it."
+    },
+    "fm-0": {
+      "title": "Show nutrient, toxin, temperature and light together. Shortcut: #.",
+      "help": "Show nutrient, toxin, temperature and light together. Shortcut: #."
+    },
+    "fm-1": {
+      "title": "Show nutrient in green. Shortcut: #.",
+      "help": "Show nutrient in green. Shortcut: #."
+    },
+    "fm-2": {
+      "title": "Show toxin in pink. Shortcut: #.",
+      "help": "Show toxin in pink. Shortcut: #."
+    },
+    "fm-3": {
+      "title": "Show temperature, from cold blue to hot orange. Shortcut: #.",
+      "help": "Show temperature, from cold blue to hot orange. Shortcut: #."
+    },
+    "fm-4": {
+      "title": "Show light in gold. Shortcut: #.",
+      "help": "Show light in gold. Shortcut: #."
+    },
+    "view-2d": {
+      "title": "Top-down view: the environment's colours show resources, the dots are organisms.",
+      "help": "Top-down view: the environment's colours show resources, the dots are organisms."
+    },
+    "view-3d": {
+      "title": "Relief view of the same world. Height = nutrient and light. Drag to rotate, wheel to zoom, click to use the tool.",
+      "help": "Relief view of the same world. Height = nutrient and light. Drag to rotate, wheel to zoom, click to use the tool."
+    },
+    "tool-inspect": {
+      "title": "Click an organism to examine its energy, traits and DNA. Shortcut: I.",
+      "help": "Click an organism to examine its energy, traits and DNA. Shortcut: I."
+    },
+    "tool-place": {
+      "title": "Click a free cell to place an organism with the editor's genome. Shortcut: O.",
+      "help": "Click a free cell to place an organism with the editor's genome. Shortcut: O."
+    },
+    "tool-paint": {
+      "title": "Click or drag to paint the environment. In #D, paint by clicking. Shortcut: P.",
+      "help": "Click or drag to paint the environment. In #D, paint by clicking. Shortcut: P."
+    },
+    "btn-pause": {
+      "title": "Pause or resume. Space does the same. You can always inspect the world while paused.",
+      "help": "Pause or resume. Space does the same. You can always inspect the world while paused."
+    },
+    "btn-step-once": {
+      "title": "Advance exactly one step and stay paused. In A / B it advances both worlds.",
+      "help": "Advance exactly one step and stay paused. In A / B it advances both worlds."
+    },
+    "speed-top": {
+      "title": "Speed in simulation steps per second. # pauses; # lets you watch; # accelerates evolution.",
+      "help": "Speed in simulation steps per second. # pauses; # lets you watch; # accelerates evolution."
+    },
+    "btn-slow": {
+      "title": "Back to observation speed: # steps per second.",
+      "help": "Back to observation speed: # steps per second."
+    },
+    "zoom-top": {
+      "title": "Share of the world visible in #D: # % shows all of it. Reduce it to examine the central area. In #D, use the wheel.",
+      "help": "Share of the world visible in #D: # % shows all of it. Reduce it to examine the central area. In #D, use the wheel."
+    },
+    "timeline-row": {
+      "title": "Snapshots of the active world, every # steps, in bounded memory. The slider previews; Resume here restores that state.",
+      "help": "Snapshots of the active world, every # steps, in bounded memory. The slider previews; Resume here restores that state."
+    },
+    "btn-timeline-first": {
+      "title": "Go to the first kept snapshot (the origin of the recording).",
+      "help": "Go to the first kept snapshot (the origin of the recording)."
+    },
+    "btn-timeline-prev": {
+      "title": "Go to the recorded snapshot immediately before the slider.",
+      "help": "Go to the recorded snapshot immediately before the slider."
+    },
+    "timeline-range": {
+      "title": "Walks through the recorded snapshots. The simulation pauses; the plate shows the chosen state without writing it until Resume here is clicked.",
+      "help": "Walks through the recorded snapshots. The simulation pauses; the plate shows the chosen state without writing it until Resume here is clicked."
+    },
+    "btn-timeline-next": {
+      "title": "Go to the recorded snapshot immediately after the slider.",
+      "help": "Go to the recorded snapshot immediately after the slider."
+    },
+    "btn-timeline-resume": {
+      "title": "Write the displayed snapshot into the active world and forget later recordings. The following steps start from there.",
+      "help": "Write the displayed snapshot into the active world and forget later recordings. The following steps start from there."
+    },
+    "timeline-label": {
+      "title": "Step of the displayed snapshot and the recording cadence.",
+      "help": "Step of the displayed snapshot and the recording cadence."
+    },
+    "timeline-budget": {
+      "title": "Memory used by the snapshots, against a # MB ceiling. The oldest after the origin are evicted first.",
+      "help": "Memory used by the snapshots, against a # MB ceiling. The oldest after the origin are evicted first."
+    },
+    "btn-charts": {
+      "title": "Collapse or show the time series to give the world more height. The choice is remembered.",
+      "help": "Collapse or show the time series to give the world more height. The choice is remembered."
+    },
+    "chart-phy": {
+      "title": "Lineage tree: each bar is a lineage, drawn from its birth step to its extinction, thicker when its peak count is larger. Click a lineage to explore it; hover for its count.",
+      "help": "Lineage tree: each bar is a lineage, drawn from its birth step to its extinction, thicker when its peak count is larger. Click a lineage to explore it; hover for its count."
+    },
+    "kit-phototroph": {
+      "title": "Uses light as its energy source. Select this kit and switch on the Place tool.",
+      "help": "Uses light as its energy source. Select this kit and switch on the Place tool."
+    },
+    "kit-heterotroph": {
+      "title": "Feeds on nutrient. Add food to the environment to sustain its growth.",
+      "help": "Feeds on nutrient. Add food to the environment to sustain its growth."
+    },
+    "kit-resistant": {
+      "title": "Resists toxin damage better than the others.",
+      "help": "Resists toxin damage better than the others."
+    },
+    "kit-predator": {
+      "title": "Hunts weaker neighbouring organisms and takes their energy.",
+      "help": "Hunts weaker neighbouring organisms and takes their energy."
+    },
+    "kit-mutualist": {
+      "title": "Photosynthesises and carries an exudate receptor: it collects part of the surplus released by neighbouring phototrophs.",
+      "help": "Photosynthesises and carries an exudate receptor: it collects part of the surplus released by neighbouring phototrophs."
+    },
+    "btn-inject": {
+      "title": "Place up to # copies of the editor's genome on free cells of the active world.",
+      "help": "Place up to # copies of the editor's genome on free cells of the active world."
+    },
+    "dna-undo": {
+      "title": "Undo the last editor change. Shortcut inside the sequence: ⌘Z.",
+      "help": "Undo the last editor change. Shortcut inside the sequence: ⌘Z."
+    },
+    "dna-redo": {
+      "title": "Restore the undone change. Shortcut inside the sequence: ⌘⇧Z.",
+      "help": "Restore the undone change. Shortcut inside the sequence: ⌘⇧Z."
+    },
+    "dna-revert": {
+      "title": "Go back to the last loaded genome: a kit, a copied organism or the starting genome.",
+      "help": "Go back to the last loaded genome: a kit, a copied organism or the starting genome."
+    },
+    "btn-from-inspect": {
+      "title": "Copy the selected organism's genome into the editor. It becomes the reference genome of the phenotype.",
+      "help": "Copy the selected organism's genome into the editor. It becomes the reference genome of the phenotype."
+    },
+    "btn-clear-genes": {
+      "title": "Empty the sequence. The phenotype becomes basal until you add a gene or pick a kit. Undoable.",
+      "help": "Empty the sequence. The phenotype becomes basal until you add a gene or pick a kit. Undoable."
+    },
+    "dna-cassette": {
+      "title": "Genome map: one segment per gene, grey for bases outside genes. Click to select the region.",
+      "help": "Genome map: one segment per gene, grey for bases outside genes. Click to select the region."
+    },
+    "dna-builder": {
+      "title": "Each card is a gene read from the sequence. Strength is its codon count; reorder, reinforce or remove genes without losing your other edits.",
+      "help": "Each card is a gene read from the sequence. Strength is its codon count; reorder, reinforce or remove genes without losing your other edits."
+    },
+    "gene-add-uptake": {
+      "title": "Add a nutrition gene, to absorb nutrient.",
+      "help": "Add a nutrition gene, to absorb nutrient."
+    },
+    "gene-add-photo": {
+      "title": "Add a photosynthesis gene, to use light.",
+      "help": "Add a photosynthesis gene, to use light."
+    },
+    "gene-add-resist": {
+      "title": "Add a toxin-resistance gene.",
+      "help": "Add a toxin-resistance gene."
+    },
+    "gene-add-tpref": {
+      "title": "Add a gene that sets the preferred temperature.",
+      "help": "Add a gene that sets the preferred temperature."
+    },
+    "gene-add-motility": {
+      "title": "Add a gene that changes the ability to move.",
+      "help": "Add a gene that changes the ability to move."
+    },
+    "gene-add-aggression": {
+      "title": "Add a predation gene to hunt neighbours.",
+      "help": "Add a predation gene to hunt neighbours."
+    },
+    "gene-add-signal": {
+      "title": "Add a cooperation and signalling gene.",
+      "help": "Add a cooperation and signalling gene."
+    },
+    "gene-add-hue": {
+      "title": "Add a colour gene. Colour does not change fitness.",
+      "help": "Add a colour gene. Colour does not change fitness."
+    },
+    "gene-add-fecundity": {
+      "title": "Add a gene that changes reproduction.",
+      "help": "Add a gene that changes reproduction."
+    },
+    "gene-add-size": {
+      "title": "Add a size gene, which also affects energy upkeep.",
+      "help": "Add a size gene, which also affects energy upkeep."
+    },
+    "gene-add-mutator": {
+      "title": "Adds a mutability cassette: it multiplies the mutation rate of this organism's births.",
+      "help": "Adds a mutability cassette: it multiplies the mutation rate of this organism's births."
+    },
+    "dna-strip-section": {
+      "title": "The sequence base by base. The coloured rails delimit the genes (ATG → TAA/TAG/TGA). Select bases to replace, delete or duplicate them.",
+      "help": "The sequence base by base. The coloured rails delimit the genes (ATG → TAA/TAG/TGA). Select bases to replace, delete or duplicate them."
+    },
+    "dna-strip": {
+      "title": "Click a base to select it, drag for a range, double-click for a codon. Type A, C, G or T to replace; Backspace deletes; ⌘Z undoes.",
+      "help": "Click a base to select it, drag for a range, double-click for a codon. Type A, C, G or T to replace; Backspace deletes; ⌘Z undoes."
+    },
+    "codon role-start": {
+      "title": "",
+      "help": "ATG · start of gene # (Resistance)"
+    },
+    "codon role-coding": {
+      "title": "",
+      "help": "AGC → S · Resistance +#"
+    },
+    "codon role-stop": {
+      "title": "",
+      "help": "TAA · end of gene # (Resistance)"
+    },
+    "codon role-junk": {
+      "title": "",
+      "help": "CC · outside a gene: no effect"
+    },
+    "dna-palette-trait": {
+      "title": "Choose the trait whose codon you want to insert, or the start and stop codons of a gene.",
+      "help": "Choose the trait whose codon you want to insert, or the start and stop codons of a gene."
+    },
+    "dna-palette-codons": {
+      "title": "Each codon shows its amino acid and its effect on the trait. Click to insert it just after the selection.",
+      "help": "Each codon shows its amino acid and its effect on the trait. Click to insert it just after the selection."
+    },
+    "dna-landscape": {
+      "title": "Single-codon substitutions inside coding regions, ranked by fitness in the selected organism's environment (or the plate centre). Click to apply it to the sequence.",
+      "help": "Single-codon substitutions inside coding regions, ranked by fitness in the selected organism's environment (or the plate centre). Click to apply it to the sequence."
+    },
+    "dna-landscape-best": {
+      "title": "The # substitutions that raise fitness the most. Click to replace the codon (the editor history records the move).",
+      "help": "The # substitutions that raise fitness the most. Click to replace the codon (the editor history records the move)."
+    },
+    "dna-landscape-worst": {
+      "title": "The # substitutions that lower fitness the most.",
+      "help": "The # substitutions that lower fitness the most."
+    },
+    "builder-pheno": {
+      "title": "Phenotype decoded from the genome being edited, compared with the loaded genome. The light marker is the reference value.",
+      "help": "Phenotype decoded from the genome being edited, compared with the loaded genome. The light marker is the reference value."
+    },
+    "btn-apply": {
+      "title": "Replace the selected organism's genome with the editor's and create a new lineage.",
+      "help": "Replace the selected organism's genome with the editor's and create a new lineage."
+    },
+    "btn-dna-place": {
+      "title": "Switches on the Place tool: then click in the world to drop an organism with this genome.",
+      "help": "Switches on the Place tool: then click in the world to drop an organism with this genome."
+    },
+    "btn-dna-copy": {
+      "title": "Copy the ACGT sequence to the clipboard.",
+      "help": "Copy the ACGT sequence to the clipboard."
+    },
+    "dna-advanced": {
+      "title": "Edit the ACGT bases directly or apply a random mutation. The sequence stays in sync with the visual editor.",
+      "help": "Edit the ACGT bases directly or apply a random mutation. The sequence stays in sync with the visual editor."
+    },
+    "genome-edit": {
+      "title": "Editable ACGT sequence. The ATG…TAA/TAG/TGA segments form the genes. Apply it to the selection or add organisms.",
+      "help": "Editable ACGT sequence. The ATG…TAA/TAG/TGA segments form the genes. Apply it to the selection or add organisms."
+    },
+    "btn-point": {
+      "title": "Change one base of the sequence in the editor.",
+      "help": "Change one base of the sequence in the editor."
+    },
+    "btn-indel": {
+      "title": "Insert or delete # to # bases in the editor's sequence.",
+      "help": "Insert or delete # to # bases in the editor's sequence."
+    },
+    "btn-dup": {
+      "title": "Copy a fragment of the sequence and insert it back into the genome.",
+      "help": "Copy a fragment of the sequence and insert it back into the genome."
+    },
+    "founder": {
+      "title": "Choose a starting genome to load into the editor.",
+      "help": "Choose a starting genome to load into the editor."
+    },
+    "btn-load-founder": {
+      "title": "Load the chosen starting genome into the editor.",
+      "help": "Load the chosen starting genome into the editor."
+    },
+    "brush-nutrientBlob": {
+      "title": "Drop nutrient. This reserve is one-off, unlike a source.",
+      "help": "Drop nutrient. This reserve is one-off, unlike a source."
+    },
+    "brush-toxinBlob": {
+      "title": "Drop an amount of toxin into the environment.",
+      "help": "Drop an amount of toxin into the environment."
+    },
+    "brush-heatBlob": {
+      "title": "Raise the temperature locally.",
+      "help": "Raise the temperature locally."
+    },
+    "brush-lightBlob": {
+      "title": "Raise the available light locally.",
+      "help": "Raise the available light locally."
+    },
+    "brush-barrier": {
+      "title": "Create obstacles for organisms and for the diffusion of resources.",
+      "help": "Create obstacles for organisms and for the diffusion of resources."
+    },
+    "brush-erase": {
+      "title": "Erase the terrain to get free cells back.",
+      "help": "Erase the terrain to get free cells back."
+    },
+    "brush-nutrientVent": {
+      "title": "Create a source that supplies nutrient at every step.",
+      "help": "Create a source that supplies nutrient at every step."
+    },
+    "brush-toxinVent": {
+      "title": "Create a permanent toxin source.",
+      "help": "Create a permanent toxin source."
+    },
+    "brush-thermalVent": {
+      "title": "Create a permanent heat source.",
+      "help": "Create a permanent heat source."
+    },
+    "brush-shade": {
+      "title": "Add shade that reduces the light received.",
+      "help": "Add shade that reduces the light received."
+    },
+    "brush-wipeOrgs": {
+      "title": "Remove the organisms under the brush.",
+      "help": "Remove the organisms under the brush."
+    },
+    "radius": {
+      "title": "Brush radius, in world cells.",
+      "help": "Brush radius, in world cells."
+    },
+    "opt-terrain": {
+      "title": "Generate sources, obstacles and shade. Switching it off removes the preset terrain.",
+      "help": "Generate sources, obstacles and shade. Switching it off removes the preset terrain."
+    },
+    "opt-disturb": {
+      "title": "Enable random disturbances: toxins, droughts and die-offs.",
+      "help": "Enable random disturbances: toxins, droughts and die-offs."
+    },
+    "sched-at": {
+      "title": "Step at which the action is applied (after disturbances, before metabolism).",
+      "help": "Step at which the action is applied (after disturbances, before metabolism)."
+    },
+    "sched-action": {
+      "title": "Kind of change: the scale factor of a field, a parameter, or a brush stroke at the plate centre.",
+      "help": "Kind of change: the scale factor of a field, a parameter, or a brush stroke at the plate centre."
+    },
+    "sched-arg": {
+      "title": "Factor k, the parameter's new value, or the stroke's intensity.",
+      "help": "Factor k, the parameter's new value, or the stroke's intensity."
+    },
+    "btn-sched-add": {
+      "title": "Add the row to the active world's programme. Replicates of an experiment inheriting this state receive the same programme.",
+      "help": "Add the row to the active world's programme. Replicates of an experiment inheriting this state receive the same programme."
+    },
+    "sched-list": {
+      "title": "Programme rows. × removes an entry. The vertical marks on the fitness chart show these steps.",
+      "help": "Programme rows. × removes an entry. The vertical marks on the fitness chart show these steps."
+    },
+    "model-target": {
+      "title": "Choose the world or worlds the model parameters are applied to.",
+      "help": "Choose the world or worlds the model parameters are applied to."
+    },
+    "model-apply": {
+      "title": "Apply the parameters that differ from the current state to the chosen world. Values are bounded by the model specification.",
+      "help": "Apply the parameters that differ from the current state to the chosen world. Values are bounded by the model specification."
+    },
+    "model-reset": {
+      "title": "Restore the published default values of every model parameter.",
+      "help": "Restore the published default values of every model parameter."
+    },
+    "model-legacy": {
+      "title": "Restore the settings from before the upgrade (neighbourhood predation, the original mutualism, no regulation). Approximates the v# engine without guaranteeing an identical hash.",
+      "help": "Restore the settings from before the upgrade (neighbourhood predation, the original mutualism, no regulation). Approximates the v# engine without guaranteeing an identical hash."
+    },
+    "btn-edit-selected": {
+      "title": "Open the DNA editor with this organism's genome. Edit it, then apply it or place a new organism.",
+      "help": "Open the DNA editor with this organism's genome. Edit it, then apply it or place a new organism."
+    },
+    "btn-ancestry": {
+      "title": "Open the selected organism's record in the explorer: phenotype, genome and the chain of lineages from the founder.",
+      "help": "Open the selected organism's record in the explorer: phenotype, genome and the chain of lineages from the founder."
+    },
+    "inspect-pathways": {
+      "title": "Molecules, enzymes and fluxes computed from the selected organism's genome and resources.",
+      "help": "Molecules, enzymes and fluxes computed from the selected organism's genome and resources."
+    },
+    "inspect-brain": {
+      "title": "Perception → action history of this organism while behaviours are enabled.",
+      "help": "Perception → action history of this organism while behaviours are enabled."
+    },
+    "btn-explorer": {
+      "title": "Open the explorer: every organism of the active world, living and dead, with filters, sorts, a detailed record and its evolutionary branch.",
+      "help": "Open the explorer: every organism of the active world, living and dead, with filters, sorts, a detailed record and its evolutionary branch."
+    },
+    "event-count": {
+      "title": "Number of events kept (ceiling #).",
+      "help": "Number of events kept (ceiling #)."
+    },
+    "event-log": {
+      "title": "Events derived from the metrics: lineage dominance or extinction, first predation, an innovation sweeping, strain extinction, population crash or boom. One click opens the explorer and the nearest snapshot.",
+      "help": "Events derived from the metrics: lineage dominance or extinction, first predation, an innovation sweeping, strain extinction, population crash or boom. One click opens the explorer and the nearest snapshot."
+    },
+    "leaderboard": {
+      "title": "Living organisms ranked by fitness. Click a row to inspect it, or Edit this DNA to reuse it.",
+      "help": "Living organisms ranked by fitness. Click a row to inspect it, or Edit this DNA to reuse it."
+    },
+    "death-tally": {
+      "title": "Deaths per cause in this world's log.",
+      "help": "Deaths per cause in this world's log."
+    },
+    "death-log": {
+      "title": "Recent deaths and their causes. Click a row to load the organism's genome into the editor.",
+      "help": "Recent deaths and their causes. Click a row to load the organism's genome into the editor."
+    },
+    "species-strains": {
+      "title": "Group organisms by founding genome. Descendants keep their strain label, mutations included.",
+      "help": "Group organisms by founding genome. Descendants keep their strain label, mutations included."
+    },
+    "species-strategies": {
+      "title": "Group organisms by current strategy, derived from the phenotype: predator, mutualist, phototroph, heterotroph or mixotroph.",
+      "help": "Group organisms by current strategy, derived from the phenotype: predator, mutualist, phototroph, heterotroph or mixotroph."
+    },
+    "opt-color-strain": {
+      "title": "Colour every organism, in #D and #D, with its strain colour, to follow groups on the plate.",
+      "help": "Colour every organism, in #D and #D, with its strain colour, to follow groups on the plate."
+    },
+    "chart-groups": {
+      "title": "Living count of each group over time. One curve rising while another falls signals a replacement.",
+      "help": "Living count of each group over time. One curve rising while another falls signals a replacement."
+    },
+    "chart-strain-map": {
+      "title": "Map of the world: the centre-of-mass path of each strain, oldest (faded) to newest. The disc is the current position; diamonds are sources (nutrient, toxin, heat).",
+      "help": "Map of the world: the centre-of-mass path of each strain, oldest (faded) to newest. The disc is the current position; diamonds are sources (nutrient, toxin, heat)."
+    },
+    "chart-strain-temp": {
+      "title": "Mean local temperature at each strain's centre over time. A fall means it is drifting away from thermal sources.",
+      "help": "Mean local temperature at each strain's centre over time. A fall means it is drifting away from thermal sources."
+    },
+    "species-list": {
+      "title": "One card per group: count, fitness, mean position, local environment, mean phenotype, drift from the founder and key mutations.",
+      "help": "One card per group: count, fitness, mean position, local environment, mean phenotype, drift from the founder and key mutations."
+    },
+    "strain-name": {
+      "title": "Name of the strain to create from the DNA editor's current genome.",
+      "help": "Name of the strain to create from the DNA editor's current genome."
+    },
+    "btn-strain-define": {
+      "title": "Create a named strain with the editor's genome. Place or inject it from its card to compare it with the others.",
+      "help": "Create a named strain with the editor's genome. Place or inject it from its card to compare it with the others."
+    },
+    "preset-name": {
+      "title": "Name of the preset to save.",
+      "help": "Name of the preset to save."
+    },
+    "btn-preset-save": {
+      "title": "Save the complete state of the active world in this browser: fields, terrain, organisms, strains and history.",
+      "help": "Save the complete state of the active world in this browser: fields, terrain, organisms, strains and history."
+    },
+    "preset-list": {
+      "title": "Presets saved locally. Load replaces the active world; Starting point selects one for the targeted experiment.",
+      "help": "Presets saved locally. Load replaces the active world; Starting point selects one for the targeted experiment."
+    },
+    "recipe-ops": {
+      "title": "Number of actions recorded since the last start or reset. Consecutive steps are merged.",
+      "help": "Number of actions recorded since the last start or reset. Consecutive steps are merged."
+    },
+    "opt-recipe-record": {
+      "title": "Record painting, placing, injecting, defining a strain and the steps. Switching it off stops the recording; switching it back on starts an empty list.",
+      "help": "Record painting, placing, injecting, defining a strain and the steps. Switching it off stops the recording; switching it back on starts an empty list."
+    },
+    "btn-recipe-copy": {
+      "title": "Copy a ?recipe= link (JSON in base#url). Beyond # characters, only the parameters are copied.",
+      "help": "Copy a ?recipe= link (JSON in base#url). Beyond # characters, only the parameters are copied."
+    },
+    "btn-recipe-export": {
+      "title": "Download the active world's recipe as JSON: parameters and action list.",
+      "help": "Download the active world's recipe as JSON: parameters and action list."
+    },
+    "btn-recipe-import": {
+      "title": "Replace the active world with an exported JSON recipe: a new world, then the actions replayed.",
+      "help": "Replace the active world with an exported JSON recipe: a new world, then the actions replayed."
+    },
+    "btn-recipe-replay": {
+      "title": "Replay the active world's recipe in world B, from the same parameters.",
+      "help": "Replay the active world's recipe in world B, from the same parameters."
+    },
+    "recipe-file": {
+      "title": "JSON recipe file to import into the active world.",
+      "help": "JSON recipe file to import into the active world."
+    },
+    "goal-source": {
+      "title": "State each replicate starts from: the active world as it is, or a saved preset.",
+      "help": "State each replicate starts from: the active world as it is, or a saved preset."
+    },
+    "goal-example": {
+      "title": "Ready-made goals; every field stays editable after selecting one.",
+      "help": "Ready-made goals; every field stays editable after selecting one."
+    },
+    "goal-metric": {
+      "title": "Quantity measured at each step: population, occupancy of an area of the environment, mean or maximum trait, count or share of a strain.",
+      "help": "Quantity measured at each step: population, occupancy of an area of the environment, mean or maximum trait, count or share of a strain."
+    },
+    "goal-field-min": {
+      "title": "Field threshold that defines the area: an organism counts when it stands on a cell where the field reaches this value.",
+      "help": "Field threshold that defines the area: an organism counts when it stands on a cell where the field reaches this value."
+    },
+    "goal-target": {
+      "title": "Value to reach. The goal is met at the first step where the comparison holds, for the given number of steps.",
+      "help": "Value to reach. The goal is met at the first step where the comparison holds, for the given number of steps."
+    },
+    "goal-sustain": {
+      "title": "Number of consecutive steps the condition must hold before the goal counts as reached.",
+      "help": "Number of consecutive steps the condition must hold before the goal counts as reached."
+    },
+    "btn-goal-add": {
+      "title": "Add the current goal to the list (# at most). Each replicate stops when every goal is reached, the world is empty, or the remaining goals are impossible.",
+      "help": "Add the current goal to the list (# at most). Each replicate stops when every goal is reached, the world is empty, or the remaining goals are impossible."
+    },
+    "goal-extra": {
+      "title": "Additional goals. Each row is measured independently; × removes it. The chart traces the first goal.",
+      "help": "Additional goals. Each row is measured independently; × removes it. The chart traces the first goal."
+    },
+    "goal-reps": {
+      "title": "Number of independent simulations (up to #) launched with successive seeds, in parallel on every core but one. A replicate stops as soon as every goal is reached, the world is empty, or the remaining goals are impossible.",
+      "help": "Number of independent simulations (up to #) launched with successive seeds, in parallel on every core but one. A replicate stops as soon as every goal is reached, the world is empty, or the remaining goals are impossible."
+    },
+    "goal-max": {
+      "title": "Step budget per replicate. Beyond it, the replicate counts as not reached.",
+      "help": "Step budget per replicate. Beyond it, the replicate counts as not reached."
+    },
+    "goal-mut": {
+      "title": "Mutation rate applied to the replicates (the active world is not modified).",
+      "help": "Mutation rate applied to the replicates (the active world is not modified)."
+    },
+    "goal-popmax": {
+      "title": "Population cap of the replicates.",
+      "help": "Population cap of the replicates."
+    },
+    "goal-seed": {
+      "title": "Seed of the first replicate of the next run; the following ones use seed + #, + #, … An integer between # and #. To replay an existing replicate, use step #.",
+      "help": "Seed of the first replicate of the next run; the following ones use seed + #, + #, … An integer between # and #. To replay an existing replicate, use step #."
+    },
+    "goal-disturb": {
+      "title": "Enable random disturbances in the replicates.",
+      "help": "Enable random disturbances in the replicates."
+    },
+    "btn-goal-run": {
+      "title": "Launch the replicates from the starting state. The displayed world keeps running independently.",
+      "help": "Launch the replicates from the starting state. The displayed world keeps running independently."
+    },
+    "btn-goal-stop": {
+      "title": "Stop the running replicates; the results already obtained stay on screen.",
+      "help": "Stop the running replicates; the results already obtained stay on screen."
+    },
+    "btn-goal-csv": {
+      "title": "Download the replicate results as CSV: seed, step reached (one column per goal), final value, population.",
+      "help": "Download the replicate results as CSV: seed, step reached (one column per goal), final value, population."
+    },
+    "btn-goal-det": {
+      "title": "Run replicate ## twice (same seed, same starting state) and compare hashState() of the final worlds. ✓ when they match.",
+      "help": "Run replicate ## twice (same seed, same starting state) and compare hashState() of the final worlds. ✓ when they match."
+    },
+    "goal-det-result": {
+      "title": "Determinism check result: ✓ and the shared hash, or ✗ with both hashes.",
+      "help": "Determinism check result: ✓ and the shared hash, or ✗ with both hashes."
+    },
+    "btn-goal-report": {
+      "title": "Download a standalone HTML report: configuration, recipe, programme, goals, summary, table, chart, the tree when the explorer is open, and the saved organisms it cites.",
+      "help": "Download a standalone HTML report: configuration, recipe, programme, goals, summary, table, chart, the tree when the explorer is open, and the saved organisms it cites."
+    },
+    "btn-goal-keep": {
+      "title": "Keep the last run (results, summary, manifest) in the browser's journal to compare it with the next ones.",
+      "help": "Keep the last run (results, summary, manifest) in the browser's journal to compare it with the next ones."
+    },
+    "chart-goal": {
+      "title": "The goal measure over time for each replicate; the dotted line is the target.",
+      "help": "The goal measure over time for each replicate; the dotted line is the target."
+    },
+    "goal-sort": {
+      "title": "Table order: fastest or slowest successes, earliest or latest failures, final value or population.",
+      "help": "Table order: fastest or slowest successes, earliest or latest failures, final value or population."
+    },
+    "goal-results": {
+      "title": "Every replicate, sorted. Click a seed or ▶ to replay that replicate in world B; “end” opens its final state.",
+      "help": "Every replicate, sorted. Click a seed or ▶ to replay that replicate in world B; “end” opens its final state."
+    },
+    "replay-seed": {
+      "title": "Seed of a replicate to replay, as shown in the table or the CSV seed column (an integer between # and #).",
+      "help": "Seed of a replicate to replay, as shown in the table or the CSV seed column (an integer between # and #)."
+    },
+    "btn-replay-seed": {
+      "title": "Rebuilds the last run's starting state with this seed and its parameters in world B, then starts playing: it reproduces the replicate exactly. Clicking again restarts from the beginning.",
+      "help": "Rebuilds the last run's starting state with this seed and its parameters in world B, then starts playing: it reproduces the replicate exactly. Clicking again restarts from the beginning."
+    },
+    "btn-catalog-seed": {
+      "title": "Rebuilds this seed's replicate up to its last step without displaying it, then opens the organism explorer on world B brought to that final state.",
+      "help": "Rebuilds this seed's replicate up to its last step without displaying it, then opens the organism explorer on world B brought to that final state."
+    },
+    "sweep-var": {
+      "title": "Swept parameter: mutation rate, population cap, reproduction threshold, or the scale factor of a field in the starting snapshot.",
+      "help": "Swept parameter: mutation rate, population cap, reproduction threshold, or the scale factor of a field in the starting snapshot."
+    },
+    "sweep-from": {
+      "title": "Lower bound of the linear grid (inclusive).",
+      "help": "Lower bound of the linear grid (inclusive)."
+    },
+    "sweep-to": {
+      "title": "Upper bound of the linear grid (inclusive).",
+      "help": "Upper bound of the linear grid (inclusive)."
+    },
+    "sweep-steps": {
+      "title": "Number of equally spaced values between the bounds, at least #.",
+      "help": "Number of equally spaced values between the bounds, at least #."
+    },
+    "sweep-reps": {
+      "title": "Number of independent replicates launched at each value of the grid.",
+      "help": "Number of independent replicates launched at each value of the grid."
+    },
+    "btn-sweep-run": {
+      "title": "Run the sweep: for each value, n replicates with successive seeds. The goal and the step budget are the targeted experiment's.",
+      "help": "Run the sweep: for each value, n replicates with successive seeds. The goal and the step budget are the targeted experiment's."
+    },
+    "btn-sweep-csv": {
+      "title": "Download the sweep table: value, success, median, min–max, extinctions.",
+      "help": "Download the sweep table: value, success, median, min–max, extinctions."
+    },
+    "sweep-table": {
+      "title": "One row per value of the grid: success k/n, median and range of steps, extinctions.",
+      "help": "One row per value of the grid: success k/n, median and range of steps, extinctions."
+    },
+    "chart-sweep": {
+      "title": "Median steps to the goal against the variable, with a min–max band.",
+      "help": "Median steps to the goal against the variable, with a min–max band."
+    },
+    "tournament-picks": {
+      "title": "Tournament contestants: strains of the active world and saved organisms. # to #; every pair (no self-pairing) is injected in equal numbers.",
+      "help": "Tournament contestants: strains of the active world and saved organisms. # to #; every pair (no self-pairing) is injected in equal numbers."
+    },
+    "tournament-reps": {
+      "title": "Number of independent replicates per pair, with successive seeds.",
+      "help": "Number of independent replicates per pair, with successive seeds."
+    },
+    "tournament-max": {
+      "title": "Step budget of each match. Each strain's share is measured at the end.",
+      "help": "Step budget of each match. Each strain's share is measured at the end."
+    },
+    "btn-tournament-run": {
+      "title": "Run every pair from the experiment's starting state. Winner: the larger share; a gap of ≤ # % is a draw.",
+      "help": "Run every pair from the experiment's starting state. Winner: the larger share; a gap of ≤ # % is a draw."
+    },
+    "btn-tournament-csv": {
+      "title": "Download the matrix: pairs, wins, draws, mean shares.",
+      "help": "Download the matrix: pairs, wins, draws, mean shares."
+    },
+    "tournament-matrix": {
+      "title": "Match-up matrix. A cell (row, column) shows the row's wins against the column; intensity follows the gap.",
+      "help": "Match-up matrix. A cell (row, column) shows the row's wins against the column; intensity follows the gap."
+    },
+    "btn-snap": {
+      "title": "Remember the active world, its genomes and its fields. This restore point stays in this session. Shortcut: S.",
+      "help": "Remember the active world, its genomes and its fields. This restore point stays in this session. Shortcut: S."
+    },
+    "btn-restore": {
+      "title": "Restore the remembered state into the active world.",
+      "help": "Restore the remembered state into the active world."
+    },
+    "btn-step-a": {
+      "title": "Pause and advance world A only, by one step.",
+      "help": "Pause and advance world A only, by one step."
+    },
+    "btn-step-b": {
+      "title": "Pause and advance world B only, by one step.",
+      "help": "Pause and advance world B only, by one step."
+    },
+    "btn-step-both": {
+      "title": "Pause and advance worlds A and B by one step each.",
+      "help": "Pause and advance worlds A and B by one step each."
+    },
+    "seed": {
+      "title": "Seed of the new experiment. The same seed with the same parameters reproduces the same evolution.",
+      "help": "Seed of the new experiment. The same seed with the same parameters reproduces the same evolution."
+    },
+    "btn-reseed": {
+      "title": "Replace A and B with two new worlds from this seed. B uses a derived seed.",
+      "help": "Replace A and B with two new worlds from this seed. B uses a derived seed."
+    },
+    "btn-bottle": {
+      "title": "Keep only a random # % of the active world's organisms. Remember a state first so you can go back.",
+      "help": "Keep only a random # % of the active world's organisms. Remember a state first so you can go back."
+    },
+    "btn-csv": {
+      "title": "Download the metric history as CSV.",
+      "help": "Download the metric history as CSV."
+    },
+    "btn-phylo": {
+      "title": "Download the lineages, their parents and their birth and extinction steps as CSV.",
+      "help": "Download the lineages, their parents and their birth and extinction steps as CSV."
+    },
+    "btn-events": {
+      "title": "Download the per-organism event log (JSON Lines: births, deaths, meals, exudate). Switch the log on in Experiment first.",
+      "help": "Download the per-organism event log (JSON Lines: births, deaths, meals, exudate). Switch the log on in Experiment first."
+    },
+    "btn-manifest": {
+      "title": "Export the manifest of the last targeted run (starting state, goals, seed, replicates, parameters): the file replays identically with the headless runner.",
+      "help": "Export the manifest of the last targeted run (starting state, goals, seed, replicates, parameters): the file replays identically with the headless runner."
+    },
+    "btn-import": {
+      "title": "Load a JSON file exported from OpenAvida into the active world.",
+      "help": "Load a JSON file exported from OpenAvida into the active world."
+    },
+    "opt-events": {
+      "title": "Record every per-organism event in a bounded log, exportable as JSON Lines for external analysis. It costs memory on long runs.",
+      "help": "Record every per-organism event in a bounded log, exportable as JSON Lines for external analysis. It costs memory on long runs."
+    },
+    "opt-view3d": {
+      "title": "Show the same world in three dimensions. The simulation engine is unchanged.",
+      "help": "Show the same world in three dimensions. The simulation engine is unchanged."
+    },
+    "opt-brains": {
+      "title": "Enable the organisms' perception → action decisions with the built-in policy.",
+      "help": "Enable the organisms' perception → action decisions with the built-in policy."
+    },
+    "opt-llm": {
+      "title": "Enable the optional LLM adapter. With no adapter configured, the built-in policy takes over.",
+      "help": "Enable the optional LLM adapter. With no adapter configured, the built-in policy takes over."
+    },
+    "opt-mp": {
+      "title": "Share a session between the tabs of this browser. The host controls time; spectators cannot paint.",
+      "help": "Share a session between the tabs of this browser. The host controls time; spectators cannot paint."
+    },
+    "mp-room": {
+      "title": "Room name. The same name joins a session from another tab of the same browser.",
+      "help": "Room name. The same name joins a session from another tab of the same browser."
+    },
+    "mp-role": {
+      "title": "Host: time control and edits. Experimenter: edits. Spectator: inspection.",
+      "help": "Host: time control and edits. Experimenter: edits. Spectator: inspection."
+    },
+    "btn-mp-host": {
+      "title": "Create a session whose simulation this tab controls.",
+      "help": "Create a session whose simulation this tab controls."
+    },
+    "btn-mp-join": {
+      "title": "Join the chosen room with the selected role.",
+      "help": "Join the chosen room with the selected role."
+    },
+    "mp-peers": {
+      "title": "Participants present in the room and their roles.",
+      "help": "Participants present in the room and their roles."
+    },
+    "ex-refresh": {
+      "title": "Re-read the displayed world: list, records and lineages restart from its current state.",
+      "help": "Re-read the displayed world: list, records and lineages restart from its current state."
+    },
+    "ex-close": {
+      "title": "Close the explorer and return to the laboratory. Escape does the same.",
+      "help": "Close the explorer and return to the laboratory. Escape does the same."
+    },
+    "ex-text": {
+      "title": "Free-text search over the rows: an organism number, l# for lineage #, s# for strain #.",
+      "help": "Free-text search over the rows: an organism number, l# for lineage #, s# for strain #."
+    },
+    "ex-liveness": {
+      "title": "Restrict the list to living organisms or to the dead in the log; “All” brings both together.",
+      "help": "Restrict the list to living organisms or to the dead in the log; “All” brings both together."
+    },
+    "ex-group": {
+      "title": "Group rows by founding strain, by strategy derived from the phenotype, by lineage, or not at all.",
+      "help": "Group rows by founding strain, by strategy derived from the phenotype, by lineage, or not at all."
+    },
+    "ex-strain": {
+      "title": "Keep only the descendants of this founding strain, mutations included.",
+      "help": "Keep only the descendants of this founding strain, mutations included."
+    },
+    "ex-strategy": {
+      "title": "Keep only the organisms whose current phenotype falls under this strategy.",
+      "help": "Keep only the organisms whose current phenotype falls under this strategy."
+    },
+    "ex-lineage": {
+      "title": "Keep only the organisms carrying this lineage number.",
+      "help": "Keep only the organisms carrying this lineage number."
+    },
+    "ex-cause": {
+      "title": "Keep only the deaths whose log entry gives this cause.",
+      "help": "Keep only the deaths whose log entry gives this cause."
+    },
+    "ex-age-min": {
+      "title": "Drop organisms whose age, in steps lived, is below this value.",
+      "help": "Drop organisms whose age, in steps lived, is below this value."
+    },
+    "ex-age-max": {
+      "title": "Drop organisms whose age, in steps lived, exceeds this value.",
+      "help": "Drop organisms whose age, in steps lived, exceeds this value."
+    },
+    "ex-kills": {
+      "title": "Keep only the organisms that killed at least this many prey.",
+      "help": "Keep only the organisms that killed at least this many prey."
+    },
+    "ex-births": {
+      "title": "Keep only the organisms that produced at least this many direct descendants.",
+      "help": "Keep only the organisms that produced at least this many direct descendants."
+    },
+    "ex-fitness": {
+      "title": "Keep only the organisms whose fitness reaches at least this value.",
+      "help": "Keep only the organisms whose fitness reaches at least this value."
+    },
+    "ex-genome": {
+      "title": "Keep only the organisms whose genome contains this run of ACGT bases.",
+      "help": "Keep only the organisms whose genome contains this run of ACGT bases."
+    },
+    "ex-trait": {
+      "title": "Phenotype trait the neighbouring threshold applies to; “None” disables this filter.",
+      "help": "Phenotype trait the neighbouring threshold applies to; “None” disables this filter."
+    },
+    "ex-trait-min": {
+      "title": "Minimum value of the chosen trait: organisms below it leave the list.",
+      "help": "Minimum value of the chosen trait: organisms below it leave the list."
+    },
+    "ex-sort": {
+      "title": "Row order inside each group: fitness, age, prey killed, offspring or birth step.",
+      "help": "Row order inside each group: fitness, age, prey killed, offspring or birth step."
+    },
+    "ex-reset": {
+      "title": "Reset every filter to its default and collapse the expanded groups.",
+      "help": "Reset every filter to its default and collapse the expanded groups."
+    },
+    "ex-records": {
+      "title": "World extremes: the holder of each record. Click a row to open its record.",
+      "help": "World extremes: the holder of each record. Click a row to open its record."
+    },
+    "ex-lin-sort": {
+      "title": "Lineage table order: living count, peak count, birth, extinction or living descendants.",
+      "help": "Lineage table order: living count, peak count, birth, extinction or living descendants."
+    },
+    "ex-lin-alive": {
+      "title": "Show only the lineages with at least one living organism.",
+      "help": "Show only the lineages with at least one living organism."
+    },
+    "ex-tree-fit": {
+      "title": "Fit the whole tree into the view: zoom and pan return to automatic fitting.",
+      "help": "Fit the whole tree into the view: zoom and pan return to automatic fitting."
+    },
+    "ex-tree-zoom": {
+      "title": "Bring the view back to the chosen lineage at the current zoom, without changing the lineages displayed.",
+      "help": "Bring the view back to the chosen lineage at the current zoom, without changing the lineages displayed."
+    },
+    "ex-tree-siblings": {
+      "title": "Add the sibling lineages of the founder → focus path, that is the other daughters of each mother, to place the focus among its contemporaries.",
+      "help": "Add the sibling lineages of the founder → focus path, that is the other daughters of each mother, to place the focus among its contemporaries."
+    },
+    "ex-tree-extinct": {
+      "title": "Take extinct lineages out of the tree, all of them or only those extinct for more than # steps, to keep only what survives.",
+      "help": "Take extinct lineages out of the tree, all of them or only those extinct for more than # steps, to keep only what survives."
+    },
+    "ex-tree-budget": {
+      "title": "Maximum number of descendant lineages drawn: beyond it the least populated branches are dropped and the note says so.",
+      "help": "Maximum number of descendant lineages drawn: beyond it the least populated branches are dropped and the note says so."
+    },
+    "ex-tree-canvas": {
+      "title": "Lineage tree around the focus: time runs left to right, each bar is a lineage, a daughter lineage leaves its mother at its birth; the bright path leads from the founder to the focus, amber dots mark a mutation with an effect. Drag: pan; wheel: zoom; click: details; double-click: recentre.",
+      "help": "Lineage tree around the focus: time runs left to right, each bar is a lineage, a daughter lineage leaves its mother at its birth; the bright path leads from the founder to the focus, amber dots mark a mutation with an effect. Drag: pan; wheel: zoom; click: details; double-click: recentre."
+    }
+  }
+}

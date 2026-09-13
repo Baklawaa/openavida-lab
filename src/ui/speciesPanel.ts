@@ -30,7 +30,7 @@ import {
   type TraitChange,
   type TraitName,
 } from "../sim/index";
-import { helpFor } from "./i18n/runtime";
+import { helpFor, tDynamic } from "./i18n/runtime";
 import type { DeathRecord } from "../sim/types";
 import { DEATH_LABEL, STRATEGY_LABEL, TRAIT_ABBR, TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
@@ -68,29 +68,29 @@ function changeText(c: TraitChange): string {
 function template(): string {
   return `
     <section class="block">
-      <div class="section-heading"><h2>Groupes</h2><span class="tag" id="species-count">0 GROUPES</span></div>
+      <div class="section-heading"><h2>${tDynamic("render.species.groups")}</h2><span class="tag" id="species-count">${tDynamic("render.species.tag", { n: 0 })}</span></div>
       <div class="row species-mode">
-        <div class="segmented" role="group" aria-label="Regroupement">
-          <button type="button" id="species-strains" class="active" aria-pressed="true">Souches</button>
-          <button type="button" id="species-strategies" aria-pressed="false">Stratégies</button>
+        <div class="segmented" role="group" aria-label="${tDynamic("render.species.grouping")}">
+          <button type="button" id="species-strains" class="active" aria-pressed="true">${tDynamic("render.species.mode.strains")}</button>
+          <button type="button" id="species-strategies" aria-pressed="false">${tDynamic("render.species.mode.strategies")}</button>
         </div>
-        <label class="toggle-inline" id="opt-color-strain"><input type="checkbox"> Colorer le monde par souche</label>
+        <label class="toggle-inline" id="opt-color-strain"><input type="checkbox"> ${tDynamic("render.species.colorByStrain")}</label>
       </div>
-      <p class="muted" id="species-mode-hint">Souche = génome fondateur. Les descendants, mutants compris, gardent l’étiquette.</p>
-      <div class="chart-card species-chart"><div class="chart-heading"><h3>Effectifs par groupe</h3><span id="species-legend"></span></div><canvas id="chart-groups" role="img" aria-label="Effectifs par groupe au fil du temps"></canvas></div>
+      <p class="muted" id="species-mode-hint">${tDynamic("render.species.hint.strains")}</p>
+      <div class="chart-card species-chart"><div class="chart-heading"><h3>${tDynamic("render.species.groupsChart")}</h3><span id="species-legend"></span></div><canvas id="chart-groups" role="img" aria-label="${tDynamic("render.species.groupsChart.aria")}"></canvas></div>
       <div class="chart-card species-chart" id="species-tracks">
-        <div class="chart-heading"><h3>Trajectoires</h3><span id="species-track-legend"></span></div>
-        <div class="track-caption">Carte · centre de masse</div>
-        <canvas id="chart-strain-map" role="img" aria-label="Trajectoire du centre de chaque souche dans le monde"></canvas>
-        <div class="track-caption">Température locale moyenne</div>
-        <canvas id="chart-strain-temp" role="img" aria-label="Température locale moyenne par souche"></canvas>
+        <div class="chart-heading"><h3>${tDynamic("render.species.tracks")}</h3><span id="species-track-legend"></span></div>
+        <div class="track-caption">${tDynamic("render.species.tracks.map")}</div>
+        <canvas id="chart-strain-map" role="img" aria-label="${tDynamic("render.species.tracks.map.aria")}"></canvas>
+        <div class="track-caption">${tDynamic("render.species.tracks.temperature")}</div>
+        <canvas id="chart-strain-temp" role="img" aria-label="${tDynamic("render.species.tracks.temperature.aria")}"></canvas>
       </div>
       <div id="species-list" class="species-list"></div>
     </section>
     <section class="block">
-      <h2>Définir une souche</h2>
-      <p class="muted">Nomme le génome courant de l’éditeur. Tout organisme placé ou injecté avec ce génome porte l’étiquette ; comparez ainsi 2 ou 3 souches dans un même milieu.</p>
-      <div class="row"><input id="strain-name" type="text" placeholder="Nom de la souche" maxlength="32"><button type="button" id="btn-strain-define" class="primary">${icon("plus")}Créer depuis l’éditeur</button></div>
+      <h2>${tDynamic("render.species.define")}</h2>
+      <p class="muted">${tDynamic("render.species.define.hint")}</p>
+      <div class="row"><input id="strain-name" type="text" placeholder="${tDynamic("render.species.name")}" maxlength="32"><button type="button" id="btn-strain-define" class="primary">${icon("plus")}${tDynamic("render.species.define.button")}</button></div>
     </section>`;
 }
 
@@ -118,8 +118,8 @@ export class SpeciesPanel {
     this.q("#species-strategies").setAttribute("aria-pressed", String(mode === "strategies"));
     this.q("#species-mode-hint").textContent =
       mode === "strains"
-        ? "Souche = génome fondateur. Les descendants, mutants compris, gardent l’étiquette."
-        : "Stratégie = classe du phénotype actuel : prédation ≥ seuil, signal ≥ 1, puis photo / nutrition dominante.";
+        ? tDynamic("render.species.hint.strains")
+        : tDynamic("render.species.hint.strategies");
     this.lastListKey = "";
     this.refresh(true);
   }
@@ -159,7 +159,7 @@ export class SpeciesPanel {
       (o) => String(o.strainId),
       (k) => {
         const s = w.strains.get(Number(k));
-        return s ? { label: s.name, color: s.color } : { label: "Sans étiquette", color: "#8aa0b5" };
+        return s ? { label: s.name, color: s.color } : { label: tDynamic("render.species.unlabelled"), color: "#8aa0b5" };
       },
       w.deaths,
       (d) => String(d.strainId ?? 0),
@@ -182,7 +182,7 @@ export class SpeciesPanel {
     const w = this.opts.world();
     const { stats, series } = this.groups();
     const n = stats.filter((s) => s.count > 0).length;
-    this.q("#species-count").textContent = `${n} GROUPE${n > 1 ? "S" : ""} VIVANT${n > 1 ? "S" : ""}`;
+    this.q("#species-count").textContent = tDynamic(n > 1 ? "render.species.count.many" : "render.species.count.one", { n });
     this.q("#species-legend").innerHTML = series.slice(0, 6).map((g) => `<i class="dot" style="background:${g.color}"></i>${g.label}`).join(" ");
 
     const canvas = this.q<HTMLCanvasElement>("#chart-groups");
@@ -208,7 +208,7 @@ export class SpeciesPanel {
     if (!force && key === this.lastListKey) return;
     this.lastListKey = key;
     if (stats.length === 0) {
-      list.innerHTML = `<p class="muted">Aucun organisme. Placez un kit, ou définissez des souches ci-dessous et injectez-les.</p>`;
+      list.innerHTML = `<p class="muted">${tDynamic("render.species.empty")}</p>`;
       return;
     }
     list.innerHTML = stats.map((s) => this.cardHtml(w, s, spread)).join("");
@@ -220,47 +220,48 @@ export class SpeciesPanel {
     const extinct = s.count === 0;
     const everLived = extinct && w.history.some((h) => (h.strains?.[s.key] ?? 0) > 0);
     const name = strain
-      ? `<input class="group-name" value="${strain.name.replace(/"/g, "&quot;")}" data-strain="${strain.id}" aria-label="Nom de la souche" maxlength="32">`
+      ? `<input class="group-name" value="${strain.name.replace(/"/g, "&quot;")}" data-strain="${strain.id}" aria-label="${tDynamic("render.species.name")}" maxlength="32">`
       : `<b class="group-label">${s.label}</b>`;
     const ops = strain
-      ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="Charger ce génome dans l’éditeur et activer Placer">Placer</button><button type="button" data-act="inject" data-strain="${strain.id}" title="Injecter 24 organismes de cette souche">+24</button><button type="button" data-act="heat" data-strain="${strain.id}" class="${w.heatStrainId === strain.id ? "active" : ""}" title="${helpFor("btn-heat-strain")}">Carte de présence</button></span>`
+      ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="${tDynamic("render.species.place.title")}">${tDynamic("render.species.place")}</button><button type="button" data-act="inject" data-strain="${strain.id}" title="${tDynamic("render.species.inject.title")}">+24</button><button type="button" data-act="heat" data-strain="${strain.id}" class="${w.heatStrainId === strain.id ? "active" : ""}" title="${helpFor("btn-heat-strain")}">${tDynamic("render.species.heat")}</button></span>`
       : "";
-    const state = extinct ? `<span class="tiny group-state">${everLived ? "éteinte" : "non placée"}</span>` : `<span class="tiny">${(s.share * 100).toFixed(0)} %</span>`;
+    const state = extinct ? `<span class="tiny group-state">${tDynamic(everLived ? "render.species.state.extinct" : "render.species.state.unplaced")}</span>` : `<span class="tiny">${(s.share * 100).toFixed(0)} %</span>`;
     const path = strainTrack(w.history, s.key, Math.max(1, w.history.length - 1));
     const displace = path.length
-      ? `<span class="span-2">Déplacement du centre depuis le fondateur : <b>${Math.hypot(path[path.length - 1]!.cx - path[0]!.cx, path[path.length - 1]!.cy - path[0]!.cy).toFixed(0)}</b> cellules</span>`
+      ? `<span class="span-2">${tDynamic("render.species.displacement", { cells: Math.hypot(path[path.length - 1]!.cx - path[0]!.cx, path[path.length - 1]!.cy - path[0]!.cy).toFixed(0) })}</span>`
       : "";
     const facts = extinct
       ? (everLived && displace ? `<div class="group-facts">${displace}</div>` : "")
       : `<div class="group-facts">
-          <span>Fitness <b>${fmt(s.meanFitness, 3)}</b></span>
-          <span>Énergie <b>${fmt(s.meanEnergy)}</b></span>
-          <span>Âge <b>${s.meanAge.toFixed(0)}</b></span>
-          <span>Centre <b>(${s.centroid.x.toFixed(0)}, ${s.centroid.y.toFixed(0)})</b> ± ${s.spread.toFixed(0)}</span>
+          <span>${tDynamic("render.species.fitness")} <b>${fmt(s.meanFitness, 3)}</b></span>
+          <span>${tDynamic("render.species.energy")} <b>${fmt(s.meanEnergy)}</b></span>
+          <span>${tDynamic("render.species.age")} <b>${s.meanAge.toFixed(0)}</b></span>
+          <span>${tDynamic("render.species.centroid")} <b>(${s.centroid.x.toFixed(0)}, ${s.centroid.y.toFixed(0)})</b> ± ${s.spread.toFixed(0)}</span>
           ${displace}
         </div>
-        <div class="group-env">Milieu local · T <b>${fmt(s.env.temperature)}</b> · Nutr <b>${fmt(s.env.nutrient)}</b> · Tox <b>${fmt(s.env.toxin)}</b> · Lum <b>${fmt(s.env.light)}</b></div>`;
-    const traits = `<div class="trait-strip" aria-label="Phénotype moyen">${TRAIT_NAMES.map((t) => `<span title="${TRAIT_LABEL[t]} ${fmt(s.traits[t], 3)}"><i style="height:${pct(t, s.traits[t]).toFixed(0)}%;background:${TRAIT_COLOR[t]}"></i><small>${TRAIT_ABBR[t]}</small></span>`).join("")}</div>`;
+        <div class="group-env">${tDynamic("render.species.env", { temperature: fmt(s.env.temperature), nutrient: fmt(s.env.nutrient), toxin: fmt(s.env.toxin), light: fmt(s.env.light) })}</div>`;
+    const traits = `<div class="trait-strip" aria-label="${tDynamic("render.species.traits.aria")}">${TRAIT_NAMES.map((t) => `<span title="${TRAIT_LABEL[t]} ${fmt(s.traits[t], 3)}"><i style="height:${pct(t, s.traits[t]).toFixed(0)}%;background:${TRAIT_COLOR[t]}"></i><small>${TRAIT_ABBR[t]}</small></span>`).join("")}</div>`;
     let drift = "";
     let innov = "";
     if (strain && !extinct) {
       const d = traitDrift(strain.founderPhenotype, s.traits).slice(0, 4);
-      if (d.length) drift = `<div class="group-drift"><span class="eyebrow">DÉRIVE DEPUIS LE FONDATEUR</span>${d.map((c) => `<div>${changeText(c)}</div>`).join("")}</div>`;
-      else drift = `<div class="group-drift muted">Phénotype moyen identique au fondateur.</div>`;
+      if (d.length) drift = `<div class="group-drift"><span class="eyebrow">${tDynamic("render.species.drift")}</span>${d.map((c) => `<div>${changeText(c)}</div>`).join("")}</div>`;
+      else drift = `<div class="group-drift muted">${tDynamic("render.species.drift.none")}</div>`;
       const inns = keyInnovations(w.innovations, spread ?? new Map(), strain.id, 4).filter((i) => i.living > 0);
       if (inns.length) {
-        innov = `<div class="group-innov"><span class="eyebrow">CHANGEMENTS CLÉS</span><ul>${inns
+        innov = `<div class="group-innov"><span class="eyebrow">${tDynamic("render.species.innovations")}</span><ul>${inns
           .map((i) => {
             const see = i.genome && i.parentGenome
-              ? `<button type="button" class="quiet btn-see-mutation" data-act="mutation" data-inn="${i.id}" title="${helpFor("btn-see-mutation")}" data-help="${helpFor("btn-see-mutation")}">Voir la mutation</button>`
+              ? `<button type="button" class="quiet btn-see-mutation" data-act="mutation" data-inn="${i.id}" title="${helpFor("btn-see-mutation")}" data-help="${helpFor("btn-see-mutation")}">${tDynamic("render.species.seeMutation")}</button>`
               : "";
-            return `<li><b class="mono">pas ${i.tick}</b> ${i.changes.map(changeText).join(" · ")}${see}<div class="tiny">${i.living} descendant${i.living > 1 ? "s" : ""} vivant${i.living > 1 ? "s" : ""} · né à T ${fmt(i.env.temperature)}, nutr ${fmt(i.env.nutrient)}, lum ${fmt(i.env.light)}</div></li>`;
+            const living = tDynamic(i.living > 1 ? "render.species.descendants.many" : "render.species.descendants.one", { count: i.living });
+            return `<li><b class="mono">${tDynamic("render.species.innovation.tick", { tick: i.tick })}</b> ${i.changes.map(changeText).join(" · ")}${see}<div class="tiny">${living} · ${tDynamic("render.species.innovation.env", { temperature: fmt(i.env.temperature), nutrient: fmt(i.env.nutrient), light: fmt(i.env.light) })}</div></li>`;
           })
           .join("")}</ul></div>`;
-      } else innov = `<div class="group-innov muted">Aucune mutation à effet notable n’a encore de descendants vivants.</div>`;
+      } else innov = `<div class="group-innov muted">${tDynamic("render.species.innovations.none")}</div>`;
     }
     const deaths = s.deathTotal
-      ? `<div class="group-deaths">Décès récents : ${(Object.keys(s.deaths) as DeathCause[])
+      ? `<div class="group-deaths">${tDynamic("render.species.deaths")} ${(Object.keys(s.deaths) as DeathCause[])
           .sort((a, b) => (s.deaths[b] ?? 0) - (s.deaths[a] ?? 0))
           .slice(0, 3)
           .map((c) => `<span style="color:${CAUSE_COLOR[c]}">${DEATH_LABEL[c]} ${s.deaths[c]}</span>`)
@@ -282,16 +283,16 @@ export class SpeciesPanel {
       const input = this.q<HTMLInputElement>("#strain-name");
       const seq = this.opts.editorGenome();
       if (!seq) {
-        this.opts.status("L’éditeur d’ADN est vide.");
+        this.opts.status(tDynamic("render.species.editorEmpty"));
         return;
       }
       const w = this.opts.world();
-      const name = input.value.trim() || `Souche ${w.nextStrainId}`;
+      const name = input.value.trim() || tDynamic("render.strain.defaultName", { id: w.nextStrainId });
       const s = this.opts.defineStrain(seq, name);
       input.value = "";
       this.lastListKey = "";
       this.refresh(true);
-      this.opts.status(`Souche « ${s.name} » définie. Placez-la ou injectez-la depuis sa carte.`);
+      this.opts.status(tDynamic("render.species.defined", { name: s.name }));
     });
     const list = this.q("#species-list");
     list.addEventListener("click", (ev) => {
@@ -318,7 +319,7 @@ export class SpeciesPanel {
       if (!input.classList.contains("group-name")) return;
       if (this.opts.renameStrain(Number(input.dataset.strain), input.value)) {
         this.lastListKey = "";
-        this.opts.status(`Souche renommée : ${input.value.trim()}.`);
+        this.opts.status(tDynamic("render.species.renamed", { name: input.value.trim() }));
       }
     });
     list.addEventListener("keydown", (ev) => {

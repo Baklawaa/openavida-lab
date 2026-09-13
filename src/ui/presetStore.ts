@@ -6,6 +6,7 @@
 import type { AncestryStep, CatalogEntry, Goal, TrialConfig, TrialResult, WorldSnapshot } from "../sim/index";
 
 import type { ExperimentRecord } from "./experimentHistory";
+import { tDynamic } from "./i18n/runtime";
 
 export interface PresetMeta {
   id: string;
@@ -254,7 +255,7 @@ export class PresetStore {
   async save(name: string, snapshot: WorldSnapshot, world: "A" | "B"): Promise<PresetMeta> {
     const rec: PresetRecord = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      name: name.trim() || `Préréglage pas ${snapshot.tick}`,
+      name: name.trim() || tDynamic("render.preset.defaultName", { tick: snapshot.tick }),
       createdAt: Date.now(),
       tick: snapshot.tick,
       population: snapshot.organisms.length,

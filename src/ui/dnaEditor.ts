@@ -42,6 +42,7 @@ import {
   type TraitName,
 } from "../sim/index";
 import { Rng } from "../sim/rng";
+import { tDynamic } from "./i18n/runtime";
 import { TRAIT_HINT, TRAIT_LABEL } from "./labels";
 import { icon, KIT_COPY } from "./layout";
 
@@ -64,10 +65,10 @@ interface Sel {
 
 const BASES = ["A", "C", "G", "T"] as const;
 const CONTROL_CODONS = [
-  { codon: "ATG", label: "début" },
-  { codon: "TAA", label: "fin" },
-  { codon: "TAG", label: "fin" },
-  { codon: "TGA", label: "fin" },
+  { codon: "ATG", labelKey: "dna.palette.control.start" },
+  { codon: "TAA", labelKey: "dna.palette.control.stop" },
+  { codon: "TAG", labelKey: "dna.palette.control.stop" },
+  { codon: "TGA", labelKey: "dna.palette.control.stop" },
 ];
 
 function fmtDelta(d: number): string {
@@ -81,55 +82,55 @@ function template(): string {
     (t) => `<button type="button" id="gene-add-${t}" class="gene-add-btn" data-trait="${t}"><span class="swatch" style="background:${geneColor(t)}"></span>${TRAIT_LABEL[t]}</button>`,
   ).join("");
   return `
-    <div class="section-heading"><h2>${icon("dna")} Éditeur d’ADN</h2><span class="tag" id="dna-meta">0 BASES · 0 GÈNES</span></div>
-    <p class="muted">Séquence ACGT décodée en direct : ORF (ATG … stop) → codons → deltas de traits → phénotype.</p>
-    <div class="dna-toolbar" role="toolbar" aria-label="Historique de l’édition">
-      <button type="button" id="dna-undo" class="quiet" disabled>${icon("undo")}<span>Annuler</span></button>
-      <button type="button" id="dna-redo" class="quiet" disabled>${icon("redo")}<span>Rétablir</span></button>
-      <button type="button" id="dna-revert" class="quiet" disabled>${icon("revert")}<span>Revenir</span></button>
+    <div class="section-heading"><h2>${icon("dna")} ${tDynamic("dna.heading.title")}</h2><span class="tag" id="dna-meta">${tDynamic("dna.heading.meta")}</span></div>
+    <p class="muted">${tDynamic("dna.heading.subtitle")}</p>
+    <div class="dna-toolbar" role="toolbar" aria-label="${tDynamic("dna.toolbar.history.aria")}">
+      <button type="button" id="dna-undo" class="quiet" disabled>${icon("undo")}<span>${tDynamic("dna.toolbar.undo")}</span></button>
+      <button type="button" id="dna-redo" class="quiet" disabled>${icon("redo")}<span>${tDynamic("dna.toolbar.redo")}</span></button>
+      <button type="button" id="dna-revert" class="quiet" disabled>${icon("revert")}<span>${tDynamic("dna.toolbar.revert")}</span></button>
       <span class="spacer"></span>
-      <button type="button" id="btn-from-inspect" class="quiet">${icon("inspect")}<span>Copier la sélection</span></button>
-      <button type="button" id="btn-clear-genes" class="quiet">Vider</button>
+      <button type="button" id="btn-from-inspect" class="quiet">${icon("inspect")}<span>${tDynamic("dna.toolbar.copySelection")}</span></button>
+      <button type="button" id="btn-clear-genes" class="quiet">${tDynamic("dna.toolbar.clear")}</button>
     </div>
-    <div id="dna-cassette" class="dna-cassette" role="group" aria-label="Carte du génome"></div>
+    <div id="dna-cassette" class="dna-cassette" role="group" aria-label="${tDynamic("dna.toolbar.map.aria")}"></div>
     <details id="dna-builder" open>
-      <summary>Gènes <span class="tag">VISUEL</span></summary>
+      <summary>${tDynamic("dna.builder.title")} <span class="tag">${tDynamic("dna.builder.tag")}</span></summary>
       <div id="gene-blocks" class="gene-blocks"></div>
-      <div class="gene-add-wrap"><span class="eyebrow">AJOUTER UN GÈNE</span><div id="gene-add" class="gene-add-grid">${geneAdd}</div></div>
+      <div class="gene-add-wrap"><span class="eyebrow">${tDynamic("dna.builder.add")}</span><div id="gene-add" class="gene-add-grid">${geneAdd}</div></div>
     </details>
     <details id="dna-strip-section" open>
-      <summary>Séquence base par base <span class="tag">ACGT</span></summary>
-      <div id="dna-strip" class="dna-strip" tabindex="0" role="application" data-own-keys aria-label="Séquence ACGT. Flèches : déplacer la sélection ; A, C, G, T : remplacer ; Retour arrière : supprimer ; Maj : étendre."></div>
+      <summary>${tDynamic("dna.strip.title")} <span class="tag">ACGT</span></summary>
+      <div id="dna-strip" class="dna-strip" tabindex="0" role="application" data-own-keys aria-label="${tDynamic("dna.strip.aria")}"></div>
       <div id="dna-sel" class="dna-selection"></div>
       <div class="dna-palette">
-        <div class="dna-palette-head"><span class="eyebrow">INSÉRER APRÈS LA SÉLECTION</span><select id="dna-palette-trait" aria-label="Trait des codons proposés"><option value="control">Début / fin</option>${traitOptions}</select></div>
+        <div class="dna-palette-head"><span class="eyebrow">${tDynamic("dna.palette.insert")}</span><select id="dna-palette-trait" aria-label="${tDynamic("dna.palette.trait.aria")}"><option value="control">${tDynamic("dna.palette.control")}</option>${traitOptions}</select></div>
         <div id="dna-palette-codons" class="codon-chips"></div>
       </div>
       <div id="dna-warnings" class="dna-warnings" aria-live="polite"></div>
     </details>
     <details id="dna-landscape">
-      <summary>Paysage</summary>
+      <summary>${tDynamic("dna.landscape.title")}</summary>
       <p class="micro" id="dna-landscape-env"></p>
-      <div class="tiny">Meilleures substitutions</div>
+      <div class="tiny">${tDynamic("dna.landscape.best")}</div>
       <div id="dna-landscape-best" class="landscape-list"></div>
-      <div class="tiny">Pires substitutions</div>
+      <div class="tiny">${tDynamic("dna.landscape.worst")}</div>
       <div id="dna-landscape-worst" class="landscape-list"></div>
     </details>
-    <div class="dna-pheno-head"><span class="eyebrow">PHÉNOTYPE</span><span class="tiny" id="dna-pheno-note">comparé au génome chargé</span></div>
+    <div class="dna-pheno-head"><span class="eyebrow">${tDynamic("dna.pheno.title")}</span><span class="tiny" id="dna-pheno-note">${tDynamic("dna.pheno.note")}</span></div>
     <div id="builder-pheno"></div>
     <div class="row dna-actions">
-      <button type="button" id="btn-apply" class="primary">${icon("edit")}<span>Appliquer à la sélection</span></button>
-      <button type="button" id="btn-dna-place">${icon("plus")}<span>Placer dans le monde</span></button>
-      <button type="button" id="btn-dna-copy" class="quiet" aria-label="Copier la séquence">${icon("copy")}</button>
+      <button type="button" id="btn-apply" class="primary">${icon("edit")}<span>${tDynamic("dna.actions.apply")}</span></button>
+      <button type="button" id="btn-dna-place">${icon("plus")}<span>${tDynamic("dna.actions.place")}</span></button>
+      <button type="button" id="btn-dna-copy" class="quiet" aria-label="${tDynamic("dna.actions.copy.aria")}">${icon("copy")}</button>
     </div>
     <details id="dna-advanced">
-      <summary>Séquence brute et mutations <span class="tag">AVANCÉ</span></summary>
+      <summary>${tDynamic("dna.mutation.title")} <span class="tag">${tDynamic("dna.mutation.tag")}</span></summary>
       <div class="stack">
-        <label class="tiny" for="genome-edit">Séquence ACGT</label>
-        <textarea id="genome-edit" spellcheck="false" placeholder="Séquence ACGT — ATG…TAA"></textarea>
-        <div class="row"><button type="button" id="btn-point">Mutation ponctuelle</button><button type="button" id="btn-indel">Insertion / délétion</button><button type="button" id="btn-dup">Duplication</button></div>
-        <label class="tiny" for="founder">Génome de départ</label>
-        <div class="row"><select id="founder">${founders}</select><button type="button" id="btn-load-founder">Charger</button></div>
+        <label class="tiny" for="genome-edit">${tDynamic("dna.mutation.sequence")}</label>
+        <textarea id="genome-edit" spellcheck="false" placeholder="${tDynamic("dna.mutation.placeholder")}"></textarea>
+        <div class="row"><button type="button" id="btn-point">${tDynamic("dna.mutation.point")}</button><button type="button" id="btn-indel">${tDynamic("dna.mutation.indel")}</button><button type="button" id="btn-dup">${tDynamic("dna.mutation.duplicate")}</button></div>
+        <label class="tiny" for="founder">${tDynamic("dna.founder.label")}</label>
+        <div class="row"><select id="founder">${founders}</select><button type="button" id="btn-load-founder">${tDynamic("dna.founder.load")}</button></div>
       </div>
     </details>`;
 }
@@ -262,21 +263,29 @@ export class DnaEditor {
   private renderMeta(): void {
     const n = this.sequence.length;
     const g = this.geneCount;
-    this.q("#dna-meta").textContent = `${n} BASE${n > 1 ? "S" : ""} · ${g} GÈNE${g > 1 ? "S" : ""}${this.isDirty ? " · MODIFIÉ" : ""}`;
+    const counts =
+      n > 1
+        ? g > 1
+          ? "dna.meta.both.many.many"
+          : "dna.meta.both.many.one"
+        : g > 1
+          ? "dna.meta.both.one.many"
+          : "dna.meta.both.one.one";
+    this.q("#dna-meta").textContent = tDynamic(counts, { n, g }) + (this.isDirty ? " · " + tDynamic("dna.meta.dirty") : "");
     (this.q("#dna-undo") as HTMLButtonElement).disabled = !this.history.canUndo;
     (this.q("#dna-redo") as HTMLButtonElement).disabled = !this.history.canRedo;
     (this.q("#dna-revert") as HTMLButtonElement).disabled = !this.isDirty;
     this.q("#dna-pheno-note").textContent = this.diffAgainst
-      ? "comparé au génome parental"
+      ? tDynamic("dna.pheno.parent")
       : this.isDirty
-        ? "comparé au génome chargé"
-        : "identique au génome chargé";
+        ? tDynamic("dna.pheno.note")
+        : tDynamic("dna.pheno.same");
   }
 
   private renderMinimap(): void {
     const host = this.q("#dna-cassette");
     if (this.sequence.length === 0) {
-      host.innerHTML = `<div class="cas-empty">génome vide</div>`;
+      host.innerHTML = `<div class="cas-empty">${tDynamic("dna.map.empty")}</div>`;
       return;
     }
     const segs: string[] = [];
@@ -284,7 +293,11 @@ export class DnaEditor {
     const flush = () => {
       if (!run) return;
       const gene = run.gene >= 0 ? this.ann.decoded.genes[run.gene] : null;
-      const label = gene ? `${TRAIT_LABEL[gene.dominant as TraitName]} · ${geneStrength(gene)} codons` : run.role === "open" ? "Gène non terminé (ignoré)" : "Hors gène";
+      const label = gene
+        ? `${TRAIT_LABEL[gene.dominant as TraitName]} · ${geneStrength(gene)} codons`
+        : run.role === "open"
+          ? tDynamic("dna.map.open")
+          : tDynamic("dna.map.junk");
       const bg = run.color ? `background:${run.color}` : "";
       segs.push(`<button type="button" class="cas-seg role-${run.role}" data-a="${run.start}" data-b="${run.start + run.len}" style="flex:${run.len};${bg}" title="${label}" aria-label="${label}"></button>`);
       run = null;
@@ -305,7 +318,7 @@ export class DnaEditor {
     const host = this.q("#gene-blocks");
     const genes = this.ann.decoded.genes;
     if (genes.length === 0) {
-      host.innerHTML = `<p class="muted">Aucun gène. Ajoutez-en un ci-dessous ou choisissez un kit.</p>`;
+      host.innerHTML = `<p class="muted">${tDynamic("dna.builder.empty")}</p>`;
       return;
     }
     host.innerHTML = genes
@@ -325,14 +338,14 @@ export class DnaEditor {
             <strong>${TRAIT_LABEL[trait]}</strong>
             <span class="mono">${strength}</span><span class="tiny">codon${strength > 1 ? "s" : ""}</span>
             <span class="chip-ops">
-              <button type="button" data-act="minus" data-i="${i}" aria-label="Réduire la force" ${strength <= 1 ? "disabled" : ""}>−</button>
-              <button type="button" data-act="plus" data-i="${i}" aria-label="Augmenter la force">+</button>
-              <button type="button" data-act="up" data-i="${i}" aria-label="Monter le gène" ${i === 0 ? "disabled" : ""}>↑</button>
-              <button type="button" data-act="down" data-i="${i}" aria-label="Descendre le gène" ${i === genes.length - 1 ? "disabled" : ""}>↓</button>
-              <button type="button" data-act="del" data-i="${i}" aria-label="Retirer le gène">×</button>
+              <button type="button" data-act="minus" data-i="${i}" aria-label="${tDynamic("dna.builder.less")}" ${strength <= 1 ? "disabled" : ""}>−</button>
+              <button type="button" data-act="plus" data-i="${i}" aria-label="${tDynamic("dna.builder.more")}">+</button>
+              <button type="button" data-act="up" data-i="${i}" aria-label="${tDynamic("dna.builder.moveUp")}" ${i === 0 ? "disabled" : ""}>↑</button>
+              <button type="button" data-act="down" data-i="${i}" aria-label="${tDynamic("dna.builder.moveDown")}" ${i === genes.length - 1 ? "disabled" : ""}>↓</button>
+              <button type="button" data-act="del" data-i="${i}" aria-label="${tDynamic("dna.builder.remove")}">×</button>
             </span>
           </div>
-          <input type="range" class="strength-range" data-i="${i}" min="1" max="12" step="1" value="${Math.min(12, strength)}" aria-label="Force du gène ${TRAIT_LABEL[trait]}">
+          <input type="range" class="strength-range" data-i="${i}" min="1" max="12" step="1" value="${Math.min(12, strength)}" aria-label="${tDynamic("dna.builder.strength.aria", { trait: TRAIT_LABEL[trait] })}">
           <div class="hint">${TRAIT_HINT[trait]}</div>
           <div class="gene-contrib">${contrib}</div>
           <div class="gene-span tiny">bases ${g.start}–${g.end - 1} · <span class="aa mono">${g.translation}</span></div>
@@ -344,7 +357,7 @@ export class DnaEditor {
   private renderStrip(): void {
     const host = this.q("#dna-strip");
     if (this.sequence.length === 0) {
-      host.innerHTML = `<p class="muted">Séquence vide. Insérez un codon ci-dessous ou ajoutez un gène.</p>`;
+      host.innerHTML = `<p class="muted">${tDynamic("dna.strip.empty")}</p>`;
       return;
     }
     const sel = this.sel;
@@ -354,12 +367,12 @@ export class DnaEditor {
       const gene = c.gene >= 0 ? genes[c.gene] : null;
       const label = gene ? TRAIT_LABEL[gene.dominant as TraitName] : "";
       let help = "";
-      if (c.role === "start") help = `ATG · début du gène ${c.gene + 1} (${label})`;
-      else if (c.role === "stop") help = `${c.bases} · fin du gène ${c.gene + 1} (${label})`;
-      else if (c.role === "coding") help = c.trait ? `${c.bases} → ${c.aa} · ${TRAIT_LABEL[c.trait]} ${fmtDelta(c.delta)}` : `${c.bases} · sans effet`;
-      else if (c.role === "open") help = `${c.bases} · gène non terminé : ignoré par l’organisme`;
-      else if (c.role === "reg") help = `${c.bases} · région régulatrice : amplifie l’expression du gène ${c.gene + 1}`;
-      else help = `${c.bases} · hors gène : sans effet`;
+      if (c.role === "start") help = tDynamic("dna.codon.start", { gene: c.gene + 1, trait: label });
+      else if (c.role === "stop") help = tDynamic("dna.codon.stop", { codon: c.bases, gene: c.gene + 1, trait: label });
+      else if (c.role === "coding") help = c.trait ? `${c.bases} → ${c.aa} · ${TRAIT_LABEL[c.trait]} ${fmtDelta(c.delta)}` : tDynamic("dna.codon.noEffect", { codon: c.bases });
+      else if (c.role === "open") help = tDynamic("dna.codon.open", { codon: c.bases });
+      else if (c.role === "reg") help = tDynamic("dna.codon.reg", { codon: c.bases, gene: c.gene + 1 });
+      else help = tDynamic("dna.codon.junk", { codon: c.bases });
       const tiles = [...c.bases]
         .map((b, k) => {
           const i = c.start + k;
@@ -387,8 +400,8 @@ export class DnaEditor {
     const host = this.q("#dna-sel");
     const sel = this.sel;
     if (!sel) {
-      const diff = this.diffAgainst ? `${this.diffCount()} bases modifiées par rapport au parent. ` : "";
-      host.innerHTML = `<span class="muted">${diff}Cliquez sur une base pour la sélectionner. Double-clic : le codon entier. Glissez ou Maj + clic : une plage.</span>`;
+      const diff = this.diffAgainst ? tDynamic("dna.sel.diff", { n: this.diffCount() }) + " " : "";
+      host.innerHTML = `<span class="muted">${diff}${tDynamic("dna.sel.hint")}</span>`;
       return;
     }
     const n = sel.b - sel.a;
@@ -398,21 +411,21 @@ export class DnaEditor {
       const base = this.sequence[sel.a];
       if (!c) info = `Base ${sel.a} · ${base}`;
       else if (c.role === "coding" && c.trait) info = `Base ${sel.a} · codon ${c.bases} → ${c.aa} · ${TRAIT_LABEL[c.trait]} ${fmtDelta(c.delta)}`;
-      else if (c.role === "start") info = `Base ${sel.a} · ATG, début du gène ${c.gene + 1}`;
-      else if (c.role === "stop") info = `Base ${sel.a} · ${c.bases}, fin du gène ${c.gene + 1}`;
-      else if (c.role === "open") info = `Base ${sel.a} · gène non terminé`;
-      else info = `Base ${sel.a} · hors gène`;
+      else if (c.role === "start") info = tDynamic("dna.sel.base.start", { index: sel.a, gene: c.gene + 1 });
+      else if (c.role === "stop") info = tDynamic("dna.sel.base.stop", { index: sel.a, codon: c.bases, gene: c.gene + 1 });
+      else if (c.role === "open") info = tDynamic("dna.sel.base.open", { index: sel.a });
+      else info = tDynamic("dna.sel.base.out", { index: sel.a });
     } else {
       info = `Bases ${sel.a}–${sel.b - 1} · ${n} bases · ${this.sequence.slice(sel.a, Math.min(sel.b, sel.a + 12))}${n > 12 ? "…" : ""}`;
     }
-    if (this.diffAgainst) info += ` · ${this.diffCount()} bases modifiées par rapport au parent`;
-    const bases = BASES.map((b) => `<button type="button" class="base-btn nt-${b}" data-set="${b}" aria-label="Remplacer par ${b}">${b}</button>`).join("");
+    if (this.diffAgainst) info += ` · ${tDynamic("dna.sel.diff.suffix", { n: this.diffCount() })}`;
+    const bases = BASES.map((b) => `<button type="button" class="base-btn nt-${b}" data-set="${b}" aria-label="${tDynamic("dna.sel.replace.aria", { base: b })}">${b}</button>`).join("");
     host.innerHTML = `<div class="sel-info mono">${info}</div>
       <div class="sel-ops">
-        <span class="base-set" role="group" aria-label="Remplacer la sélection par">${bases}</span>
-        <button type="button" class="quiet" data-sel="dup" title="Dupliquer la sélection (⌘D)">Dupliquer</button>
-        <button type="button" class="quiet" data-sel="del" title="Supprimer la sélection (⌫)">Supprimer</button>
-        <button type="button" class="quiet" data-sel="none" title="Désélectionner (Échap)">×</button>
+        <span class="base-set" role="group" aria-label="${tDynamic("dna.sel.replace.group.aria")}">${bases}</span>
+        <button type="button" class="quiet" data-sel="dup" title="${tDynamic("dna.sel.dup.title")}">${tDynamic("dna.sel.dup")}</button>
+        <button type="button" class="quiet" data-sel="del" title="${tDynamic("dna.sel.del.title")}">${tDynamic("dna.sel.del")}</button>
+        <button type="button" class="quiet" data-sel="none" title="${tDynamic("dna.sel.none.title")}">×</button>
       </div>`;
   }
 
@@ -420,7 +433,7 @@ export class DnaEditor {
     const host = this.q("#dna-palette-codons");
     (this.q("#dna-palette-trait") as HTMLSelectElement).value = this.paletteTrait;
     if (this.paletteTrait === "control") {
-      host.innerHTML = CONTROL_CODONS.map((c) => `<button type="button" class="codon-chip" data-codon="${c.codon}"><span class="mono">${c.codon}</span><small>${c.label}</small></button>`).join("");
+      host.innerHTML = CONTROL_CODONS.map((c) => `<button type="button" class="codon-chip" data-codon="${c.codon}"><span class="mono">${c.codon}</span><small>${tDynamic(c.labelKey)}</small></button>`).join("");
       return;
     }
     const trait = this.paletteTrait as TraitName;
@@ -433,7 +446,7 @@ export class DnaEditor {
   private renderIssues(): void {
     const host = this.q("#dna-warnings");
     const issues = validateSequence(this.ann);
-    host.innerHTML = issues.map((i) => `<div class="dna-issue ${i.level}">${icon(i.level === "warn" ? "warn" : "help")}<span>${i.text}</span></div>`).join("");
+    host.innerHTML = issues.map((i) => `<div class="dna-issue ${i.level}">${icon(i.level === "warn" ? "warn" : "help")}<span>${tDynamic(`sim.dna.${i.id}`, i.vars)}</span></div>`).join("");
   }
 
   private renderPheno(): void {
@@ -445,14 +458,14 @@ export class DnaEditor {
     const box = this.q<HTMLDetailsElement>("#dna-landscape");
     const envEl = this.q("#dna-landscape-env");
     if (!box.open) {
-      envEl.textContent = "Ouvrez pour évaluer les substitutions d’un codon dans les gènes, à l’environnement local.";
+      envEl.textContent = tDynamic("dna.landscape.closed");
       this.q("#dna-landscape-best").innerHTML = "";
       this.q("#dna-landscape-worst").innerHTML = "";
       return;
     }
     const env = this.opts.env();
     const probe = probeLandscape(this.sequence, env, 10);
-    envEl.textContent = `${this.opts.envLabel()} · fitness de référence ${probe.baseline.toFixed(3)}.`;
+    envEl.textContent = tDynamic("dna.landscape.env", { env: this.opts.envLabel(), baseline: probe.baseline.toFixed(3) });
     const maxAbs = Math.max(0.001, ...probe.best.map((h) => Math.abs(h.deltaFitness)), ...probe.worst.map((h) => Math.abs(h.deltaFitness)));
     const row = (h: LandscapeHit, kind: "best" | "worst") => {
       const traits = Object.entries(h.traits)
@@ -460,7 +473,7 @@ export class DnaEditor {
         .map(([t, d]) => `${TRAIT_LABEL[t as TraitName] ?? t} ${fmtDelta(d!)}`)
         .join(" · ");
       const w = Math.max(4, (Math.abs(h.deltaFitness) / maxAbs) * 100);
-      return `<button type="button" class="landscape-hit ${kind}" data-pos="${h.position}" data-codon="${h.codon}" title="Remplacer ${h.from} par ${h.codon} à la base ${h.position}">
+      return `<button type="button" class="landscape-hit ${kind}" data-pos="${h.position}" data-codon="${h.codon}" title="${tDynamic("dna.landscape.hit.title", { from: h.from, codon: h.codon, position: h.position })}">
         <i style="width:${w.toFixed(0)}%"></i>
         <span class="mono">${h.from}→${h.codon}</span>
         <span class="pos">@${h.position}</span>
@@ -468,8 +481,8 @@ export class DnaEditor {
         <span class="tiny">${traits}</span>
       </button>`;
     };
-    this.q("#dna-landscape-best").innerHTML = probe.best.map((h) => row(h, "best")).join("") || `<p class="muted">Aucune substitution n’améliore la fitness.</p>`;
-    this.q("#dna-landscape-worst").innerHTML = probe.worst.map((h) => row(h, "worst")).join("") || `<p class="muted">Aucune substitution n’abaisse la fitness.</p>`;
+    this.q("#dna-landscape-best").innerHTML = probe.best.map((h) => row(h, "best")).join("") || `<p class="muted">${tDynamic("dna.landscape.none.best")}</p>`;
+    this.q("#dna-landscape-worst").innerHTML = probe.worst.map((h) => row(h, "worst")).join("") || `<p class="muted">${tDynamic("dna.landscape.none.worst")}</p>`;
   }
 
   private syncTextarea(): void {
@@ -489,25 +502,25 @@ export class DnaEditor {
       if (prev === null) return;
       this.sel = null;
       this.render();
-      status("Modification annulée.");
+      status(tDynamic("dna.status.undone"));
     });
     this.q("#dna-redo").addEventListener("click", () => {
       const next = this.history.redo();
       if (next === null) return;
       this.sel = null;
       this.render();
-      status("Modification rétablie.");
+      status(tDynamic("dna.status.redone"));
     });
-    this.q("#dna-revert").addEventListener("click", () => this.commit(this.reference, null, "Génome chargé rétabli."));
-    this.q("#btn-clear-genes").addEventListener("click", () => this.commit("", null, "Génome vidé : phénotype basal."));
+    this.q("#dna-revert").addEventListener("click", () => this.commit(this.reference, null, tDynamic("dna.status.reverted")));
+    this.q("#btn-clear-genes").addEventListener("click", () => this.commit("", null, tDynamic("dna.status.cleared")));
     this.q("#btn-from-inspect").addEventListener("click", () => {
       const org = this.opts.selectedGenome();
       if (!org) {
-        status("Sélectionnez d’abord un organisme avec Inspecter.");
+        status(tDynamic("dna.status.noSelection"));
         return;
       }
       this.load(org.genome);
-      status(`ADN de l’organisme ${org.id} copié dans l’éditeur.`);
+      status(tDynamic("dna.status.copiedFromOrganism", { id: org.id }));
     });
 
     // Minimap → select a region.
@@ -537,8 +550,8 @@ export class DnaEditor {
         };
         if (act === "plus") {
           const next = bumpGene(seq, gene, 1);
-          this.commit(next, geneSel(i, next), next === seq ? undefined : `${TRAIT_LABEL[gene.dominant as TraitName]} renforcé.`);
-          if (next === seq) status(`Le génome est plein (${MAX_GENOME} bases).`);
+          this.commit(next, geneSel(i, next), next === seq ? undefined : tDynamic("dna.status.geneBoosted", { trait: TRAIT_LABEL[gene.dominant as TraitName] }));
+          if (next === seq) status(tDynamic("dna.status.full", { max: MAX_GENOME }));
         } else if (act === "minus") this.commit(bumpGene(seq, gene, -1), geneSel(i, bumpGene(seq, gene, -1)));
         else if (act === "up") {
           const next = moveGene(seq, genes, i, -1);
@@ -546,7 +559,7 @@ export class DnaEditor {
         } else if (act === "down") {
           const next = moveGene(seq, genes, i, 1);
           this.commit(next, geneSel(i + 1, next));
-        } else if (act === "del") this.commit(removeGene(seq, gene), null, `Gène ${TRAIT_LABEL[gene.dominant as TraitName]} retiré.`);
+        } else if (act === "del") this.commit(removeGene(seq, gene), null, tDynamic("dna.status.geneRemoved", { trait: TRAIT_LABEL[gene.dominant as TraitName] }));
         return;
       }
       const title = t.closest<HTMLElement>("[data-select]");
@@ -585,11 +598,11 @@ export class DnaEditor {
       const seq = this.sequence;
       const next = appendGene(seq, trait);
       if (next === seq) {
-        status(`Le génome est plein (${MAX_GENOME} bases).`);
+        status(tDynamic("dna.status.full", { max: MAX_GENOME }));
         return;
       }
       const g = annotateSequence(next).decoded.genes.at(-1);
-      this.commit(next, g ? { a: g.start, b: g.end } : null, `Gène ajouté : ${TRAIT_LABEL[trait]}.`);
+      this.commit(next, g ? { a: g.start, b: g.end } : null, tDynamic("dna.status.geneAdded", { trait: TRAIT_LABEL[trait] }));
     });
 
     // Strip: pointer selection.
@@ -679,7 +692,7 @@ export class DnaEditor {
       if (meta && key.toLowerCase() === "c") {
         if (!sel) return;
         ev.preventDefault();
-        void navigator.clipboard?.writeText(this.sequence.slice(sel.a, sel.b)).then(() => status("Sélection copiée."), () => {});
+        void navigator.clipboard?.writeText(this.sequence.slice(sel.a, sel.b)).then(() => status(tDynamic("dna.status.selectionCopied")), () => {});
         return;
       }
       if (meta) return;
@@ -733,7 +746,7 @@ export class DnaEditor {
       const codon = btn.dataset.codon ?? "";
       if (!Number.isInteger(pos) || codon.length !== 3) return;
       const next = replaceRange(this.sequence, pos, pos + 3, codon);
-      this.commit(next, { a: pos, b: pos + 3 }, `Substitution ${this.sequence.slice(pos, pos + 3)} → ${codon} à la base ${pos}.`);
+      this.commit(next, { a: pos, b: pos + 3 }, tDynamic("dna.status.substituted", { from: this.sequence.slice(pos, pos + 3), to: codon, pos }));
     });
     this.q("#dna-palette-codons").addEventListener("click", (ev) => {
       const chip = (ev.target as HTMLElement).closest<HTMLElement>("[data-codon]");
@@ -743,10 +756,10 @@ export class DnaEditor {
       const seq = this.sequence;
       const next = insertAt(seq, at, codon);
       if (next === seq) {
-        status(`Le génome est plein (${MAX_GENOME} bases).`);
+        status(tDynamic("dna.status.full", { max: MAX_GENOME }));
         return;
       }
-      this.commit(next, { a: at, b: at + codon.length }, `Codon ${codon} inséré.`);
+      this.commit(next, { a: at, b: at + codon.length }, tDynamic("dna.status.codonInserted", { codon }));
       this.focusStrip();
     });
 
@@ -755,8 +768,8 @@ export class DnaEditor {
     this.q("#btn-dna-place").addEventListener("click", () => this.opts.onPlace());
     this.q("#btn-dna-copy").addEventListener("click", () => {
       void navigator.clipboard?.writeText(this.sequence).then(
-        () => status(`Séquence copiée (${this.sequence.length} bases).`),
-        () => status("Copie impossible dans ce navigateur."),
+        () => status(tDynamic("dna.status.copied", { n: this.sequence.length })),
+        () => status(tDynamic("dna.status.copyFailed")),
       );
     });
 
@@ -775,13 +788,13 @@ export class DnaEditor {
       const after = fn(before);
       this.commit(after, this.selectDiff(before, after), msg);
     };
-    this.q("#btn-point").addEventListener("click", () => mutate((s) => pointMutate(s, this.rng), "Mutation ponctuelle : une base remplacée."));
-    this.q("#btn-indel").addEventListener("click", () => mutate((s) => indelMutate(s, this.rng), "Insertion ou délétion appliquée."));
-    this.q("#btn-dup").addEventListener("click", () => mutate((s) => duplicateMutate(s, this.rng).seq, "Fragment dupliqué."));
+    this.q("#btn-point").addEventListener("click", () => mutate((s) => pointMutate(s, this.rng), tDynamic("dna.status.pointMutated")));
+    this.q("#btn-indel").addEventListener("click", () => mutate((s) => indelMutate(s, this.rng), tDynamic("dna.status.indelMutated")));
+    this.q("#btn-dup").addEventListener("click", () => mutate((s) => duplicateMutate(s, this.rng).seq, tDynamic("dna.status.fragmentDuplicated")));
     this.q("#btn-load-founder").addEventListener("click", () => {
       const id = this.q<HTMLSelectElement>("#founder").value;
       this.load(genomeForKit(id));
-      status(`Génome de départ chargé : ${KIT_COPY[id]?.label ?? id}.`);
+      status(tDynamic("dna.status.founderLoaded", { kit: KIT_COPY[id]?.label ?? id }));
     });
 
     root.addEventListener("toggle", () => this.renderStrip(), true);
@@ -804,7 +817,9 @@ export class DnaEditor {
     if (!sel) return;
     const next = deleteRange(this.sequence, sel.a, sel.b);
     const a = Math.min(sel.a, Math.max(0, next.length - 1));
-    this.commit(next, next.length ? { a, b: a + 1 } : null, `${sel.b - sel.a} base${sel.b - sel.a > 1 ? "s" : ""} supprimée${sel.b - sel.a > 1 ? "s" : ""}.`);
+    const n = sel.b - sel.a;
+    const msg = tDynamic(n > 1 ? "dna.status.basesDeleted.many" : "dna.status.basesDeleted.one", { n });
+    this.commit(next, next.length ? { a, b: a + 1 } : null, msg);
   }
 
   private duplicateSelection(): void {
@@ -813,10 +828,10 @@ export class DnaEditor {
     const seq = this.sequence;
     const next = duplicateRange(seq, sel.a, sel.b);
     if (next === seq) {
-      this.opts.status(`Le génome est plein (${MAX_GENOME} bases).`);
+      this.opts.status(tDynamic("dna.status.full", { max: MAX_GENOME }));
       return;
     }
     const len = sel.b - sel.a;
-    this.commit(next, { a: sel.b, b: Math.min(next.length, sel.b + len) }, "Sélection dupliquée.");
+    this.commit(next, { a: sel.b, b: Math.min(next.length, sel.b + len) }, tDynamic("dna.status.selectionDuplicated"));
   }
 }

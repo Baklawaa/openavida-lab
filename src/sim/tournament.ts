@@ -68,8 +68,8 @@ export function tournamentConfigs(
       const ga = decoded(a.genome);
       const gb = decoded(b.genome);
       const ops: RecipeOp[] = [
-        { type: "strain", name: a.name || `Souche ${i + 1}`, genome: ga },
-        { type: "strain", name: b.name || `Souche ${j + 1}`, genome: gb },
+        { type: "strain", name: a.name || `Strain ${i + 1}`, genome: ga },
+        { type: "strain", name: b.name || `Strain ${j + 1}`, genome: gb },
         { type: "inject", genome: ga, count: inject, x: xA, y },
         { type: "inject", genome: gb, count: inject, x: xB, y },
       ];

@@ -3,6 +3,10 @@
  *
  * "Once" kinds (dominant, sweep, first predation) are gated by EventFlags
  * so a bounded event log can forget old rows without re-firing.
+ *
+ * Events carry structured fields only (kind, tick, ids): the interface builds
+ * their sentence from the locale catalog (src/ui/i18n/sim.fr.ts), so the sim
+ * stays free of display language.
  */
 import { innovationSpread } from "./species";
 import type { Innovation, Strain } from "./species";
@@ -24,7 +28,6 @@ export interface WorldEvent {
   id: number;
   tick: number;
   kind: WorldEventKind;
-  text: string;
   lineageId?: number;
   strainId?: number;
   innovationId?: number;
@@ -79,7 +82,6 @@ export function detectEvents(prev: MetricsSample, world: EventWorld, flags: Even
           tick,
           kind: "lineage-dominant",
           lineageId: lin.id,
-          text: `Lignée ${lin.id} dépasse 20 % de la population.`,
         });
       }
     }
@@ -92,14 +94,13 @@ export function detectEvents(prev: MetricsSample, world: EventWorld, flags: Even
         tick,
         kind: "lineage-collapse",
         lineageId: lin.id,
-        text: `Lignée ${lin.id} s’éteint après avoir dépassé 20 %.`,
       });
     }
   }
 
   if (world.lastPredation > 0 && !firstPredation) {
     firstPredation = true;
-    events.push({ tick, kind: "first-predation", text: "Première prédation." });
+    events.push({ tick, kind: "first-predation" });
   }
 
   if (pop > 0 && world.innovations.length) {
@@ -118,7 +119,6 @@ export function detectEvents(prev: MetricsSample, world: EventWorld, flags: Even
           innovationId: inn.id,
           strainId: inn.strainId,
           lineageId: inn.lineageId,
-          text: `Innovation ${inn.id} : plus de 30 % des descendants de la souche.`,
         });
       }
     }
@@ -131,12 +131,10 @@ export function detectEvents(prev: MetricsSample, world: EventWorld, flags: Even
     if ((n ?? 0) <= 0) continue;
     if ((nowStrains[k] ?? 0) > 0) continue;
     const id = Number(k);
-    const name = world.strains.get(id)?.name ?? `souche ${id}`;
     events.push({
       tick,
       kind: "strain-extinct",
       strainId: id,
-      text: `Souche « ${name} » éteinte.`,
     });
   }
 
@@ -146,12 +144,12 @@ export function detectEvents(prev: MetricsSample, world: EventWorld, flags: Even
     const crashNow = pop <= refPop * 0.6;
     const crashThen = prevRef !== null && prevRef > 0 && prev.population <= prevRef * 0.6;
     if (crossed(crashNow, crashThen)) {
-      events.push({ tick, kind: "population-crash", text: "Chute de population (−40 % en 20 pas)." });
+      events.push({ tick, kind: "population-crash" });
     }
     const boomNow = pop >= refPop * 2;
     const boomThen = prevRef !== null && prevRef > 0 && prev.population >= prevRef * 2;
     if (crossed(boomNow, boomThen)) {
-      events.push({ tick, kind: "population-boom", text: "Essor de population (+100 % en 20 pas)." });
+      events.push({ tick, kind: "population-boom" });
     }
   }
 

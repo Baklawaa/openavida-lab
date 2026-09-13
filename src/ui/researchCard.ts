@@ -11,6 +11,7 @@ import {
   type TraitName,
   type World,
 } from "../sim/index";
+import { tDynamic } from "./i18n/runtime";
 
 const TRACKED_TRAITS: readonly TraitName[] = ["uptake", "photo", "resist", "size", "mutator"];
 
@@ -44,7 +45,7 @@ export function strainSelections(world: World, limit = 3): StrainSelection[] {
       }));
       return {
         strainId,
-        name: world.strains.get(strainId)?.name ?? `Souche ${strainId}`,
+        name: world.strains.get(strainId)?.name ?? tDynamic("render.strain.defaultName", { id: strainId }),
         coefficient: selectionCoefficient(series),
         share: count / total,
       };
@@ -69,10 +70,11 @@ export interface SelectionReport {
   note: string;
 }
 
-const REASON_CLONAL = "population clonale unique";
-const REASON_SHORT = "historique trop court";
-const REASON_FIXED = "fréquences fixées";
-const REASON_EMPTY = "aucun organisme vivant";
+/** Reason keys, translated where the reason is reported. */
+const REASON_CLONAL = "render.research.reason.clonal";
+const REASON_SHORT = "render.research.reason.short";
+const REASON_FIXED = "render.research.reason.fixed";
+const REASON_EMPTY = "render.research.reason.empty";
 
 /** Frequency series of one lineage, from the bounded per-tick lineage samples. */
 function lineageSeries(world: World, lineageId: number): FrequencyPoint[] {
@@ -94,11 +96,11 @@ function lineageSeries(world: World, lineageId: number): FrequencyPoint[] {
 }
 
 function nullReason(world: World, series: readonly FrequencyPoint[]): string {
-  if (world.organisms.length === 0) return REASON_EMPTY;
+  if (world.organisms.length === 0) return tDynamic(REASON_EMPTY);
   const usable = series.filter((p) => p.total > 0 && p.count > 0 && p.count < p.total).length;
-  if (usable >= 2) return REASON_FIXED;
-  if (series.length < 2) return REASON_SHORT;
-  return new Set(world.organisms.map((o) => o.strainId)).size <= 1 ? REASON_CLONAL : REASON_FIXED;
+  if (usable >= 2) return tDynamic(REASON_FIXED);
+  if (series.length < 2) return tDynamic(REASON_SHORT);
+  return tDynamic(new Set(world.organisms.map((o) => o.strainId)).size <= 1 ? REASON_CLONAL : REASON_FIXED);
 }
 
 /**
@@ -127,7 +129,7 @@ export function selectionRows(world: World): SelectionReport {
     return {
       grouping: "strain",
       rows,
-      note: "Pente de logit(fréquence) par pas, estimée sur l’historique. Positif = souche en progression.",
+      note: tDynamic("render.research.note.strain"),
     };
   }
 
@@ -146,16 +148,16 @@ export function selectionRows(world: World): SelectionReport {
       const last = c.series.at(-1)!;
       return {
         id: c.id,
-        name: `Lignée ${c.id}`,
+        name: tDynamic("render.lineage.defaultName", { id: c.id }),
         share: last.count / Math.max(1, last.total),
         coefficient,
-        ...(coefficient === null ? { reason: REASON_FIXED } : {}),
+        ...(coefficient === null ? { reason: tDynamic(REASON_FIXED) } : {}),
       };
     });
     return {
       grouping: "lineage",
       rows,
-      note: "Souche unique : la sélection est estimée entre lignées (les 5 plus peuplées sont conservées à chaque pas ; seules celles qui ont au moins deux mesures sont listées). Positif = lignée en progression.",
+      note: tDynamic("render.research.note.lineage"),
     };
   }
   const livingLineages = [...world.lineages.values()].filter((l) => l.count > 0).length;
@@ -167,7 +169,8 @@ export function selectionRows(world: World): SelectionReport {
         : livingLineages < 2
           ? REASON_CLONAL
           : REASON_FIXED;
-  return { grouping: "none", rows: [], note: `Sélection non mesurable : ${reason}.` };
+  // The reason is reported inside a sentence, so the key is resolved here.
+  return { grouping: "none", rows: [], note: tDynamic("render.research.note.none", { reason: tDynamic(reason) }) };
 }
 
 export function researchHtml(world: World): string {
@@ -179,15 +182,15 @@ export function researchHtml(world: World): string {
 
   const selectionHeading =
     selection.grouping === "strain"
-      ? "SÉLECTION PAR SOUCHE"
+      ? tDynamic("render.research.heading.strain")
       : selection.grouping === "lineage"
-        ? "SÉLECTION PAR LIGNÉE (souche unique)"
-        : "SÉLECTION";
+        ? tDynamic("render.research.heading.lineage")
+        : tDynamic("render.research.heading.selection");
   const selectionHtml = selection.rows.length
     ? `${selection.rows
         .map(
           (s) =>
-            `<div class="research-row"><b>${escapeHtml(s.name)}</b><span>${(s.share * 100).toFixed(0)} % de la population</span><span class="mono">s = ${s.coefficient === null ? `— ${escapeHtml(s.reason ?? "")}` : `${s.coefficient.toFixed(4)} / pas`}</span></div>`,
+            `<div class="research-row"><b>${escapeHtml(s.name)}</b><span>${tDynamic("render.research.share", { share: (s.share * 100).toFixed(0) })}</span><span class="mono">s = ${s.coefficient === null ? `— ${escapeHtml(s.reason ?? "")}` : `${s.coefficient.toFixed(4)} ${tDynamic("render.research.perStep")}`}</span></div>`,
         )
         .join("")}<p class="micro">${escapeHtml(selection.note)}</p>`
     : `<p class="muted">${escapeHtml(selection.note)}</p>`;
@@ -198,8 +201,8 @@ export function researchHtml(world: World): string {
 
   return `<div class="research-grid">
     <div><span class="eyebrow">${selectionHeading}</span>${selectionHtml}</div>
-    <div><span class="eyebrow">DÉRIVE NEUTRE</span><p><b>${world.neutralLog.length}</b> substitution(s) neutre(s) · horloge <b>${clock.toFixed(2)}</b> / 100 pas / lignée</p></div>
-    <div><span class="eyebrow">FITNESS RÉALISÉE</span><p><b>${latest?.meanOffspringPerAdult !== undefined ? latest.meanOffspringPerAdult.toFixed(2) : "—"}</b> descendants par adulte décédé · fixation <b>${latest ? (latest.fixationFraction * 100).toFixed(0) : 0} %</b></p></div>
-    <div><span class="eyebrow">DISTRIBUTION DES TRAITS</span><p class="research-traits">${traits || "—"}</p></div>
+    <div><span class="eyebrow">${tDynamic("render.research.heading.drift")}</span><p><b>${world.neutralLog.length}</b> ${tDynamic("render.research.neutral.substitutions")} · ${tDynamic("render.research.neutral.clock", { clock: clock.toFixed(2) })}</p></div>
+    <div><span class="eyebrow">${tDynamic("render.research.heading.fitness")}</span><p><b>${latest?.meanOffspringPerAdult !== undefined ? latest.meanOffspringPerAdult.toFixed(2) : "—"}</b> ${tDynamic("render.research.fitness.descendants")} · ${tDynamic("render.research.fitness.fixation", { pct: latest ? (latest.fixationFraction * 100).toFixed(0) : 0 })}</p></div>
+    <div><span class="eyebrow">${tDynamic("render.research.heading.traits")}</span><p class="research-traits">${traits || "—"}</p></div>
   </div>`;
 }

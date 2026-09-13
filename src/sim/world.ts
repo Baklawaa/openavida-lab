@@ -399,7 +399,7 @@ export class World {
     return org;
   }
 
-  /** Find the strain whose founding genome matches, or create "Souche n". */
+  /** Find the strain whose founding genome matches, or create "Strain n". */
   strainFor(genome: string, phenotype?: import("./mapping").Phenotype): Strain {
     const signature = genomeSignature(genome);
     for (const s of this.strains.values()) if (s.signature === signature && s.genome === genome) return s;
@@ -421,7 +421,9 @@ export class World {
     const id = this.nextStrainId++;
     const strain: Strain = {
       id,
-      name: opts.name ?? `Souche ${id}`,
+      // Neutral default label: the sim carries no display language, and the
+      // interface can relabel an unnamed strain from its id.
+      name: opts.name ?? `Strain ${id}`,
       color: strainColor(id - 1),
       genome: seq,
       signature,

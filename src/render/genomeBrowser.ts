@@ -1,4 +1,5 @@
 import { BASE_COLOR, TRAIT_COLOR, type TraitName } from "../sim/mapping";
+import { tDynamic } from "../ui/i18n/runtime";
 import { decodeGenome, toGenomeTrack, type GenomeTrack } from "../sim/genome";
 import type { Phenotype } from "../sim/mapping";
 import { TRAIT_LABEL } from "../ui/labels";
@@ -46,7 +47,7 @@ export class GenomeBrowser {
     if (!track || track.sequence.length === 0) {
       ctx.fillStyle = "#5a6a78";
       ctx.font = `${12 * (window.devicePixelRatio || 1)}px ui-monospace, monospace`;
-      ctx.fillText("Sélectionnez un organisme", 12, h * 0.5);
+      ctx.fillText(tDynamic("render.genome.empty"), 12, h * 0.5);
       return;
     }
     const seq = track.sequence;
@@ -129,7 +130,7 @@ export function phenotypeDiffHtml(ph: Phenotype, ref: Phenotype): string {
 }
 
 export function genesHtml(track: GenomeTrack): string {
-  if (track.genes.length === 0) return `<p class="muted">Aucun gène (ATG…stop) dans cette séquence.</p>`;
+  if (track.genes.length === 0) return `<p class="muted">${tDynamic("render.genome.noGenes")}</p>`;
   return track.genes
     .map((g) => {
       const bits = Object.entries(g.contrib)

@@ -27,7 +27,10 @@ import {
 const args = process.argv.slice(2);
 const update = args.includes("--update");
 const locale = args.includes("--en") ? "en" : "fr";
-const base = args.find((a) => a.startsWith("http")) ?? `http://127.0.0.1:5174/?lang=${locale}`;
+// The locale is pinned in the URL, so the same gate can be run twice.
+const target = new URL(args.find((a) => a.startsWith("http")) ?? "http://127.0.0.1:5174/");
+target.searchParams.set("lang", locale);
+const base = target.toString();
 const fixturePath = locale === "en" ? FIXTURE_PATH.replace(".fr.json", ".en.json") : FIXTURE_PATH;
 
 const browser = await chromium.launch({ headless: true, channel: "chrome" });

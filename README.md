@@ -18,9 +18,13 @@ Open http://127.0.0.1:5174
 - [docs/research.md](docs/research.md) — running experiments headlessly: manifests, the runner, what lands in a run directory, the Python reader, and how to reproduce a stored result.
 - [workbench.md](workbench.md) — the evidence log: what each upgrade stage changed, why, and what was measured.
 
+## Language
+
+The interface is bilingual, French by default. `?lang=en` opens it in English and `?lang=fr` forces French; the picker in the header stores the choice in the browser (switching reloads the page, so no panel is ever half-translated); otherwise the browser's language decides, and French is the fallback. Every user-visible string lives in `src/ui/i18n/` — one French and one English section per area — and tests assert that no French copy exists outside those files, that the English catalog covers every key, and that the two renderings really differ (a browser gate renders every panel in both locales).
+
 ## Interface
 
-The French interface keeps playback, field layers, world selection, and the 2D/3D view beside the simulation. The toolbox has four spaces:
+The interface keeps playback, field layers, world selection, and the 2D/3D view beside the simulation. The toolbox has four spaces:
 
 - **Organismes**: starter kits, placement, population injection, and the visual DNA editor.
 - **Milieu**: brushes, radius, terrain sources, random disturbances, a timed programme (scale a field, change a parameter, or paint at a given step), and the whole model parameter table — every field is generated from the specification that also documents it.

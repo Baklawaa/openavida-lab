@@ -66,7 +66,7 @@ import { attachControlHelp, controlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
-import { applyDocumentLang, locale, switchLocale, type Locale } from "./ui/i18n/runtime";
+import { applyDocumentLang, locale, switchLocale, tDynamic, type Locale } from "./ui/i18n/runtime";
 import { ModelPanel } from "./ui/modelPanel";
 import { DEFAULT_OVERLAY_ALPHA, describeExudate, EXUDATE_OVERLAY_ALPHA, normalizeOverlay } from "./render/overlay";
 import { researchHtml } from "./ui/researchCard";
@@ -100,6 +100,31 @@ function download(filename: string, text: string, mime: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/**
+ * Sentence of one world event. The sim stores structured fields only
+ * (kind, tick, ids); the copy lives in the locale catalog.
+ */
+function eventText(w: World, e: World["events"][number]): string {
+  switch (e.kind) {
+    case "lineage-dominant":
+      return tDynamic("sim.event.lineage-dominant", { lineage: e.lineageId ?? 0 });
+    case "lineage-collapse":
+      return tDynamic("sim.event.lineage-collapse", { lineage: e.lineageId ?? 0 });
+    case "first-predation":
+      return tDynamic("sim.event.first-predation");
+    case "innovation-sweep":
+      return tDynamic("sim.event.innovation-sweep", { innovation: e.innovationId ?? 0 });
+    case "strain-extinct": {
+      const id = e.strainId ?? 0;
+      return tDynamic("sim.event.strain-extinct", { name: w.strains.get(id)?.name ?? `Strain ${id}` });
+    }
+    case "population-crash":
+      return tDynamic("sim.event.population-crash");
+    case "population-boom":
+      return tDynamic("sim.event.population-boom");
+  }
 }
 
 export function mount(root: HTMLElement): void {
@@ -192,7 +217,7 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-focus")!.addEventListener("click", () => {
     const focused = root.classList.toggle("focus-mode");
     root.querySelector("#btn-focus")!.setAttribute("aria-pressed", String(focused));
-    root.querySelector("#btn-focus")!.setAttribute("aria-label", focused ? "Rétablir l’interface complète" : "Agrandir la visualisation");
+    root.querySelector("#btn-focus")!.setAttribute("aria-label", focused ? tDynamic("app.focus.restore") : tDynamic("app.focus.enlarge"));
     layout();
   });
   side.addEventListener("toggle", () => requestAnimationFrame(layout), true);
@@ -211,7 +236,7 @@ export function mount(root: HTMLElement): void {
     (root.querySelector("#founder") as HTMLSelectElement).value = id;
     const p = decodeGenome(genomeForKit(id)).phenotype;
     (root.querySelector("#kit-traits") as HTMLElement).textContent =
-      `Lumière ${p.photo.toFixed(2)} · Nutrition ${p.uptake.toFixed(2)} · Résist. ${p.resist.toFixed(2)}`;
+      tDynamic("app.kit.traits", { light: p.photo.toFixed(2), uptake: p.uptake.toFixed(2), resist: p.resist.toFixed(2) });
     dna.load(genomeForKit(id));
   };
   for (const kit of DNA_KITS) {
@@ -253,7 +278,7 @@ export function mount(root: HTMLElement): void {
     root.querySelector("#view-2d")!.setAttribute("aria-pressed", String(which === "2d"));
     root.querySelector("#view-3d")!.setAttribute("aria-pressed", String(which === "3d"));
     (root.querySelector("#zoom-top") as HTMLInputElement).disabled = which === "3d";
-    root.querySelector("#view-hint")!.textContent = which === "3d" ? "Glisser : tourner · Molette : zoomer · Clic : outil actif" : root.querySelector("#place-hint")!.textContent;
+    root.querySelector("#view-hint")!.textContent = which === "3d" ? tDynamic("app.view.hint3d") : root.querySelector("#place-hint")!.textContent;
     if (which === "3d" && state.view === "split") setView(dual.active);
     (root.querySelector("#opt-view3d input") as HTMLInputElement).checked = which === "3d";
     if (which === "3d") {
@@ -298,7 +323,7 @@ export function mount(root: HTMLElement): void {
   function paintPeers(): void {
     const host = root.querySelector("#mp-peers")!;
     if (!state.room) {
-      host.textContent = "Activez la session partagée pour ouvrir un salon.";
+      host.textContent = tDynamic("app.mp.enable");
       cursors.innerHTML = "";
       return;
     }
@@ -326,16 +351,16 @@ export function mount(root: HTMLElement): void {
     },
     onApply: (seq) => {
       if (state.selectedId < 0) {
-        status("Sélectionnez d’abord un organisme avec Inspecter, ou placez-en un avec ce génome.");
+        status(tDynamic("app.dna.selectFirst"));
         return;
       }
       host.apply({ kind: "replaceGenome", which: sideOf(current()), orgId: state.selectedId, genome: seq });
       selectOrganism(current(), state.selectedId, "apply");
-      status("Génome appliqué à la sélection : nouvelle lignée créée.");
+      status(tDynamic("app.dna.applied"));
     },
     onPlace: () => {
       setTool("place");
-      status("Cliquez dans le monde pour placer un organisme avec ce génome.");
+      status(tDynamic("app.dna.placeHint"));
     },
     env: () => {
       const w = current();
@@ -347,8 +372,8 @@ export function mount(root: HTMLElement): void {
       const w = current();
       const org = w.organisms.find((o) => o.id === state.selectedId);
       return org
-        ? `Environnement de la cellule (${org.x}, ${org.y})`
-        : `Environnement du centre (${Math.floor(w.w / 2)}, ${Math.floor(w.h / 2)})`;
+        ? tDynamic("app.dna.envCell", { x: org.x, y: org.y })
+        : tDynamic("app.dna.envCenter", { x: Math.floor(w.w / 2), y: Math.floor(w.h / 2) });
     },
   });
   const editorGenome = (): string => dna.sequence || genomeForKit(state.kit);
@@ -401,7 +426,7 @@ export function mount(root: HTMLElement): void {
     },
   });
   if (sharedRecipe) {
-    status(`Recette chargée : ${sharedRecipe.ops.length} action${sharedRecipe.ops.length > 1 ? "s" : ""}.`);
+    status(tDynamic(sharedRecipe.ops.length > 1 ? "app.recipe.loaded.many" : "app.recipe.loaded.one", { count: sharedRecipe.ops.length }));
   }
   /** Name the strain after its kit when the genome is an unmodified kit genome. */
   function tagStrain(world: World, seq: string): void {
@@ -415,12 +440,12 @@ export function mount(root: HTMLElement): void {
     loadGenome: (seq, label) => {
       dna.load(seq);
       setTool("place");
-      status(`Génome de « ${label} » chargé. Cliquez sur une cellule libre pour le placer.`);
+      status(tDynamic("app.strain.genomeLoaded", { label }));
     },
     inject: (seq, n) => {
       tagStrain(current(), seq);
       const placed = host.apply({ kind: "inject", which: sideOf(current()), genome: seq, count: n }).count ?? 0;
-      status(`${placed} organismes injectés dans le monde ${dual.active}.`);
+      status(tDynamic("app.inject.count", { n: placed, world: dual.active }));
       paintFeeds();
       refreshMetrics();
     },
@@ -429,22 +454,22 @@ export function mount(root: HTMLElement): void {
     onColorByStrain: (on) => {
       renderer.colorByStrain = on;
       if (view3d) view3d.colorByStrain = on;
-      status(on ? "Couleur des organismes : souche fondatrice." : "Couleur des organismes : guilde et lignée.");
+      status(on ? tDynamic("app.strain.colorStrain") : tDynamic("app.strain.colorGuild"));
     },
     onHeatStrain: (id) => {
       host.apply({ kind: "heatStrain", which: sideOf(current()), strainId: id });
-      status(id === null ? "Carte de présence masquée." : `Carte de présence : souche ${id}.`);
+      status(id === null ? tDynamic("app.strain.heatOff") : tDynamic("app.strain.heatOn", { id }));
     },
     openMutation: (inn) => {
       if (!inn.genome) {
-        status("Séquence de la mutation absente (instantané ancien).");
+        status(tDynamic("app.mutation.missing"));
         return;
       }
       dna.load(inn.genome, { diffAgainst: inn.parentGenome ?? "" });
       openTab("organisms");
       root.querySelector("#dna-editor")?.scrollIntoView({ block: "nearest" });
       (root.querySelector("#dna-strip-section") as HTMLDetailsElement | null)?.setAttribute("open", "");
-      status(`Mutation au pas ${inn.tick} · ${inn.kind} · génome comparé au parent.`);
+      status(tDynamic("app.mutation.loaded", { tick: inn.tick, kind: inn.kind }));
     },
   });
 
@@ -466,8 +491,8 @@ export function mount(root: HTMLElement): void {
       dna.load(seq, opts?.diffAgainst !== undefined ? { diffAgainst: opts.diffAgainst } : {});
       setTool("place");
       status(opts?.diffAgainst !== undefined
-        ? `Génome de ${label} chargé, comparé à la référence.`
-        : `Génome de ${label} chargé dans l’éditeur.`);
+        ? tDynamic("app.explorer.genomeCompared", { label })
+        : tDynamic("app.explorer.genomeLoaded", { label }));
     },
     plateSelection: () => {
       const org = viewWorld().organisms.find((o) => o.id === state.selectedId);
@@ -494,16 +519,16 @@ export function mount(root: HTMLElement): void {
     const board = root.querySelector("#leaderboard")!;
     const top = strongestLiving(w.organisms, 8);
     if (top.length === 0) {
-      board.innerHTML = `<p class="muted">Aucun organisme vivant.</p>`;
+      board.innerHTML = tDynamic("app.leaderboard.empty");
     } else {
       board.innerHTML = top
         .map((o, i) => {
           const ph = o.ph;
           return `<button type="button" class="feed-row" data-org="${o.id}">
-            <div class="feed-head"><b>#${i + 1}</b> Fitness ${o.fitness.toFixed(3)} · Énergie ${o.energy.toFixed(2)}</div>
-            <div class="muted">Lignée ${o.lineageId} · Lumière ${ph.photo.toFixed(2)} · Nutrition ${ph.uptake.toFixed(2)}</div>
+            <div class="feed-head"><b>#${i + 1}</b> ${tDynamic("app.leaderboard.head", { fitness: o.fitness.toFixed(3), energy: o.energy.toFixed(2) })}</div>
+            <div class="muted">${tDynamic("app.leaderboard.traits", { lineage: o.lineageId, light: ph.photo.toFixed(2), uptake: ph.uptake.toFixed(2) })}</div>
             <div class="dna">${dnaSnippet(o.genome)}</div>
-            <span class="use-dna" data-use="${o.id}">Modifier cet ADN</span>
+            <span class="use-dna" data-use="${o.id}">${tDynamic("app.leaderboard.useDna")}</span>
           </button>`;
         })
         .join("");
@@ -514,14 +539,14 @@ export function mount(root: HTMLElement): void {
     const recentEvents = w.events.slice(-40).reverse();
     root.querySelector("#event-count")!.textContent = String(w.events.length);
     if (recentEvents.length === 0) {
-      eventLog.innerHTML = `<p class="muted">Aucun événement pour le moment.</p>`;
+      eventLog.innerHTML = tDynamic("app.events.empty");
     } else {
       eventLog.innerHTML = recentEvents
         .map((e) => {
           const color = EVENT_COLOR[e.kind];
           return `<button type="button" class="feed-row event-row" data-tick="${e.tick}" data-kind="${e.kind}" data-lineage="${e.lineageId ?? ""}" data-strain="${e.strainId ?? ""}">
-            <div class="feed-head" style="color:${color}">${e.text}</div>
-            <div class="muted">Pas ${e.tick}</div>
+            <div class="feed-head" style="color:${color}">${eventText(w, e)}</div>
+            <div class="muted">${tDynamic("app.events.tick", { tick: e.tick })}</div>
           </button>`;
         })
         .join("");
@@ -531,18 +556,18 @@ export function mount(root: HTMLElement): void {
     const causes = Object.keys(CAUSE_LABEL) as DeathCause[];
     const parts = causes
       .filter((k) => (tally[k] ?? 0) > 0)
-      .map((k) => `<span style="color:${CAUSE_COLOR[k]}">${DEATH_LABEL[k]} : ${tally[k]}</span>`);
-    tallyEl.innerHTML = parts.length ? parts.join(" · ") : `<span class="muted">Aucun décès pour le moment</span>`;
+      .map((k) => `<span style="color:${CAUSE_COLOR[k]}">${tDynamic("app.deaths.tally", { label: DEATH_LABEL[k], count: tally[k] ?? 0 })}</span>`);
+    tallyEl.innerHTML = parts.length ? parts.join(" · ") : tDynamic("app.deaths.none");
     const log = root.querySelector("#death-log")!;
     const recent = w.deaths.slice(-16).reverse();
     if (recent.length === 0) {
-      log.innerHTML = `<p class="muted">Aucun décès enregistré.</p>`;
+      log.innerHTML = tDynamic("app.deaths.empty");
     } else {
       log.innerHTML = recent
         .map((d) => {
           return `<button type="button" class="feed-row" data-genome="${d.genome}">
             <div class="feed-head" style="color:${CAUSE_COLOR[d.cause]}">${DEATH_LABEL[d.cause]}</div>
-            <div class="muted">Pas ${d.tick} · N° ${d.orgId} · Lignée ${d.lineageId} · Fitness ${d.fitness.toFixed(3)}</div>
+            <div class="muted">${tDynamic("app.deaths.row", { tick: d.tick, org: d.orgId, lineage: d.lineageId, fitness: d.fitness.toFixed(3) })}</div>
             <div class="dna">${dnaSnippet(d.genome)}</div>
           </button>`;
         })
@@ -558,9 +583,9 @@ export function mount(root: HTMLElement): void {
       b.classList.toggle("active", b.id === "tool-" + tool);
       b.setAttribute("aria-pressed", String(b.id === "tool-" + tool));
     });
-    const hint = tool === "place" ? "Clic sur une cellule libre : place un organisme avec le génome de l’éditeur." : tool === "paint" ? "Clic ou glisser : applique le pinceau sélectionné." : "Clic sur un organisme : génome, phénotype, métabolisme.";
+    const hint = tool === "place" ? tDynamic("app.hint.place") : tool === "paint" ? tDynamic("app.hint.paint") : tDynamic("app.hint.inspect");
     root.querySelector("#place-hint")!.textContent = hint;
-    root.querySelector("#view-hint")!.textContent = state.surface === "3d" ? "Glisser : tourner · Molette : zoomer · Clic : outil actif" : hint;
+    root.querySelector("#view-hint")!.textContent = state.surface === "3d" ? tDynamic("app.view.hint3d") : hint;
     canvas.style.cursor = tool === "inspect" ? "crosshair" : "cell";
     openPanel(tool === "paint" ? "environment" : tool === "inspect" ? "analysis" : "organisms");
   }
@@ -585,9 +610,9 @@ export function mount(root: HTMLElement): void {
     const actions = root.querySelector("#inspect-actions") as HTMLElement;
     if (!org) {
       if (reason === "select" || reason === "peek") {
-        root.querySelector("#selection-tag")!.textContent = "AUCUN";
+        root.querySelector("#selection-tag")!.textContent = tDynamic("app.inspect.none");
         actions.hidden = true;
-        meta.textContent = "Cliquez sur un organisme dans le monde.";
+        meta.textContent = tDynamic("app.inspect.clickOrganism");
         gEl.textContent = "";
         pEl.innerHTML = "";
         genesEl.innerHTML = "";
@@ -597,9 +622,9 @@ export function mount(root: HTMLElement): void {
       }
       return;
     }
-    root.querySelector("#selection-tag")!.textContent = `N° ${org.id}`;
+    root.querySelector("#selection-tag")!.textContent = tDynamic("app.inspect.number", { id: org.id });
     actions.hidden = false;
-    meta.innerHTML = `<div class="selection-metrics"><span>Énergie<b>${org.energy.toFixed(2)}</b></span><span>Fitness<b>${org.fitness.toFixed(3)}</b></span></div><div class="selection-info">Lignée ${org.lineageId} · Position (${org.x}, ${org.y}) · Parent ${org.parentId < 0 ? "fondateur" : org.parentId}</div><div class="selection-info">Corpulence ${(org.mass * 100).toFixed(0)} % · Taille effective ${bodySize(org).toFixed(2)} (génome ${org.ph.size.toFixed(2)}) · Âge ${org.age}</div>`;
+    meta.innerHTML = `<div class="selection-metrics"><span>${tDynamic("app.inspect.energy", { value: org.energy.toFixed(2) })}</span><span>${tDynamic("app.inspect.fitness", { value: org.fitness.toFixed(3) })}</span></div><div class="selection-info">${tDynamic("app.inspect.identity", { lineage: org.lineageId, x: org.x, y: org.y, parent: org.parentId < 0 ? tDynamic("app.inspect.founder") : org.parentId })}</div><div class="selection-info">${tDynamic("app.inspect.body", { mass: (org.mass * 100).toFixed(0), size: bodySize(org).toFixed(2), genome: org.ph.size.toFixed(2), age: org.age })}</div>`;
     if (reason === "refresh") return;
     const decoded = decodeGenome(org.genome);
     const track = toGenomeTrack(decoded);
@@ -632,7 +657,7 @@ export function mount(root: HTMLElement): void {
   cPhy.addEventListener("mousemove", (ev) => {
     const hit = phylogenyHitAt(phyHits, ev.offsetX, ev.offsetY);
     const node = hit ? current().lineages.get(hit.id) : undefined;
-    cPhy.title = node ? `Lignée n° ${node.id} · née au pas ${node.bornTick} · ${node.count} vivants (max ${node.peakCount})` : "";
+    cPhy.title = node ? tDynamic("app.chart.lineageTitle", { id: node.id, born: node.bornTick, count: node.count, peak: node.peakCount }) : "";
     cPhy.style.cursor = hit ? "pointer" : "default";
   });
   cPhy.addEventListener("mouseleave", () => {
@@ -671,7 +696,7 @@ export function mount(root: HTMLElement): void {
   const chartsBtn = root.querySelector<HTMLButtonElement>("#btn-charts")!;
   function setChartsCollapsed(collapsed: boolean): void {
     root.classList.toggle("charts-collapsed", collapsed);
-    chartsBtn.textContent = collapsed ? "Afficher" : "Réduire";
+    chartsBtn.textContent = collapsed ? tDynamic("app.charts.show") : tDynamic("app.charts.hide");
     chartsBtn.setAttribute("aria-expanded", String(!collapsed));
     try { localStorage.setItem("openavida.charts", collapsed ? "0" : "1"); } catch { /* storage unavailable */ }
     layout();
@@ -687,10 +712,10 @@ export function mount(root: HTMLElement): void {
       if (n && n.textContent !== v) n.textContent = v;
     };
     const activeWorld = live === dual.b ? "B" : "A";
-    set("chart-world", `MONDE ${activeWorld} · HISTORIQUE`);
+    set("chart-world", tDynamic("app.charts.world", { world: activeWorld }));
     set("world-size", `${w.w} × ${w.h}`);
-    set("stage-label", state.view === "split" ? `A · ${dual.a.organisms.length} organismes${activeWorld === "A" ? " · sélectionné" : ""}` : `MONDE ${activeWorld}`);
-    set("stage-label-b", `B · ${dual.b.organisms.length} organismes${activeWorld === "B" ? " · sélectionné" : ""}`);
+    set("stage-label", state.view === "split" ? tDynamic("app.stage.side", { side: "A", count: dual.a.organisms.length, selected: activeWorld === "A" ? tDynamic("app.stage.selected") : "" }) : tDynamic("app.stage.world", { world: activeWorld }));
+    set("stage-label-b", tDynamic("app.stage.side", { side: "B", count: dual.b.organisms.length, selected: activeWorld === "B" ? tDynamic("app.stage.selected") : "" }));
     (root.querySelector("#stage-label-b") as HTMLElement).hidden = state.view !== "split";
     (root.querySelector("#empty-world") as HTMLElement).hidden = state.tool !== "place" || state.view === "split" || w.organisms.length > 0;
     set("m-tick", String(w.tick));
@@ -710,7 +735,7 @@ export function mount(root: HTMLElement): void {
       const org = w.organisms.find((o) => o.id === state.selectedId);
       if (!org) {
         selectOrganism(w, -1);
-        root.querySelector("#inspect-meta")!.textContent = "Cet organisme n’est plus vivant. Consultez le journal des décès ci-dessous.";
+        root.querySelector("#inspect-meta")!.textContent = tDynamic("app.inspect.dead");
       }
     }
     refreshTimeline();
@@ -724,7 +749,19 @@ export function mount(root: HTMLElement): void {
       goals.refresh();
       updatePlayback();
       const note = document.getElementById("field-note");
-      if (note) note.textContent = renderer.fieldMode === 5 ? describeExudate(w) : "";
+      if (note) {
+        const stats = renderer.fieldMode === 5 ? describeExudate(w) : null;
+        const parts = !stats
+          ? []
+          : stats.max <= 0
+            ? [tDynamic("render.exudate.empty")]
+            : [
+                tDynamic(stats.producers > 1 ? "render.exudate.producers.many" : "render.exudate.producers.one", { producers: stats.producers }),
+                tDynamic(stats.visible > 1 ? "render.exudate.cells.many" : "render.exudate.cells.one", { visible: stats.visible }),
+                tDynamic("render.exudate.totals", { max: stats.max.toFixed(3), total: stats.total.toFixed(2) }),
+              ];
+        note.textContent = parts.join(" · ");
+      }
       state.lastUi = now;
     }
     const gl = state.surface === "3d" && view3d ? view3d.gl : renderer.gl;
@@ -831,7 +868,7 @@ export function mount(root: HTMLElement): void {
       if (child) {
         dual.active = sidePick;
         selectOrganism(world, child.id, "peek");
-        status(`Organisme placé en (${grid.x}, ${grid.y}).`);
+        status(tDynamic("app.place.done", { x: grid.x, y: grid.y }));
         emitOp({ kind: "place", x: grid.x, y: grid.y, genome: seq });
         paintFeeds();
         refreshMetrics();
@@ -841,7 +878,7 @@ export function mount(root: HTMLElement): void {
           dual.active = sidePick;
           selectOrganism(world, occ.id, "peek");
           refreshMetrics();
-        } else status("Cette cellule est bloquée par un obstacle.");
+        } else status(tDynamic("app.place.blocked"));
       }
       return;
     }
@@ -866,7 +903,7 @@ export function mount(root: HTMLElement): void {
       const f = world.fields.sample(grid.x, grid.y);
       const readout = root.querySelector<HTMLElement>("#cell-readout")!;
       readout.hidden = false;
-      readout.textContent = `(${grid.x}, ${grid.y}) · Nutr. ${f.nutrient.toFixed(2)} · Tox. ${f.toxin.toFixed(2)} · Temp. ${f.temperature.toFixed(2)} · Lum. ${f.light.toFixed(2)} · Exs. ${f.exudate.toFixed(2)}`;
+      readout.textContent = tDynamic("app.readout.cell", { x: grid.x, y: grid.y, nutrient: f.nutrient.toFixed(2), toxin: f.toxin.toFixed(2), temperature: f.temperature.toFixed(2), light: f.light.toFixed(2), exudate: f.exudate.toFixed(2) });
     }
     if (ev.buttons === 0) return;
     const action = pointerAction({
@@ -947,12 +984,12 @@ export function mount(root: HTMLElement): void {
     const paused = state.paused || state.speed <= 0;
     const button = root.querySelector<HTMLElement>("#btn-pause")!;
     if (button.dataset.paused !== String(paused)) {
-      button.innerHTML = `${icon(paused ? "play" : "pause")}<span>${paused ? "Reprendre" : "Pause"}</span>`;
-      button.setAttribute("aria-label", paused ? "Reprendre la simulation" : "Mettre en pause");
+      button.innerHTML = `${icon(paused ? "play" : "pause")}<span>${tDynamic(paused ? "btn.play" : "btn.pause")}</span>`;
+      button.setAttribute("aria-label", paused ? tDynamic("app.playback.resumeAria") : tDynamic("app.playback.pauseAria"));
       button.dataset.paused = String(paused);
     }
     const label = root.querySelector("#run-state")!;
-    const text = !canDriveClock(state.room) ? "Session suivie" : paused ? "En pause" : "En cours";
+    const text = !canDriveClock(state.room) ? tDynamic("app.playback.followed") : paused ? tDynamic("app.playback.paused") : tDynamic("app.playback.running");
     if (label.textContent !== text) label.innerHTML = `<i></i>${text}`;
     label.classList.toggle("paused", paused);
   }
@@ -1001,11 +1038,14 @@ export function mount(root: HTMLElement): void {
     const span = Math.max(1, max - min);
     timelineMarks.innerHTML = ticks.map((t) => `<i style="left:${((t - min) / span) * 100}%"></i>`).join("");
     const shown = state.previewTick ?? viewWorld().tick;
-    timelineLabel.textContent = `pas ${shown} (enregistré toutes les ${every})`;
+    timelineLabel.textContent = tDynamic("app.timeline.label", { tick: shown, every });
     if (meta) {
       const usedMo = meta.used / (1024 * 1024);
       const capMo = meta.budget / (1024 * 1024);
-      timelineBudget.textContent = `${entries.length} instantané${entries.length > 1 ? "s" : ""} · ${usedMo < 0.1 ? `${Math.round(meta.used / 1024)} ko` : `${usedMo.toFixed(1)} Mo`} / ${capMo.toFixed(0)} Mo`;
+      const size = usedMo < 0.1
+        ? tDynamic("app.timeline.kb", { kb: Math.round(meta.used / 1024) })
+        : tDynamic("app.timeline.mb", { mb: usedMo.toFixed(1) });
+      timelineBudget.textContent = tDynamic(entries.length > 1 ? "app.timeline.budget.many" : "app.timeline.budget.one", { count: entries.length, size, cap: capMo.toFixed(0) });
     } else timelineBudget.textContent = "";
   }
   async function previewTick(tick: number): Promise<void> {
@@ -1052,7 +1092,7 @@ export function mount(root: HTMLElement): void {
     const tick = state.previewTick ?? Number(timelineRange.value);
     const snap = state.preview?.snapshot() ?? (await host.snapshotAt(sideOf(current()), tick));
     if (!snap) {
-      status("Aucun instantané à cet endroit.");
+      status(tDynamic("app.timeline.none"));
       return;
     }
     const which = sideOf(current());
@@ -1065,7 +1105,7 @@ export function mount(root: HTMLElement): void {
     updatePlayback();
     paintFeeds();
     refreshMetrics();
-    status(`Monde ${which} repris au pas ${snap.tick}.`);
+    status(tDynamic("app.timeline.resumed", { world: which, tick: snap.tick }));
   });
   const terrainBox = root.querySelector("#opt-terrain input") as HTMLInputElement;
   const disturbBox = root.querySelector("#opt-disturb input") as HTMLInputElement;
@@ -1073,11 +1113,11 @@ export function mount(root: HTMLElement): void {
   disturbBox.checked = dual.a.disturbances;
   terrainBox.addEventListener("change", () => {
     host.apply({ kind: "terrainPreset", on: terrainBox.checked });
-    status(terrainBox.checked ? "Relief aléatoire : sources, obstacles et ombre ajoutés." : "Relief prédéfini retiré.");
+    status(terrainBox.checked ? tDynamic("app.terrain.on") : tDynamic("app.terrain.off"));
   });
   disturbBox.addEventListener("change", () => {
     host.apply({ kind: "disturbances", on: disturbBox.checked });
-    status(disturbBox.checked ? "Perturbations aléatoires activées." : "Perturbations aléatoires désactivées.");
+    status(disturbBox.checked ? tDynamic("app.disturb.on") : tDynamic("app.disturb.off"));
   });
   // Model parameters: the form is generated from PARAM_SPEC (see modelPanel.ts).
   let model: ModelPanel | null = null;
@@ -1097,15 +1137,15 @@ export function mount(root: HTMLElement): void {
   const schedList = root.querySelector<HTMLElement>("#sched-list")!;
   function describeSched(item: ScheduledOp): string {
     const op = item.op;
-    if (op.type === "scale") return `× ${op.k} sur ${FIELD_LABEL[op.field] ?? op.field}`;
+    if (op.type === "scale") return tDynamic("app.schedule.scale", { k: op.k, field: FIELD_LABEL[op.field] ?? op.field });
     if (op.type === "params") {
       const e = Object.entries(op.params)[0];
-      return e ? `${SCHED_PARAM_LABEL[e[0]] ?? e[0]} → ${e[1]}` : "paramètres";
+      return e ? `${SCHED_PARAM_LABEL[e[0]] ?? e[0]} → ${e[1]}` : tDynamic("app.schedule.params");
     }
-    if (op.type === "paint") return `touche ${op.brush} r=${op.radius}`;
-    if (op.type === "inject") return `injecter ${op.count}`;
-    if (op.type === "place") return `placer (${op.x},${op.y})`;
-    if (op.type === "strain") return `souche ${op.name}`;
+    if (op.type === "paint") return tDynamic("app.schedule.paint", { brush: op.brush, radius: op.radius });
+    if (op.type === "inject") return tDynamic("app.schedule.inject", { count: op.count });
+    if (op.type === "place") return tDynamic("app.schedule.place", { x: op.x, y: op.y });
+    if (op.type === "strain") return tDynamic("app.schedule.strain", { name: op.name });
     return op.type;
   }
   let schedListKey = "";
@@ -1115,11 +1155,11 @@ export function mount(root: HTMLElement): void {
     if (key === schedListKey) return;
     schedListKey = key;
     if (!list.length) {
-      schedList.innerHTML = `<p class="muted">Aucune entrée.</p>`;
+      schedList.innerHTML = tDynamic("app.schedule.empty");
       return;
     }
     schedList.innerHTML = list
-      .map((s, i) => `<div class="sched-row"><span class="mono">pas ${s.at}</span><span>${describeSched(s)}</span><button type="button" class="quiet" data-sched-i="${i}" aria-label="Retirer">×</button></div>`)
+      .map((s, i) => `<div class="sched-row"><span class="mono">${tDynamic("app.schedule.step", { tick: s.at })}</span><span>${describeSched(s)}</span><button type="button" class="quiet" data-sched-i="${i}" aria-label="${tDynamic("app.schedule.remove")}">×</button></div>`)
       .join("");
   }
   root.querySelector("#btn-sched-add")!.addEventListener("click", () => {
@@ -1127,7 +1167,7 @@ export function mount(root: HTMLElement): void {
     const [kind, key] = schedAction.value.split(":");
     const arg = Number(schedArg.value);
     if (!kind || !key || !Number.isFinite(arg)) {
-      status("Programme incomplet.");
+      status(tDynamic("app.schedule.incomplete"));
       return;
     }
     const w = current();
@@ -1144,7 +1184,7 @@ export function mount(root: HTMLElement): void {
     schedListKey = "";
     refreshScheduleList();
     drawCharts();
-    status(`Programme : ${describeSched({ at, op })} au pas ${at}.`);
+    status(tDynamic("app.schedule.added", { op: describeSched({ at, op }), tick: at }));
   });
   schedList.addEventListener("click", (ev) => {
     const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-sched-i]");
@@ -1250,12 +1290,12 @@ export function mount(root: HTMLElement): void {
       b.setAttribute("aria-pressed", String(active));
     });
     const legends = [
-      '<i class="dot nutrient"></i>Nutriments <i class="dot toxin"></i>Toxines <i class="dot light"></i>Lumière',
-      'Nutriments <span class="legend-scale nutrient-scale"></span> faible → élevé',
-      'Toxines <span class="legend-scale toxin-scale"></span> faible → élevé',
-      'Température <span class="legend-scale temperature-scale"></span> froid → chaud',
-      'Lumière <span class="legend-scale light-scale"></span> faible → élevée',
-      'Exsudat <span class="legend-scale"></span> faible → élevé',
+      tDynamic("app.legend.all"),
+      tDynamic("app.legend.nutrient"),
+      tDynamic("app.legend.toxin"),
+      tDynamic("app.legend.temperature"),
+      tDynamic("app.legend.light"),
+      tDynamic("app.legend.exudate"),
     ];
     root.querySelector("#field-legend")!.innerHTML = legends[mode]!;
   }
@@ -1270,8 +1310,8 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-snap")!.addEventListener("click", () => {
     state.snapshot = takeSnapshot(current());
     (root.querySelector("#btn-restore") as HTMLButtonElement).disabled = false;
-    root.querySelector("#snapshot-info")!.textContent = `Monde ${dual.active} · pas ${current().tick} · ${current().organisms.length} organismes`;
-    status("État mémorisé. Vous pouvez le restaurer depuis Expérience.");
+    root.querySelector("#snapshot-info")!.textContent = tDynamic("app.snapshot.info", { world: dual.active, tick: current().tick, count: current().organisms.length });
+    status(tDynamic("app.snapshot.saved"));
   });
   root.querySelector("#btn-restore")!.addEventListener("click", () => {
     if (!state.snapshot) {
@@ -1280,12 +1320,12 @@ export function mount(root: HTMLElement): void {
     }
     host.apply({ kind: "restore", which: sideOf(current()), snapshot: state.snapshot });
     selectOrganism(current(), -1);
-    status(`Monde restauré au pas ${current().tick}.`);
+    status(tDynamic("app.snapshot.restored", { tick: current().tick }));
     refreshMetrics();
   });
   root.querySelector("#btn-bottle")!.addEventListener("click", () => {
     const n = host.apply({ kind: "bottleneck", which: sideOf(current()), keep: 0.1 }).count ?? 0;
-    status(`Goulot d’étranglement : ${n} organismes conservés.`);
+    status(tDynamic("app.bottleneck.done", { n }));
     paintFeeds();
     refreshMetrics();
   });
@@ -1296,7 +1336,7 @@ export function mount(root: HTMLElement): void {
     renderer.highlightLineage = -1;
     state.selectedId = -1;
     selectOrganism(current(), -1);
-    status(`Mondes A et B réinitialisés avec la graine ${seed}.`);
+    status(tDynamic("app.reseed.done", { seed }));
     refreshMetrics();
   });
   root.querySelector("#btn-share")!.addEventListener("click", async () => {
@@ -1308,7 +1348,7 @@ export function mount(root: HTMLElement): void {
     })();
     try {
       await navigator.clipboard.writeText(url);
-      status("Lien de configuration copié. Pour partager l’état actuel, exportez le monde.");
+      status(tDynamic("app.share.copied"));
     } catch {
       status(url);
     }
@@ -1326,28 +1366,28 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-manifest")!.addEventListener("click", () => {
     const manifest = goals.manifest();
     if (!manifest) {
-      status("Aucune course à décrire : lancez une expérience ciblée, puis exportez son manifeste.");
+      status(tDynamic("app.manifest.none"));
       return;
     }
     download("openavida-manifest.json", JSON.stringify(manifest, null, 2), "application/json");
-    status(`Manifeste exporté : ${manifest.name} · ${manifest.run.replicates} réplicats · ${manifest.paramsDigest}.`);
+    status(tDynamic("app.manifest.exported", { name: manifest.name, replicates: manifest.run.replicates, digest: manifest.paramsDigest }));
   });
   root.querySelector("#btn-events")!.addEventListener("click", () => {
     const w = current();
     if (w.eventLog.length === 0) {
-      status("Journal d’événements vide : activez « Journal d’événements » puis laissez tourner la simulation.");
+      status(tDynamic("app.eventsExport.empty"));
       return;
     }
     download(`openavida-events-t${w.tick}.jsonl`, exportEventsJSONL(w, provenanceOf(w)), "application/x-ndjson");
-    status(`${w.eventLog.length} événements exportés.`);
+    status(tDynamic("app.eventsExport.done", { count: w.eventLog.length }));
   });
   const eventsBox = root.querySelector("#opt-events input") as HTMLInputElement;
   eventsBox.checked = dual.a.params.recordEvents;
   eventsBox.addEventListener("change", () => {
     host.apply({ kind: "setParams", which: sideOf(current()), params: { recordEvents: eventsBox.checked } });
     status(eventsBox.checked
-      ? "Journal d’événements activé (borné, export JSONL)."
-      : "Journal d’événements désactivé.");
+      ? tDynamic("app.eventsLog.on")
+      : tDynamic("app.eventsLog.off"));
   });
   root.querySelector("#btn-import")!.addEventListener("click", () => {
     (root.querySelector("#import-file") as HTMLInputElement).click();
@@ -1359,10 +1399,10 @@ export function mount(root: HTMLElement): void {
       const text = await file.text();
       host.apply({ kind: "restore", which: sideOf(current()), snapshot: parseJSONSnapshot(text) });
       selectOrganism(current(), -1);
-      status("Monde importé avec succès.");
+      status(tDynamic("app.import.done"));
       refreshMetrics();
     } catch {
-      status("Import impossible : choisissez un fichier JSON exporté depuis OpenAvida.");
+      status(tDynamic("app.import.failed"));
     } finally {
       (ev.target as HTMLInputElement).value = "";
     }
@@ -1371,18 +1411,18 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-edit-selected")!.addEventListener("click", () => {
     const org = current().organisms.find((o) => o.id === state.selectedId);
     if (!org) {
-      status("Cet organisme n’est plus vivant.");
+      status(tDynamic("app.inspect.gone"));
       return;
     }
     loadSeqIntoBuilder(org.genome);
     setTool("place");
     root.querySelector("#dna-editor")!.scrollIntoView({ block: "start", behavior: "smooth" });
-    status(`ADN de l’organisme ${org.id} ouvert dans l’éditeur. Modifiez-le, puis appliquez-le ou placez un nouvel organisme.`);
+    status(tDynamic("app.dna.opened", { id: org.id }));
   });
   root.querySelector("#btn-explorer")!.addEventListener("click", () => explorer.open({ tab: "organisms" }));
   root.querySelector("#btn-ancestry")!.addEventListener("click", () => {
     if (state.selectedId >= 0) explorer.open({ organismId: state.selectedId });
-    else status("Sélectionnez d’abord un organisme.");
+    else status(tDynamic("app.inspect.selectFirst"));
   });
   root.querySelector("#event-log")!.addEventListener("click", (ev) => {
     const row = (ev.target as HTMLElement).closest<HTMLElement>(".event-row");
@@ -1403,7 +1443,7 @@ export function mount(root: HTMLElement): void {
       if (org) {
         loadSeqIntoBuilder(org.genome);
         setTool("place");
-        status(`ADN de l’organisme ${id} chargé dans l’éditeur.`);
+        status(tDynamic("app.dna.loaded", { id }));
       }
       return;
     }
@@ -1420,14 +1460,14 @@ export function mount(root: HTMLElement): void {
     if (!seq) return;
     loadSeqIntoBuilder(seq);
     setTool("place");
-    status("ADN chargé : modifiez-le ou placez un nouvel organisme.");
+    status(tDynamic("app.dna.loadedGeneric"));
   });
   root.querySelector("#btn-start")!.addEventListener("click", () => (root.querySelector("#btn-inject") as HTMLButtonElement).click());
   root.querySelector("#btn-inject")!.addEventListener("click", () => {
     const seq = dna.sequence || founderHeterotroph();
     tagStrain(current(), seq);
     const n = host.apply({ kind: "inject", which: sideOf(current()), genome: seq, count: 24 }).count ?? 0;
-    status(`${n} organismes ajoutés au monde ${dual.active}.`);
+    status(tDynamic("app.inject.added", { n, world: dual.active }));
     paintFeeds();
     refreshMetrics();
   });
@@ -1543,7 +1583,7 @@ export function mount(root: HTMLElement): void {
     const t = performance.now();
     if (t - lastLoopError < 1000) return;
     lastLoopError = t;
-    status(`Erreur d’exécution : ${err instanceof Error ? err.message : String(err)}`);
+    status(tDynamic("app.error.runtime", { message: err instanceof Error ? err.message : String(err) }));
     console.error(err);
   };
   const frameBody = (now: number): void => {

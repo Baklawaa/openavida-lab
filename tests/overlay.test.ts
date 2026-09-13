@@ -38,9 +38,15 @@ describe("overlay rendering helpers", () => {
     expect(overlayByte(0.5)).toBeLessThan(overlayByte(0.9));
   });
 
-  it("describes an empty and a populated exudate layer", () => {
+  it("measures an empty and a populated exudate layer", () => {
+    // Structured on purpose: the sentence is composed by the caller's locale
+    // catalog, so the plate note can be translated without touching the renderer.
     const empty = new World({ width: 12, height: 12, startPopulation: 0, seed: 3 });
-    expect(describeExudate(empty)).toContain("aucun exsudat");
+    const none = describeExudate(empty);
+    expect(none.max).toBe(0);
+    expect(none.producers).toBe(0);
+    expect(none.total).toBe(0);
+    expect(none.visible).toBe(0);
 
     const w = new World({ width: 12, height: 12, startPopulation: 0, seed: 3 });
     w.fields.nutrient.fill(0);
@@ -50,9 +56,12 @@ describe("overlay rendering helpers", () => {
     producer.ph.photo = 2.2;
     producer.ph.signal = 0;
     for (let i = 0; i < 12; i++) w.step();
-    const text = describeExudate(w);
-    expect(text).toContain("producteur");
-    expect(text).toContain("max");
+    const stats = describeExudate(w);
+    expect(stats.max).toBeGreaterThan(0);
+    expect(stats.producers).toBeGreaterThan(0);
+    expect(stats.visible).toBeGreaterThan(0);
+    expect(stats.visible).toBeLessThanOrEqual(w.w * w.h);
+    expect(stats.total).toBeGreaterThan(0);
     expect(w.fields.exudate.reduce((s, v) => s + v, 0)).toBeGreaterThan(0);
   });
 

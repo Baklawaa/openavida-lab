@@ -15,27 +15,15 @@ import { BUCKETS, dumpUiText, scriptedState } from "./ui-text.mjs";
 const base = (process.argv[2] || "http://127.0.0.1:5174/").replace(/\?.*$/, "");
 const FRENCH = /[àâçéèêëîïôûùüÿœÀÂÇÉÈÊËÎÏÔÛÙŒ]/;
 /**
- * Panels whose copy still lives outside the catalog while the migration runs.
- * The list must be empty when the stage closes: an entry that has become
- * bilingual is reported as stale, so it cannot be forgotten.
+ * Panels whose copy still lives outside the catalog while a migration chunk is
+ * in flight. Empty now that every panel renders from src/ui/i18n: an entry that
+ * has become bilingual is reported as stale, so the list cannot stay behind.
  */
-const PENDING_BUCKETS = [
-  "playback",
-  "charts",
-  "panel.organisms",
-  "panel.environment",
-  "panel.analysis",
-  "panel.experiment",
-  "panel.species",
-  "footer",
-];
+const PENDING_BUCKETS = [];
 /** The picker names each language in its own language, in every locale. */
 const LANGUAGE_NAMES = /Français/g;
-/**
- * True while some `data-help` text is still generated in French outside the
- * catalog (the DNA editor's codon tiles until chunk 8.3).
- */
-const PENDING_HELP = true;
+/** Every `data-help` text now comes from the catalog, in both locales. */
+const PENDING_HELP = false;
 
 const browser = await chromium.launch({ headless: true, channel: "chrome" });
 

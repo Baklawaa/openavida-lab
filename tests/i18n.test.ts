@@ -27,28 +27,13 @@ import {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Files that still carry French copy, removed one migration chunk at a time. */
-const PENDING_MIGRATION: readonly string[] = [
-  "src/app.ts",
-  "src/render/charts.ts",
-  "src/render/genomeBrowser.ts",
-  "src/render/lineageTreeCanvas.ts",
-  "src/render/overlay.ts",
-  "src/sim/catalog.ts",
-  "src/sim/dnaEdit.ts",
-  "src/sim/events.ts",
-  "src/sim/tournament.ts",
-  "src/sim/world.ts",
-  "src/ui/dnaEditor.ts",
-  "src/ui/explorer.ts",
-  "src/ui/experimentHistory.ts",
-  "src/ui/goalPanel.ts",
-  "src/ui/modelPanel.ts",
-  "src/ui/presetStore.ts",
-  "src/ui/report.ts",
-  "src/ui/researchCard.ts",
-  "src/ui/speciesPanel.ts",
-];
+/**
+ * Files that still carry French copy. The list is now empty: every
+ * user-visible French string of the interface lives in src/ui/i18n/fr.*.ts.
+ * It stays as the mechanism that keeps the rule enforceable — an entry whose
+ * file has become clean fails the test, so the list cannot be left stale.
+ */
+const PENDING_MIGRATION: readonly string[] = [];
 
 /** French words that carry no accent, so the accent scan alone would miss them. */
 const FRENCH_WORDS =
@@ -125,33 +110,29 @@ describe("message catalogs", () => {
     }
   });
 
-  it("keeps the two locales apart, except for names and symbols", () => {
+  it("keeps the two locales apart, except for names, symbols and cognates", () => {
     const identical = (Object.keys(FR) as Array<keyof typeof FR>).filter((key) => FR[key] === EN[key]);
-    // The same word in both languages, or a proper noun: these are translated,
-    // they simply happen to be identical.
-    const allowed = new Set([
-      "shell.lang.fr",
-      "shell.lang.en",
-      "main.aria",
-      "metric.population",
-      "metric.fitness",
-      "chart.fitness",
-      "btn.pause",
-      "sched.action.aria",
-      "diag.fixation",
-      "diag.extinctions",
-      "guide.eyebrow",
-      "trait.fecundity.label",
-      "param.diffusionRate.label",
-      "unit.aggression",
-      "unit.concentration",
-      "unit.fraction",
-    ]);
-    // Trait abbreviations are symbols and the kit summaries name trait ids, so
-    // some of them coincide across locales by design.
-    const allowedShape = /^(trait\.[a-z]+\.abbr|kit\.[a-z]+\.short)$/;
+    /**
+     * Messages that are translated but happen to read the same in both
+     * languages: proper nouns, notation, three-letter symbols, and the words
+     * French borrows from English ("fitness", "parent", "variable", …). Each
+     * shape carries its reason, so a genuinely forgotten translation cannot
+     * hide in here.
+     */
+    const allowed: ReadonlyArray<{ shape: RegExp; why: string }> = [
+      { shape: /^shell\.lang\.(fr|en)$/, why: "each language is named in its own language" },
+      { shape: /^trait\.[a-z]+\.abbr$/, why: "three-letter trait symbols" },
+      { shape: /^kit\.[a-z]+\.short$/, why: "kit summaries name trait ids" },
+      { shape: /^unit\.(aggression|concentration|fraction)$/, why: "same unit word" },
+      { shape: /^param\.diffusionRate\.label$/, why: "diffusion" },
+      { shape: /^trait\.fecundity\.label$/, why: "reproduction" },
+      { shape: /^explorer\.(filter\.fitness|table\.col\.fitness|detail\.(fitness|parent|position)|lineage\.(parent|col\.parent|signature|sort\.extinct)|saved\.(col\.fitness|simulation))$/, why: "fitness, parent, position, signature, simulation, extinction" },
+      { shape: /^goal\.(goal\.population|metric\.(population|group\.population|group\.trait|trait\.max|condition)|preset\.tag|recipe\.(ops|action)\.(one|many)|block\.tag|progress\.dead|summary\.(iqr|range|extinctions)|table\.pop|history\.note|sweep\.(variable|points|table\.range|table\.extinctions))$/, why: "population, traits, condition, action, min–max, extinctions" },
+      { shape: /^(main\.aria|metric\.(population|fitness)|chart\.fitness|btn\.pause|sched\.action\.aria|diag\.(fixation|extinctions)|guide\.eyebrow)$/, why: "simulation, population, fitness, pause, action, fixation" },
+    ];
     for (const key of identical) {
-      expect(allowed.has(key) || allowedShape.test(key), `${key} is untranslated`).toBe(true);
+      const hit = allowed.find((rule) => rule.shape.test(key));
+      expect(hit, `${key} ("${FR[key]}") is untranslated`).toBeDefined();
     }
   });
 

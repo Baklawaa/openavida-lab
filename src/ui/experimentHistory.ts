@@ -9,6 +9,7 @@ import {
   type TrialResult,
   type TrialSummary,
 } from "../sim/index";
+import { tDynamic } from "./i18n/runtime";
 
 /** Replicates kept per record (the summary keeps the full statistics). */
 export const HISTORY_RESULTS_CAP = 200;
@@ -82,7 +83,7 @@ export function sampleCurves(results: readonly TrialResult[], max = HISTORY_CURV
 
 export function engineDrift(record: EngineInfo, current: EngineInfo): string | null {
   if (record.version === current.version && record.revision === current.revision) return null;
-  return `moteur ${record.version} (rév. ${record.revision}) ≠ courant ${current.version} (rév. ${current.revision})`;
+  return tDynamic("render.history.engineMismatch", { version: record.version, revision: record.revision, currentVersion: current.version, currentRevision: current.revision });
 }
 
 export function recordFromRun(init: {

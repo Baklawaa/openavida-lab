@@ -42,6 +42,7 @@ import {
 import type { LineageNode } from "../sim/types";
 import { LineageTreeView } from "../render/lineageTreeCanvas";
 import { layoutLineageTree, lineageStrainMap, type TreeNode } from "../render/lineageTreeLayout";
+import { tDynamic } from "./i18n/runtime";
 import { DEATH_LABEL, DEATH_SHORT, STRATEGY_LABEL, TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
 import type { PresetStore, SavedOrganism, SavedOrganismMeta } from "./presetStore";
@@ -81,77 +82,84 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 }
 
+/** Sort preset label: the sim returns ids (`trait:<trait>` for the trait presets). */
+function sortLabel(sort: CatalogSort): string {
+  return sort.startsWith("trait:")
+    ? tDynamic("sim.sort.trait", { trait: sort.slice(6) })
+    : tDynamic(`sim.sort.${sort}`);
+}
+
 function template(): string {
-  const sorts = CATALOG_SORTS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("");
+  const sorts = CATALOG_SORTS.map((s) => `<option value="${s.id}">${sortLabel(s.id)}</option>`).join("");
   const traits = TRAIT_NAMES.filter((t) => t !== "hue").map((t) => `<option value="${t}">${TRAIT_LABEL[t]}</option>`).join("");
   const causes = (Object.keys(DEATH_LABEL) as DeathCause[]).map((c) => `<option value="${c}">${DEATH_LABEL[c]}</option>`).join("");
   const strategies = STRATEGIES.map((s) => `<option value="${s}">${STRATEGY_LABEL[s]}</option>`).join("");
   return `
     <div class="explorer">
       <header class="explorer-head">
-        <h2>${icon("inspect")} Explorateur</h2><span id="ex-world" class="tag"></span>
+        <h2>${icon("inspect")} ${tDynamic("explorer.heading.title")}</h2><span id="ex-world" class="tag"></span>
         <div class="segmented ex-tabs" role="tablist">
-          <button type="button" data-etab="organisms" class="active" role="tab" aria-selected="true">Organismes</button>
-          <button type="button" data-etab="lineages" role="tab" aria-selected="false">Lignées</button>
-          <button type="button" data-etab="tree" role="tab" aria-selected="false">Arbre</button>
-          <button type="button" data-etab="saved" role="tab" aria-selected="false">Enregistrés</button>
+          <button type="button" data-etab="organisms" class="active" role="tab" aria-selected="true">${tDynamic("explorer.tab.organisms")}</button>
+          <button type="button" data-etab="lineages" role="tab" aria-selected="false">${tDynamic("explorer.tab.lineages")}</button>
+          <button type="button" data-etab="tree" role="tab" aria-selected="false">${tDynamic("explorer.tab.tree")}</button>
+          <button type="button" data-etab="saved" role="tab" aria-selected="false">${tDynamic("explorer.tab.saved")}</button>
         </div>
         <span class="spacer"></span>
-        <button type="button" id="ex-refresh" class="quiet" title="Relire le monde">${icon("revert")}<span>Actualiser</span></button>
-        <button type="button" id="ex-close" class="quiet" aria-label="Fermer l’explorateur">${icon("plus")}<span>Fermer</span></button>
+        <button type="button" id="ex-refresh" class="quiet" title="${tDynamic("explorer.refresh.title")}">${icon("revert")}<span>${tDynamic("explorer.refresh")}</span></button>
+        <button type="button" id="ex-close" class="quiet" aria-label="${tDynamic("explorer.close.aria")}">${icon("plus")}<span>${tDynamic("explorer.close")}</span></button>
       </header>
 
       <div class="explorer-body" id="ex-tab-organisms">
         <aside class="explorer-filters">
-          <label class="ex-field">Recherche<input id="ex-text" type="text" placeholder="n° 42 · l12 (lignée) · s2 (souche)" spellcheck="false"></label>
+          <label class="ex-field">${tDynamic("explorer.filter.search")}<input id="ex-text" type="text" placeholder="${tDynamic("explorer.filter.search.placeholder")}" spellcheck="false"></label>
           <div class="ex-grid">
-            <label class="ex-field">État<select id="ex-liveness"><option value="all">Tous</option><option value="alive">Vivants</option><option value="dead">Morts</option></select></label>
-            <label class="ex-field">Regrouper<select id="ex-group"><option value="strain">Souche</option><option value="strategy">Stratégie</option><option value="lineage">Lignée</option><option value="none">Aucun</option></select></label>
-            <label class="ex-field">Souche<select id="ex-strain"><option value="">Toutes</option></select></label>
-            <label class="ex-field">Stratégie<select id="ex-strategy"><option value="">Toutes</option>${strategies}</select></label>
-            <label class="ex-field">Lignée n°<input id="ex-lineage" type="number" min="1" step="1" placeholder="toutes"></label>
-            <label class="ex-field">Cause du décès<select id="ex-cause"><option value="">Toutes</option>${causes}</select></label>
-            <label class="ex-field">Âge min<input id="ex-age-min" type="number" min="0" step="1"></label>
-            <label class="ex-field">Âge max<input id="ex-age-max" type="number" min="0" step="1"></label>
-            <label class="ex-field">Tués ≥<input id="ex-kills" type="number" min="0" step="1"></label>
-            <label class="ex-field">Descendants ≥<input id="ex-births" type="number" min="0" step="1"></label>
-            <label class="ex-field">Fitness ≥<input id="ex-fitness" type="number" step="0.05"></label>
-            <label class="ex-field">Génome contient<input id="ex-genome" type="text" placeholder="ACGT…" spellcheck="false"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.state")}<select id="ex-liveness"><option value="all">${tDynamic("explorer.filter.liveness.all")}</option><option value="alive">${tDynamic("explorer.filter.liveness.alive")}</option><option value="dead">${tDynamic("explorer.filter.liveness.dead")}</option></select></label>
+            <label class="ex-field">${tDynamic("explorer.filter.group")}<select id="ex-group"><option value="strain">${tDynamic("explorer.filter.group.strain")}</option><option value="strategy">${tDynamic("explorer.filter.group.strategy")}</option><option value="lineage">${tDynamic("explorer.filter.group.lineage")}</option><option value="none">${tDynamic("explorer.filter.group.none")}</option></select></label>
+            <label class="ex-field">${tDynamic("explorer.filter.strain")}<select id="ex-strain"><option value="">${tDynamic("explorer.filter.all")}</option></select></label>
+            <label class="ex-field">${tDynamic("explorer.filter.strategy")}<select id="ex-strategy"><option value="">${tDynamic("explorer.filter.all")}</option>${strategies}</select></label>
+            <label class="ex-field">${tDynamic("explorer.filter.lineage")}<input id="ex-lineage" type="number" min="1" step="1" placeholder="${tDynamic("explorer.filter.lineage.placeholder")}"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.cause")}<select id="ex-cause"><option value="">${tDynamic("explorer.filter.all")}</option>${causes}</select></label>
+            <label class="ex-field">${tDynamic("explorer.filter.ageMin")}<input id="ex-age-min" type="number" min="0" step="1"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.ageMax")}<input id="ex-age-max" type="number" min="0" step="1"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.kills")}<input id="ex-kills" type="number" min="0" step="1"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.births")}<input id="ex-births" type="number" min="0" step="1"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.fitness")}<input id="ex-fitness" type="number" step="0.05"></label>
+            <label class="ex-field">${tDynamic("explorer.filter.genome")}<input id="ex-genome" type="text" placeholder="ACGT…" spellcheck="false"></label>
           </div>
-          <label class="ex-field">Trait ≥ valeur<div class="row ex-trait"><select id="ex-trait"><option value="">Aucun</option>${traits}</select><input id="ex-trait-min" type="number" step="0.05" value="0.5"></div></label>
-          <label class="ex-field">Tri<select id="ex-sort">${sorts}</select></label>
-          <div class="row"><button type="button" id="ex-reset" class="quiet">Réinitialiser les filtres</button></div>
-          <div class="ex-records"><span class="eyebrow">RECORDS DU MONDE</span><div id="ex-records"></div></div>
+          <label class="ex-field">${tDynamic("explorer.filter.trait")}<div class="row ex-trait"><select id="ex-trait"><option value="">${tDynamic("explorer.filter.trait.none")}</option>${traits}</select><input id="ex-trait-min" type="number" step="0.05" value="0.5"></div></label>
+          <label class="ex-field">${tDynamic("explorer.filter.sort")}<select id="ex-sort">${sorts}</select></label>
+          <div class="row"><button type="button" id="ex-reset" class="quiet">${tDynamic("explorer.filter.reset")}</button></div>
+          <div class="ex-records"><span class="eyebrow">${tDynamic("explorer.record.heading")}</span><div id="ex-records"></div></div>
         </aside>
         <section class="explorer-list">
           <div class="ex-count" id="ex-count"></div>
           <div id="ex-groups" class="ex-groups"></div>
         </section>
-        <aside class="explorer-detail" id="ex-detail"><p class="muted">Cliquez sur un organisme.</p></aside>
+        <aside class="explorer-detail" id="ex-detail"><p class="muted">${tDynamic("explorer.empty.organism")}</p></aside>
       </div>
 
       <div class="explorer-body explorer-body-2" id="ex-tab-lineages" hidden>
         <section class="explorer-list">
-          <div class="ex-count"><label class="tiny" for="ex-lin-sort">Trier</label> <select id="ex-lin-sort"><option value="count">Effectif vivant</option><option value="peak">Effectif maximal</option><option value="born">Apparition</option><option value="extinct">Extinction</option><option value="subtree">Descendance vivante</option></select> <label class="ex-inline"><input id="ex-lin-alive" type="checkbox"> vivantes seulement</label><span id="ex-lin-count" class="tiny"></span></div>
+          <div class="ex-count"><label class="tiny" for="ex-lin-sort">${tDynamic("explorer.lineage.sort")}</label> <select id="ex-lin-sort"><option value="count">${tDynamic("explorer.lineage.sort.count")}</option><option value="peak">${tDynamic("explorer.lineage.sort.peak")}</option><option value="born">${tDynamic("explorer.lineage.sort.born")}</option><option value="extinct">${tDynamic("explorer.lineage.sort.extinct")}</option><option value="subtree">${tDynamic("explorer.lineage.sort.subtree")}</option></select> <label class="ex-inline"><input id="ex-lin-alive" type="checkbox"> ${tDynamic("explorer.lineage.aliveOnly")}</label><span id="ex-lin-count" class="tiny"></span></div>
           <div id="ex-lineages" class="ex-groups"></div>
         </section>
-        <aside class="explorer-detail" id="ex-lin-detail"><p class="muted">Cliquez sur une lignée, ici ou dans l’arbre des lignées.</p></aside>
+        <aside class="explorer-detail" id="ex-lin-detail"><p class="muted">${tDynamic("explorer.empty.lineage")}</p></aside>
       </div>
 
       <div class="explorer-body explorer-body-tree" id="ex-tab-tree" hidden>
         <section class="explorer-tree">
           <div class="ex-tree-bar">
-            <button type="button" id="ex-tree-fit" class="quiet">Ajuster</button>
-            <button type="button" id="ex-tree-zoom" class="quiet">Zoom sur le foyer</button>
-            <label class="ex-inline"><input id="ex-tree-siblings" type="checkbox" checked> lignées sœurs</label>
-            <label class="ex-inline">Éteintes <select id="ex-tree-extinct"><option value="all">toutes</option><option value="200">récentes (200 pas)</option><option value="0">masquées</option></select></label>
-            <label class="ex-inline">Descendance <select id="ex-tree-budget"><option value="150">150</option><option value="400" selected>400</option><option value="1500">1500</option></select></label>
+            <button type="button" id="ex-tree-fit" class="quiet">${tDynamic("explorer.tree.fit")}</button>
+            <button type="button" id="ex-tree-zoom" class="quiet">${tDynamic("explorer.tree.zoomFocus")}</button>
+            <label class="ex-inline"><input id="ex-tree-siblings" type="checkbox" checked> ${tDynamic("explorer.tree.siblings")}</label>
+            <label class="ex-inline">${tDynamic("explorer.tree.extinct")} <select id="ex-tree-extinct"><option value="all">${tDynamic("explorer.tree.extinct.all")}</option><option value="200">${tDynamic("explorer.tree.extinct.recent")}</option><option value="0">${tDynamic("explorer.tree.extinct.hidden")}</option></select></label>
+            <label class="ex-inline">${tDynamic("explorer.tree.descendants")} <select id="ex-tree-budget"><option value="150">150</option><option value="400" selected>400</option><option value="1500">1500</option></select></label>
             <span id="ex-tree-note" class="tiny"></span>
-            <span class="ex-tree-legend"><i class="dot" style="background:#e6f1e9"></i>trajet fondateur → foyer <i class="dot" style="background:#eac789"></i>mutation à effet <i class="dot faded"></i>éteinte</span>
+            <span class="ex-tree-legend"><i class="dot" style="background:#e6f1e9"></i>${tDynamic("explorer.tree.legend.path")} <i class="dot" style="background:#eac789"></i>${tDynamic("explorer.tree.legend.change")} <i class="dot faded"></i>${tDynamic("explorer.tree.legend.extinct")}</span>
           </div>
-          <div class="ex-tree-wrap"><canvas id="ex-tree-canvas" role="img" aria-label="Arbre des lignées autour de la lignée choisie"></canvas></div>
+          <div class="ex-tree-wrap"><canvas id="ex-tree-canvas" role="img" aria-label="${tDynamic("explorer.tree.canvas.aria")}"></canvas></div>
         </section>
-        <aside class="explorer-detail" id="ex-tree-detail"><p class="muted">Cliquez sur une lignée de l’arbre. Double-clic : recentrer l’arbre sur elle.</p></aside>
+        <aside class="explorer-detail" id="ex-tree-detail"><p class="muted">${tDynamic("explorer.empty.tree")}</p></aside>
       </div>
 
       <div class="explorer-body explorer-body-2" id="ex-tab-saved" hidden>
@@ -159,7 +167,7 @@ function template(): string {
           <div class="ex-count" id="ex-saved-count"></div>
           <div id="ex-saved" class="ex-groups"></div>
         </section>
-        <aside class="explorer-detail" id="ex-saved-detail"><p class="muted">Sélectionnez un organisme enregistré.</p></aside>
+        <aside class="explorer-detail" id="ex-saved-detail"><p class="muted">${tDynamic("explorer.empty.saved")}</p></aside>
       </div>
     </div>`;
 }
@@ -224,10 +232,10 @@ export class Explorer {
   private reload(): void {
     const w = this.opts.world();
     this.entries = buildCatalog(w);
-    this.q("#ex-world").textContent = `MONDE ${this.opts.worldSide()} · PAS ${w.tick} · ${w.organisms.length} VIVANTS · ${w.deaths.length} MORTS`;
+    this.q("#ex-world").textContent = tDynamic("explorer.heading.world", { world: this.opts.worldSide(), tick: w.tick, alive: w.organisms.length, dead: w.deaths.length });
     const strainSel = this.q<HTMLSelectElement>("#ex-strain");
     const prev = strainSel.value;
-    strainSel.innerHTML = `<option value="">Toutes</option>` + [...w.strains.values()].map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+    strainSel.innerHTML = `<option value="">${tDynamic("explorer.filter.all")}</option>` + [...w.strains.values()].map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
     strainSel.value = [...strainSel.options].some((o) => o.value === prev) ? prev : "";
     this.renderList();
     this.renderRecords();
@@ -292,24 +300,28 @@ export class Explorer {
     this.shown = sortCatalog(applyFilter(this.entries, filter), sort);
     const w = this.opts.world();
     const groups = groupCatalog(this.shown, mode);
-    this.q("#ex-count").textContent = `${this.shown.length} organisme${this.shown.length > 1 ? "s" : ""} sur ${this.entries.length} · ${groups.length} groupe${groups.length > 1 ? "s" : ""}`;
+    this.q("#ex-count").textContent = tDynamic(this.shown.length > 1 ? "explorer.table.count.many" : "explorer.table.count.one", {
+      shown: this.shown.length,
+      total: this.entries.length,
+      groups: tDynamic(groups.length > 1 ? "explorer.table.groups.many" : "explorer.table.groups.one", { count: groups.length }),
+    });
     let budget = MAX_ROWS_TOTAL;
     const html = groups.map((g) => {
-      const label = mode === "strain" ? (w.strains.get(Number(g.key))?.name ?? "Sans étiquette") : mode === "strategy" ? STRATEGY_LABEL[g.key as Strategy] : mode === "lineage" ? `Lignée ${g.key}` : "Tous";
+      const label = mode === "strain" ? (w.strains.get(Number(g.key))?.name ?? tDynamic("explorer.table.noStrain")) : mode === "strategy" ? STRATEGY_LABEL[g.key as Strategy] : mode === "lineage" ? tDynamic("explorer.table.lineageGroup", { id: g.key }) : tDynamic("explorer.table.all");
       const color = mode === "strain" ? (w.strains.get(Number(g.key))?.color ?? "#8aa0b5") : mode === "strategy" ? STRATEGY_COLOR[g.key as Strategy] : "#8aa0b5";
       const expanded = this.expandedGroups.has(g.key);
       const cap = expanded ? Math.min(g.entries.length, budget) : Math.min(MAX_ROWS_PER_GROUP, g.entries.length, budget);
       budget -= cap;
       const rows = g.entries.slice(0, cap).map((e) => this.rowHtml(e)).join("");
-      const more = g.entries.length > cap ? `<button type="button" class="quiet ex-more" data-group="${esc(g.key)}">${expanded ? "Limite d’affichage atteinte" : `Afficher les ${g.entries.length - cap} autres`}</button>` : "";
-      return `<section class="ex-group"><header class="ex-group-head"><i class="swatch" style="background:${color}"></i><b>${esc(label)}</b><span class="tiny">${g.entries.length} · ${g.alive} vivant${g.alive > 1 ? "s" : ""} · fitness moy. ${fmt(g.meanFitness)}</span></header>
-        <table class="ex-table"><thead><tr><th>N°</th><th>État</th><th class="num">Âge</th><th class="num">Fitness</th><th class="num">Énergie</th><th class="num">Tués</th><th class="num">Desc.</th><th class="num">Corp.</th><th>Lignée</th></tr></thead><tbody>${rows}</tbody></table>${more}</section>`;
+      const more = g.entries.length > cap ? `<button type="button" class="quiet ex-more" data-group="${esc(g.key)}">${expanded ? tDynamic("explorer.table.limit") : tDynamic("explorer.table.more", { count: g.entries.length - cap })}</button>` : "";
+      return `<section class="ex-group"><header class="ex-group-head"><i class="swatch" style="background:${color}"></i><b>${esc(label)}</b><span class="tiny">${tDynamic(g.alive > 1 ? "explorer.table.groupStat.many" : "explorer.table.groupStat.one", { total: g.entries.length, alive: g.alive, fitness: fmt(g.meanFitness) })}</span></header>
+        <table class="ex-table"><thead><tr><th>${tDynamic("explorer.table.col.id")}</th><th>${tDynamic("explorer.table.col.state")}</th><th class="num">${tDynamic("explorer.table.col.age")}</th><th class="num">${tDynamic("explorer.table.col.fitness")}</th><th class="num">${tDynamic("explorer.table.col.energy")}</th><th class="num">${tDynamic("explorer.table.col.kills")}</th><th class="num">${tDynamic("explorer.table.col.births")}</th><th class="num">${tDynamic("explorer.table.col.mass")}</th><th>${tDynamic("explorer.table.col.lineage")}</th></tr></thead><tbody>${rows}</tbody></table>${more}</section>`;
     });
-    this.q("#ex-groups").innerHTML = html.join("") || `<p class="muted">Aucun organisme ne correspond aux filtres.</p>`;
+    this.q("#ex-groups").innerHTML = html.join("") || `<p class="muted">${tDynamic("explorer.empty.list")}</p>`;
   }
 
   private rowHtml(e: CatalogEntry): string {
-    const state = e.alive ? `<span class="hit">vivant</span>` : `<span class="dead" title="${esc(DEATH_LABEL[e.cause!])} au pas ${e.deathTick}">${esc(DEATH_SHORT[e.cause!] ?? e.cause!)}</span>`;
+    const state = e.alive ? `<span class="hit">${tDynamic("explorer.table.state.alive")}</span>` : `<span class="dead" title="${tDynamic("explorer.table.state.death", { cause: esc(DEATH_LABEL[e.cause!]), tick: String(e.deathTick) })}">${esc(DEATH_SHORT[e.cause!] ?? e.cause!)}</span>`;
     const sel = this.selected?.id === e.id && this.selected.alive === e.alive ? " selected" : "";
     return `<tr class="ex-row${sel}" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}"><td class="mono">${e.id}</td><td>${state}</td><td class="mono num">${e.age}</td><td class="mono num">${fmt(e.fitness)}</td><td class="mono num">${e.energy === null ? "—" : fmt(e.energy, 2)}</td><td class="mono num">${e.kills}</td><td class="mono num">${e.births}</td><td class="mono num">${fmt(e.mass, 2)}</td><td class="mono">${e.lineageId}</td></tr>`;
   }
@@ -317,8 +329,8 @@ export class Explorer {
   private renderRecords(): void {
     const recs = catalogRecords(this.entries).slice(0, 12);
     this.q("#ex-records").innerHTML = recs
-      .map((r) => `<button type="button" class="ex-record" data-id="${r.entry.id}" data-alive="${r.entry.alive ? 1 : 0}"><span>${esc(r.label)}</span><b class="mono">n° ${r.entry.id}</b></button>`)
-      .join("") || `<p class="muted">Aucun organisme.</p>`;
+      .map((r) => `<button type="button" class="ex-record" data-id="${r.entry.id}" data-alive="${r.entry.alive ? 1 : 0}"><span>${esc(sortLabel(r.sort))}</span><b class="mono">${tDynamic("explorer.record.id", { id: r.entry.id })}</b></button>`)
+      .join("") || `<p class="muted">${tDynamic("explorer.empty.records")}</p>`;
   }
 
   private findEntry(id: number, alive: boolean): CatalogEntry | undefined {
@@ -339,7 +351,7 @@ export class Explorer {
     if (savedId) {
       const rec = await this.opts.store.loadOrganism(savedId);
       if (!rec) {
-        this.opts.status("Organisme enregistré introuvable.");
+        this.opts.status(tDynamic("explorer.compare.missingSaved"));
         return;
       }
       this.runCompare(rec.entry.genome, rec.name);
@@ -349,20 +361,20 @@ export class Explorer {
     if (Number.isInteger(id) && id > 0) {
       const e = this.entries.find((x) => x.id === id);
       if (!e) {
-        this.opts.status(`Organisme n° ${id} absent du catalogue.`);
+        this.opts.status(tDynamic("explorer.compare.missingOrganism", { id }));
         return;
       }
-      this.runCompare(e.genome, `organisme n° ${e.id}`);
+      this.runCompare(e.genome, tDynamic("explorer.compare.organismLabel", { id: e.id }));
       return;
     }
-    this.opts.status("Indiquez un n° d’organisme, un enregistrement, ou l’organisme sélectionné sur la plaque.");
+    this.opts.status(tDynamic("explorer.compare.hint"));
   }
 
   private runCompare(second: string, secondLabel: string): void {
     const first = this.selected;
     if (!first) return;
     const al = alignSequences(first.genome, second);
-    this.compare = { first: first.genome, second, firstLabel: `organisme n° ${first.id}`, secondLabel };
+    this.compare = { first: first.genome, second, firstLabel: tDynamic("explorer.compare.organismLabel", { id: first.id }), secondLabel };
     const host = this.dialog.querySelector("#ex-align");
     if (!host) return;
     let rowA = "";
@@ -376,13 +388,13 @@ export class Explorer {
     }
     host.innerHTML = `<div class="align-block">
       <div class="tiny">${esc(this.compare.firstLabel)}</div>
-      <div class="align-strip" aria-label="Séquence de référence">${rowA}</div>
+      <div class="align-strip" aria-label="${tDynamic("explorer.compare.ref.aria")}">${rowA}</div>
       <div class="tiny">${esc(secondLabel)}</div>
-      <div class="align-strip" aria-label="Séquence comparée">${rowB}</div>
-      <p class="micro">${al.matches} identités · ${al.mismatches} substitutions · ${al.gaps} gaps · score ${al.score}</p>
-      <button type="button" data-act="compare-load">Charger la comparaison</button>
+      <div class="align-strip" aria-label="${tDynamic("explorer.compare.cmp.aria")}">${rowB}</div>
+      <p class="micro">${tDynamic("explorer.compare.stats", { matches: al.matches, mismatches: al.mismatches, gaps: al.gaps, score: al.score })}</p>
+      <button type="button" data-act="compare-load">${tDynamic("explorer.compare.load")}</button>
     </div>`;
-    this.opts.status(`Alignement : ${al.matches} identités, ${al.mismatches} substitutions, ${al.gaps} gaps.`);
+    this.opts.status(tDynamic("explorer.compare.status", { matches: al.matches, mismatches: al.mismatches, gaps: al.gaps }));
   }
 
   private showOrganism(e: CatalogEntry): void {
@@ -399,43 +411,43 @@ export class Explorer {
     const w = this.opts.world();
     const strain = w.strains.get(e.strainId);
     const steps = ancestry(w.lineages, w.innovations, e.lineageId);
-    const state = e.alive ? `<span class="hit">vivant</span>` : `<span class="dead">${esc(DEATH_LABEL[e.cause!])} au pas ${e.deathTick}</span>`;
+    const state = e.alive ? `<span class="hit">${tDynamic("explorer.table.state.alive")}</span>` : `<span class="dead">${tDynamic("explorer.table.state.death", { cause: esc(DEATH_LABEL[e.cause!]), tick: String(e.deathTick) })}</span>`;
     return `
-      <div class="ex-detail-head"><h3>Organisme n° ${e.id}</h3>${state}</div>
+      <div class="ex-detail-head"><h3>${tDynamic("explorer.detail.title", { id: e.id })}</h3>${state}</div>
       <div class="ex-facts">
-        <span>Souche<b><i class="swatch" style="background:${strain?.color ?? "#8aa0b5"}"></i>${esc(strain?.name ?? "—")}</b></span>
-        <span>Stratégie<b style="color:${STRATEGY_COLOR[e.strategy]}">${STRATEGY_LABEL[e.strategy]}</b></span>
-        <span>Lignée<b><button type="button" class="linklike" data-lineage="${e.lineageId}">n° ${e.lineageId}</button></b></span>
-        <span>Parent<b>${e.parentId < 0 ? "fondateur" : `n° ${e.parentId}`}</b></span>
-        <span>Né au pas<b>${e.bornTick}</b></span>
-        <span>Âge<b>${e.age}</b></span>
-        <span>Fitness<b>${fmt(e.fitness)}</b></span>
-        <span>Énergie<b>${e.energy === null ? "—" : fmt(e.energy, 2)}</b></span>
-        <span>Proies tuées<b>${e.kills}</b></span>
-        <span>Descendants directs<b>${e.births}</b></span>
-        <span>Corpulence<b>${fmt(e.mass, 2)}</b></span>
-        <span>Position<b>(${e.x}, ${e.y})</b></span>
+        <span>${tDynamic("explorer.detail.strain")}<b><i class="swatch" style="background:${strain?.color ?? "#8aa0b5"}"></i>${esc(strain?.name ?? "—")}</b></span>
+        <span>${tDynamic("explorer.detail.strategy")}<b style="color:${STRATEGY_COLOR[e.strategy]}">${STRATEGY_LABEL[e.strategy]}</b></span>
+        <span>${tDynamic("explorer.detail.lineage")}<b><button type="button" class="linklike" data-lineage="${e.lineageId}">${tDynamic("explorer.detail.lineageId", { id: e.lineageId })}</button></b></span>
+        <span>${tDynamic("explorer.detail.parent")}<b>${e.parentId < 0 ? tDynamic("explorer.detail.founder") : tDynamic("explorer.detail.parentId", { id: e.parentId })}</b></span>
+        <span>${tDynamic("explorer.detail.born")}<b>${e.bornTick}</b></span>
+        <span>${tDynamic("explorer.detail.age")}<b>${e.age}</b></span>
+        <span>${tDynamic("explorer.detail.fitness")}<b>${fmt(e.fitness)}</b></span>
+        <span>${tDynamic("explorer.detail.energy")}<b>${e.energy === null ? "—" : fmt(e.energy, 2)}</b></span>
+        <span>${tDynamic("explorer.detail.kills")}<b>${e.kills}</b></span>
+        <span>${tDynamic("explorer.detail.births")}<b>${e.births}</b></span>
+        <span>${tDynamic("explorer.detail.mass")}<b>${fmt(e.mass, 2)}</b></span>
+        <span>${tDynamic("explorer.detail.position")}<b>(${e.x}, ${e.y})</b></span>
       </div>
       <div class="row ex-actions">
-        ${e.alive ? `<button type="button" data-act="select" data-id="${e.id}">${icon("inspect")}Voir dans le monde</button>` : ""}
-        <button type="button" data-act="tree" data-lineage="${e.lineageId}">${icon("chart")}Voir dans l’arbre</button>
-        <button type="button" data-act="highlight" data-lineage="${e.lineageId}">Surligner la lignée</button>
-        <button type="button" data-act="dna" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("dna")}Charger l’ADN</button>
-        <button type="button" data-act="compare-toggle">${icon("dna")}Comparer à…</button>
-        <button type="button" class="primary" data-act="save" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("save")}Enregistrer…</button>
+        ${e.alive ? `<button type="button" data-act="select" data-id="${e.id}">${icon("inspect")}${tDynamic("explorer.detail.action.world")}</button>` : ""}
+        <button type="button" data-act="tree" data-lineage="${e.lineageId}">${icon("chart")}${tDynamic("explorer.detail.action.tree")}</button>
+        <button type="button" data-act="highlight" data-lineage="${e.lineageId}">${tDynamic("explorer.detail.action.highlight")}</button>
+        <button type="button" data-act="dna" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("dna")}${tDynamic("explorer.detail.action.dna")}</button>
+        <button type="button" data-act="compare-toggle">${icon("dna")}${tDynamic("explorer.detail.action.compare")}</button>
+        <button type="button" class="primary" data-act="save" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${icon("save")}${tDynamic("explorer.detail.action.save")}</button>
       </div>
       <div id="ex-compare" class="ex-compare" hidden>
-        <label class="tiny" for="ex-compare-id">Organisme n°</label>
-        <input id="ex-compare-id" type="number" min="1" step="1" placeholder="n°">
-        <label class="tiny" for="ex-compare-saved">Enregistré</label>
+        <label class="tiny" for="ex-compare-id">${tDynamic("explorer.compare.idLabel")}</label>
+        <input id="ex-compare-id" type="number" min="1" step="1" placeholder="${tDynamic("explorer.compare.idPlaceholder")}">
+        <label class="tiny" for="ex-compare-saved">${tDynamic("explorer.compare.savedLabel")}</label>
         <select id="ex-compare-saved"><option value="">—</option></select>
-        <div class="row"><button type="button" data-act="compare-plate">Organisme sélectionné</button><button type="button" class="primary" data-act="compare-run">Aligner</button></div>
+        <div class="row"><button type="button" data-act="compare-plate">${tDynamic("explorer.compare.plate")}</button><button type="button" class="primary" data-act="compare-run">${tDynamic("explorer.compare.run")}</button></div>
       </div>
       <div id="ex-align"></div>
       <div id="ex-save-form" hidden></div>
       ${phenotypeTableHtml(e.ph)}
       <div class="ex-genome mono">${e.genome}</div>
-      <div class="ex-ancestry"><span class="eyebrow">ÉVOLUTION · ${steps.length} lignée${steps.length > 1 ? "s" : ""} du fondateur à cet organisme</span>${ancestryHtml(steps, w.tick)}</div>`;
+      <div class="ex-ancestry"><span class="eyebrow">${tDynamic(steps.length > 1 ? "explorer.ancestry.organism.many" : "explorer.ancestry.organism.one", { count: steps.length })}</span>${ancestryHtml(steps, w.tick)}</div>`;
   }
 
   /* ---------- lineages tab ---------- */
@@ -456,8 +468,11 @@ export class Explorer {
               : (sub.get(b.id) ?? 0) - (sub.get(a.id) ?? 0),
     );
     const shown = nodes.slice(0, 600);
-    this.q("#ex-lin-count").textContent = `${nodes.length} lignée${nodes.length > 1 ? "s" : ""}${shown.length < nodes.length ? ` · ${shown.length} affichées` : ""}`;
-    this.q("#ex-lineages").innerHTML = `<table class="ex-table"><thead><tr><th>N°</th><th>Parent</th><th class="num">Née</th><th class="num">Éteinte</th><th class="num">Vivants</th><th class="num">Max</th><th class="num">Descendance</th></tr></thead><tbody>${shown
+    this.q("#ex-lin-count").textContent = tDynamic(nodes.length > 1 ? "explorer.lineage.count.many" : "explorer.lineage.count.one", {
+      count: nodes.length,
+      more: shown.length < nodes.length ? tDynamic("explorer.lineage.more", { count: shown.length }) : "",
+    });
+    this.q("#ex-lineages").innerHTML = `<table class="ex-table"><thead><tr><th>${tDynamic("explorer.lineage.col.id")}</th><th>${tDynamic("explorer.lineage.col.parent")}</th><th class="num">${tDynamic("explorer.lineage.col.born")}</th><th class="num">${tDynamic("explorer.lineage.col.extinct")}</th><th class="num">${tDynamic("explorer.lineage.col.alive")}</th><th class="num">${tDynamic("explorer.lineage.col.peak")}</th><th class="num">${tDynamic("explorer.lineage.col.subtree")}</th></tr></thead><tbody>${shown
       .map((n) => `<tr class="ex-row${n.id === this.selectedLineage ? " selected" : ""}" data-lineage="${n.id}"><td class="mono">${n.id}</td><td class="mono">${n.parentId < 0 ? "—" : n.parentId}</td><td class="mono num">${n.bornTick}</td><td class="mono num">${n.extinctTick ?? "—"}</td><td class="mono num">${n.count}</td><td class="mono num">${n.peakCount}</td><td class="mono num">${sub.get(n.id) ?? subtreeCount(w.lineages, n.id)}</td></tr>`)
       .join("")}</tbody></table>`;
   }
@@ -473,30 +488,30 @@ export class Explorer {
   private lineageDetailHtml(id: number): string {
     const w = this.opts.world();
     const node = w.lineages.get(id);
-    if (!node) return `<p class="muted">Lignée ${id} inconnue.</p>`;
+    if (!node) return `<p class="muted">${tDynamic("explorer.detail.unknownLineage", { id })}</p>`;
     const steps = ancestry(w.lineages, w.innovations, id);
     const kids = descendantLineages(w.lineages, id, 40);
     const members = organismsUnderLineage(w.organisms, w.lineages, id);
     const own = w.organisms.filter((o) => o.lineageId === id);
     const sample = own[0] ?? members[0];
     return `
-      <div class="ex-detail-head"><h3>Lignée n° ${id}</h3>${node.count > 0 ? `<span class="hit">${node.count} vivant${node.count > 1 ? "s" : ""}</span>` : `<span class="dead">éteinte au pas ${node.extinctTick ?? "?"}</span>`}</div>
+      <div class="ex-detail-head"><h3>${tDynamic("explorer.lineage.title", { id })}</h3>${node.count > 0 ? `<span class="hit">${tDynamic(node.count > 1 ? "explorer.lineage.alive.many" : "explorer.lineage.alive.one", { count: node.count })}</span>` : `<span class="dead">${tDynamic("explorer.lineage.extinctAt", { tick: node.extinctTick ?? "?" })}</span>`}</div>
       <div class="ex-facts">
-        <span>Née au pas<b>${node.bornTick}</b></span>
-        <span>Effectif maximal<b>${node.peakCount}</b></span>
-        <span>Parent<b>${node.parentId < 0 ? "fondateur" : `<button type="button" class="linklike" data-lineage="${node.parentId}">n° ${node.parentId}</button>`}</b></span>
-        <span>Sous-lignées<b>${descendantLineages(w.lineages, id, 100000).length}</b></span>
-        <span>Descendance vivante<b>${subtreeCount(w.lineages, id)}</b></span>
-        <span>Signature<b class="mono">${esc(node.signature)}</b></span>
+        <span>${tDynamic("explorer.lineage.born")}<b>${node.bornTick}</b></span>
+        <span>${tDynamic("explorer.lineage.peak")}<b>${node.peakCount}</b></span>
+        <span>${tDynamic("explorer.lineage.parent")}<b>${node.parentId < 0 ? tDynamic("explorer.lineage.founder") : `<button type="button" class="linklike" data-lineage="${node.parentId}">${tDynamic("explorer.lineage.parentId", { id: node.parentId })}</button>`}</b></span>
+        <span>${tDynamic("explorer.lineage.sub")}<b>${descendantLineages(w.lineages, id, 100000).length}</b></span>
+        <span>${tDynamic("explorer.lineage.aliveSubtree")}<b>${subtreeCount(w.lineages, id)}</b></span>
+        <span>${tDynamic("explorer.lineage.signature")}<b class="mono">${esc(node.signature)}</b></span>
       </div>
       <div class="row ex-actions">
-        <button type="button" data-act="tree" data-lineage="${id}">${icon("chart")}Voir dans l’arbre</button>
-        <button type="button" data-act="highlight" data-lineage="${id}">Surligner sur la plaque</button>
-        <button type="button" data-act="members" data-lineage="${id}">${icon("inspect")}Voir ses organismes</button>
-        ${sample ? `<button type="button" data-act="dna-org" data-id="${sample.id}">${icon("dna")}Charger un génome</button>` : ""}
+        <button type="button" data-act="tree" data-lineage="${id}">${icon("chart")}${tDynamic("explorer.detail.action.tree")}</button>
+        <button type="button" data-act="highlight" data-lineage="${id}">${tDynamic("explorer.lineage.action.highlight")}</button>
+        <button type="button" data-act="members" data-lineage="${id}">${icon("inspect")}${tDynamic("explorer.lineage.action.members")}</button>
+        ${sample ? `<button type="button" data-act="dna-org" data-id="${sample.id}">${icon("dna")}${tDynamic("explorer.lineage.action.dna")}</button>` : ""}
       </div>
-      <div class="ex-ancestry"><span class="eyebrow">ORIGINE · ${steps.length} lignée${steps.length > 1 ? "s" : ""} depuis le fondateur</span>${ancestryHtml(steps, w.tick)}</div>
-      ${kids.length ? `<div class="ex-ancestry"><span class="eyebrow">SOUS-LIGNÉES DIRECTES ET SUIVANTES</span><ul class="ex-kids">${kids.map((k) => `<li><button type="button" class="linklike" data-lineage="${k.id}">n° ${k.id}</button> · née ${k.bornTick} · ${k.count > 0 ? `${k.count} vivants` : `éteinte ${k.extinctTick}`} · max ${k.peakCount}</li>`).join("")}</ul></div>` : ""}`;
+      <div class="ex-ancestry"><span class="eyebrow">${tDynamic(steps.length > 1 ? "explorer.ancestry.lineage.many" : "explorer.ancestry.lineage.one", { count: steps.length })}</span>${ancestryHtml(steps, w.tick)}</div>
+      ${kids.length ? `<div class="ex-ancestry"><span class="eyebrow">${tDynamic("explorer.lineage.kids.heading")}</span><ul class="ex-kids">${kids.map((k) => `<li><button type="button" class="linklike" data-lineage="${k.id}">${tDynamic("explorer.lineage.kids.id", { id: k.id })}</button>${tDynamic(k.count > 0 ? "explorer.lineage.kids.alive" : "explorer.lineage.kids.extinct", { born: k.bornTick, count: k.count, tick: String(k.extinctTick), peak: k.peakCount })}</li>`).join("")}</ul></div>` : ""}`;
   }
 
   /* ---------- tree tab ---------- */
@@ -518,7 +533,7 @@ export class Explorer {
       },
       onFocus: (id) => this.showTree(id),
       strainColor: (sid) => w().strains.get(sid)?.color ?? "#8aa0b5",
-      strainName: (sid) => w().strains.get(sid)?.name ?? "souche inconnue",
+      strainName: (sid) => w().strains.get(sid)?.name ?? tDynamic("explorer.tree.unknownStrain"),
       changeLabel: (n: TreeNode) => {
         const c = n.change;
         if (!c) return "";
@@ -556,8 +571,13 @@ export class Explorer {
     view.setLayout(layout, w.tick);
     const hidden = layout.nodes.reduce((sum, n) => sum + n.hiddenDescendants, 0);
     this.q("#ex-tree-note").textContent = layout.nodes.length
-      ? `${layout.nodes.length} lignée${layout.nodes.length > 1 ? "s" : ""} · trajet de ${layout.path.length} · foyer n° ${focusId}${hidden ? ` · ${hidden} sous-lignées masquées` : ""}`
-      : `Lignée n° ${focusId} inconnue.`;
+      ? tDynamic(layout.nodes.length > 1 ? "explorer.tree.note.many" : "explorer.tree.note.one", {
+          count: layout.nodes.length,
+          path: layout.path.length,
+          focus: focusId,
+          hidden: hidden ? tDynamic("explorer.tree.note.hidden", { count: hidden }) : "",
+        })
+      : tDynamic("explorer.tree.unknown", { focus: focusId });
     this.q("#ex-tree-detail").innerHTML = this.lineageDetailHtml(focusId);
     this.opts.highlightLineage(focusId);
     requestAnimationFrame(() => {
@@ -571,12 +591,12 @@ export class Explorer {
 
   private async refreshSaved(): Promise<void> {
     this.saved = await this.opts.store.listOrganisms();
-    this.q("#ex-saved-count").textContent = `${this.saved.length} organisme${this.saved.length > 1 ? "s" : ""} enregistré${this.saved.length > 1 ? "s" : ""}`;
+    this.q("#ex-saved-count").textContent = tDynamic(this.saved.length > 1 ? "explorer.saved.count.many" : "explorer.saved.count.one", { count: this.saved.length });
     this.q("#ex-saved").innerHTML = this.saved.length
-      ? `<table class="ex-table"><thead><tr><th>Nom</th><th>N°</th><th>Origine</th><th class="num">Fitness</th><th class="num">Tués</th><th class="num">Branche</th><th>Monde</th></tr></thead><tbody>${this.saved
-          .map((s) => `<tr class="ex-row${this.savedSelected?.id === s.id ? " selected" : ""}" data-saved="${s.id}"><td>${esc(s.name)}</td><td class="mono">${s.entry.id}</td><td class="tiny">${esc(s.source.label)} · pas ${s.source.tick} · graine ${s.source.seed}</td><td class="mono num">${fmt(s.entry.fitness)}</td><td class="mono num">${s.entry.kills}</td><td class="mono num">${s.steps}</td><td>${s.hasSnapshot ? "inclus" : "—"}</td></tr>`)
+      ? `<table class="ex-table"><thead><tr><th>${tDynamic("explorer.saved.col.name")}</th><th>${tDynamic("explorer.saved.col.id")}</th><th>${tDynamic("explorer.saved.col.origin")}</th><th class="num">${tDynamic("explorer.saved.col.fitness")}</th><th class="num">${tDynamic("explorer.saved.col.kills")}</th><th class="num">${tDynamic("explorer.saved.col.branch")}</th><th>${tDynamic("explorer.saved.col.world")}</th></tr></thead><tbody>${this.saved
+          .map((s) => `<tr class="ex-row${this.savedSelected?.id === s.id ? " selected" : ""}" data-saved="${s.id}"><td>${esc(s.name)}</td><td class="mono">${s.entry.id}</td><td class="tiny">${tDynamic("explorer.saved.source", { label: esc(s.source.label), tick: s.source.tick, seed: s.source.seed })}</td><td class="mono num">${fmt(s.entry.fitness)}</td><td class="mono num">${s.entry.kills}</td><td class="mono num">${s.steps}</td><td>${s.hasSnapshot ? tDynamic("explorer.saved.included") : "—"}</td></tr>`)
           .join("")}</tbody></table>`
-      : `<p class="muted">Aucun organisme enregistré. Dans Organismes, ouvrez une fiche puis « Enregistrer… ».</p>`;
+      : `<p class="muted">${tDynamic("explorer.empty.savedList")}</p>`;
   }
 
   private async showSaved(id: string): Promise<void> {
@@ -589,35 +609,35 @@ export class Explorer {
     this.q("#ex-saved-detail").innerHTML = `
       <div class="ex-detail-head"><h3>${esc(rec.name)}</h3><span class="tiny">${new Date(rec.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span></div>
       <div class="ex-facts">
-        <span>Organisme<b>n° ${e.id} · ${e.alive ? "vivant" : `mort (${esc(DEATH_LABEL[e.cause!])})`}</b></span>
-        <span>Origine<b>${esc(rec.source.label)} · pas ${rec.source.tick}</b></span>
-        <span>Graine du monde<b class="mono">${rec.source.seed}</b></span>
-        <span>Souche<b>${esc(rec.strainName)}</b></span>
-        <span>Stratégie<b>${STRATEGY_LABEL[e.strategy]}</b></span>
-        <span>Âge<b>${e.age}</b></span>
-        <span>Fitness<b>${fmt(e.fitness)}</b></span>
-        <span>Proies tuées<b>${e.kills}</b></span>
-        <span>Descendants<b>${e.births}</b></span>
-        <span>Simulation<b>${rec.snapshot ? "incluse" : "non incluse"}</b></span>
+        <span>${tDynamic("explorer.saved.organism")}<b>${e.alive ? tDynamic("explorer.saved.organism.alive", { id: e.id }) : tDynamic("explorer.saved.organism.dead", { id: e.id, cause: esc(DEATH_LABEL[e.cause!]) })}</b></span>
+        <span>${tDynamic("explorer.saved.origin")}<b>${tDynamic("explorer.saved.sourceShort", { label: esc(rec.source.label), tick: rec.source.tick })}</b></span>
+        <span>${tDynamic("explorer.saved.seed")}<b class="mono">${rec.source.seed}</b></span>
+        <span>${tDynamic("explorer.detail.strain")}<b>${esc(rec.strainName)}</b></span>
+        <span>${tDynamic("explorer.detail.strategy")}<b>${STRATEGY_LABEL[e.strategy]}</b></span>
+        <span>${tDynamic("explorer.detail.age")}<b>${e.age}</b></span>
+        <span>${tDynamic("explorer.detail.fitness")}<b>${fmt(e.fitness)}</b></span>
+        <span>${tDynamic("explorer.detail.kills")}<b>${e.kills}</b></span>
+        <span>${tDynamic("explorer.saved.descendants")}<b>${e.births}</b></span>
+        <span>${tDynamic("explorer.saved.simulation")}<b>${rec.snapshot ? tDynamic("explorer.saved.simIncluded") : tDynamic("explorer.saved.simMissing")}</b></span>
       </div>
       <div class="row ex-actions">
-        <button type="button" data-act="saved-dna" data-saved="${id}">${icon("dna")}Charger l’ADN</button>
-        ${rec.snapshot ? `<button type="button" class="primary" data-act="saved-world" data-saved="${id}">${icon("play")}Ouvrir la simulation dans B</button>` : ""}
-        <button type="button" class="quiet" data-act="saved-export" data-saved="${id}">${icon("save")}Exporter .json</button>
-        <button type="button" class="danger" data-act="saved-remove" data-saved="${id}">Supprimer</button>
+        <button type="button" data-act="saved-dna" data-saved="${id}">${icon("dna")}${tDynamic("explorer.detail.action.dna")}</button>
+        ${rec.snapshot ? `<button type="button" class="primary" data-act="saved-world" data-saved="${id}">${icon("play")}${tDynamic("explorer.saved.action.world")}</button>` : ""}
+        <button type="button" class="quiet" data-act="saved-export" data-saved="${id}">${icon("save")}${tDynamic("explorer.saved.action.export")}</button>
+        <button type="button" class="danger" data-act="saved-remove" data-saved="${id}">${tDynamic("explorer.saved.action.remove")}</button>
       </div>
       ${phenotypeTableHtml(e.ph)}
       <div class="ex-genome mono">${e.genome}</div>
-      <div class="ex-ancestry"><span class="eyebrow">ÉVOLUTION ENREGISTRÉE · ${rec.ancestry.length} lignée${rec.ancestry.length > 1 ? "s" : ""}</span>${ancestryHtml(rec.ancestry, rec.source.tick)}</div>`;
+      <div class="ex-ancestry"><span class="eyebrow">${tDynamic(rec.ancestry.length > 1 ? "explorer.ancestry.saved.many" : "explorer.ancestry.saved.one", { count: rec.ancestry.length })}</span>${ancestryHtml(rec.ancestry, rec.source.tick)}</div>`;
   }
 
   private saveForm(e: CatalogEntry): void {
     const form = this.q("#ex-save-form");
     form.hidden = false;
     form.innerHTML = `<div class="ex-save">
-      <input id="ex-save-name" type="text" maxlength="48" placeholder="Nom (ex. Chasseur n° ${e.id})" value="${e.alive ? "" : ""}">
-      <label class="ex-inline"><input id="ex-save-world" type="checkbox" checked> Inclure la simulation entière (monde, carte, graine) pour la revoir plus tard</label>
-      <div class="row"><button type="button" class="primary" data-act="save-confirm" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">Enregistrer</button><button type="button" class="quiet" data-act="save-cancel">Annuler</button></div>
+      <input id="ex-save-name" type="text" maxlength="48" placeholder="${tDynamic("explorer.save.namePlaceholder", { id: e.id })}" value="${e.alive ? "" : ""}">
+      <label class="ex-inline"><input id="ex-save-world" type="checkbox" checked> ${tDynamic("explorer.save.includeWorld")}</label>
+      <div class="row"><button type="button" class="primary" data-act="save-confirm" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}">${tDynamic("explorer.save.confirm")}</button><button type="button" class="quiet" data-act="save-cancel">${tDynamic("explorer.save.cancel")}</button></div>
     </div>`;
     this.q<HTMLInputElement>("#ex-save-name").focus();
   }
@@ -626,9 +646,9 @@ export class Explorer {
     const w = this.opts.world();
     const rec: SavedOrganism = {
       id: `${Date.now().toString(36)}-${e.id}`,
-      name: name.trim() || `Organisme n° ${e.id}`,
+      name: name.trim() || tDynamic("explorer.save.defaultName", { id: e.id }),
       savedAt: Date.now(),
-      source: { world: this.opts.worldSide(), tick: w.tick, seed: w.params.seed, label: `Monde ${this.opts.worldSide()}` },
+      source: { world: this.opts.worldSide(), tick: w.tick, seed: w.params.seed, label: tDynamic("explorer.save.worldLabel", { world: this.opts.worldSide() }) },
       entry: { ...e, ph: { ...e.ph } },
       ancestry: ancestry(w.lineages, w.innovations, e.lineageId).map((s) => ({ lineage: { ...s.lineage }, innovation: s.innovation ? { ...s.innovation, changes: s.innovation.changes.map((c) => ({ ...c })), env: { ...s.innovation.env } } : null, depth: s.depth })),
       strainName: w.strains.get(e.strainId)?.name ?? "—",
@@ -637,7 +657,7 @@ export class Explorer {
     await this.opts.store.saveOrganism(rec);
     this.q("#ex-save-form").hidden = true;
     await this.refreshSaved();
-    this.opts.status(`Organisme n° ${e.id} enregistré sous « ${rec.name} »${includeWorld ? " avec la simulation" : ""}.`);
+    this.opts.status(tDynamic("explorer.save.done", { id: e.id, name: rec.name, world: includeWorld ? tDynamic("explorer.save.withWorld") : "" }));
   }
 
   private exportSaved(rec: SavedOrganism): void {
@@ -742,13 +762,13 @@ export class Explorer {
           this.opts.selectOrganism(entry.id);
           this.opts.highlightLineage(entry.lineageId);
           this.close();
-          this.opts.status(`Organisme n° ${entry.id} sélectionné ; sa lignée est surlignée sur la plaque.`);
+          this.opts.status(tDynamic("explorer.status.selected", { id: entry.id }));
         }
         return;
       case "highlight": {
         const id = Number(el.dataset.lineage);
         this.opts.highlightLineage(id);
-        this.opts.status(`Lignée n° ${id} surlignée sur la plaque (anneaux). Fermez l’explorateur pour la voir.`);
+        this.opts.status(tDynamic("explorer.status.highlighted", { id }));
         return;
       }
       case "members":
@@ -759,7 +779,7 @@ export class Explorer {
         this.showTree(Number(el.dataset.lineage));
         return;
       case "dna":
-        if (entry) this.opts.loadGenome(entry.genome, `organisme n° ${entry.id}`);
+        if (entry) this.opts.loadGenome(entry.genome, tDynamic("explorer.compare.organismLabel", { id: entry.id }));
         return;
       case "compare-toggle": {
         const box = this.dialog.querySelector<HTMLElement>("#ex-compare");
@@ -770,10 +790,10 @@ export class Explorer {
       case "compare-plate": {
         const sel = this.opts.plateSelection();
         if (!sel) {
-          this.opts.status("Aucun organisme sélectionné sur la plaque.");
+          this.opts.status(tDynamic("explorer.status.noPlateSelection"));
           return;
         }
-        this.runCompare(sel.genome, `organisme n° ${sel.id} (plaque)`);
+        this.runCompare(sel.genome, tDynamic("explorer.compare.organismPlate", { id: sel.id }));
         return;
       }
       case "compare-run":
@@ -782,12 +802,12 @@ export class Explorer {
       case "compare-load":
         if (this.compare) {
           this.opts.loadGenome(this.compare.second, this.compare.secondLabel, { diffAgainst: this.compare.first });
-          this.opts.status(`Génome de ${this.compare.secondLabel} chargé, comparé à ${this.compare.firstLabel}.`);
+          this.opts.status(tDynamic("explorer.status.compareLoaded", { second: this.compare.secondLabel, first: this.compare.firstLabel }));
         }
         return;
       case "dna-org": {
         const o = this.opts.world().organisms.find((x) => x.id === Number(el.dataset.id));
-        if (o) this.opts.loadGenome(o.genome, `organisme n° ${o.id}`);
+        if (o) this.opts.loadGenome(o.genome, tDynamic("explorer.compare.organismLabel", { id: o.id }));
         return;
       }
       case "save":
@@ -806,7 +826,7 @@ export class Explorer {
         if (this.savedSelected?.snapshot) {
           this.opts.restoreInto("B", this.savedSelected.snapshot);
           this.close();
-          this.opts.status(`Simulation de « ${this.savedSelected.name} » ouverte dans le monde B (pas ${this.savedSelected.source.tick}, graine ${this.savedSelected.source.seed}).`);
+          this.opts.status(tDynamic("explorer.status.worldRestored", { name: this.savedSelected.name, tick: this.savedSelected.source.tick, seed: this.savedSelected.source.seed }));
         }
         return;
       case "saved-export":
@@ -816,7 +836,7 @@ export class Explorer {
         if (this.savedSelected) {
           void this.opts.store.removeOrganism(this.savedSelected.id).then(() => {
             this.savedSelected = null;
-            this.q("#ex-saved-detail").innerHTML = `<p class="muted">Sélectionnez un organisme enregistré.</p>`;
+            this.q("#ex-saved-detail").innerHTML = `<p class="muted">${tDynamic("explorer.empty.saved")}</p>`;
             return this.refreshSaved();
           });
         }
@@ -827,21 +847,21 @@ export class Explorer {
 
 /** Vertical evolution branch: one card per lineage from the founder, mutations that opened it, biggest changes marked. */
 export function ancestryHtml(steps: readonly AncestryStep[], now: number): string {
-  if (!steps.length) return `<p class="muted">Lignée inconnue.</p>`;
+  if (!steps.length) return `<p class="muted">${tDynamic("explorer.ancestry.unknown")}</p>`;
   const big = new Set(biggestChanges(steps, 3).map((b) => `${b.step.lineage.id}:${b.change.trait}`));
   return `<ol class="ex-branch">${steps
     .map((s) => {
       const l: LineageNode = s.lineage;
-      const alive = l.count > 0 ? `${l.count} vivant${l.count > 1 ? "s" : ""}` : l.extinctTick !== null ? `éteinte au pas ${l.extinctTick}` : "sans membre";
+      const alive = l.count > 0 ? (l.count > 1 ? tDynamic("explorer.ancestry.alive.many", { count: l.count }) : tDynamic("explorer.ancestry.alive.one", { count: l.count })) : l.extinctTick !== null ? tDynamic("explorer.ancestry.extinct", { tick: l.extinctTick }) : tDynamic("explorer.ancestry.noMember");
       const changes = s.innovation
         ? s.innovation.changes.map((c) => {
             const d = c.to - c.from;
             const key = `${l.id}:${c.trait}`;
             return `<span class="ex-change${big.has(key) ? " big" : ""}" style="--g:${TRAIT_COLOR[c.trait]}">${TRAIT_LABEL[c.trait]} ${fmt(c.from, 2)} → ${fmt(c.to, 2)} <em class="${d > 0 ? "up" : "down"}">${d > 0 ? "+" : "−"}${fmt(Math.abs(d), 2)}</em></span>`;
           }).join("")
-        : s.depth === 0 ? `<span class="ex-change neutral">génome fondateur</span>` : `<span class="ex-change neutral">mutation sans effet notable sur le phénotype</span>`;
-      const env = s.innovation ? `<div class="tiny">née à T ${fmt(s.innovation.env.temperature, 2)} · nutr ${fmt(s.innovation.env.nutrient, 2)} · tox ${fmt(s.innovation.env.toxin, 2)} · lum ${fmt(s.innovation.env.light, 2)} · ${s.innovation.kind}</div>` : "";
-      return `<li class="ex-step"><div class="ex-step-head"><b>Lignée <button type="button" class="linklike" data-lineage="${l.id}">n° ${l.id}</button></b><span class="tiny">pas ${l.bornTick}${l.bornTick < now ? ` → ${l.extinctTick ?? now}` : ""} · max ${l.peakCount} · ${alive}</span></div><div class="ex-changes">${changes}</div>${env}</li>`;
+        : s.depth === 0 ? `<span class="ex-change neutral">${tDynamic("explorer.ancestry.founderGenome")}</span>` : `<span class="ex-change neutral">${tDynamic("explorer.ancestry.neutralMutation")}</span>`;
+      const env = s.innovation ? `<div class="tiny">${tDynamic("explorer.ancestry.env", { temp: fmt(s.innovation.env.temperature, 2), nutrient: fmt(s.innovation.env.nutrient, 2), toxin: fmt(s.innovation.env.toxin, 2), light: fmt(s.innovation.env.light, 2), kind: s.innovation.kind })}</div>` : "";
+      return `<li class="ex-step"><div class="ex-step-head"><b>${tDynamic("explorer.ancestry.lineage")} <button type="button" class="linklike" data-lineage="${l.id}">${tDynamic("explorer.ancestry.lineageId", { id: l.id })}</button></b><span class="tiny">${tDynamic("explorer.ancestry.step", { tick: l.bornTick, end: l.bornTick < now ? ` → ${l.extinctTick ?? now}` : "", peak: l.peakCount, alive })}</span></div><div class="ex-changes">${changes}</div>${env}</li>`;
     })
     .join("")}</ol>`;
 }

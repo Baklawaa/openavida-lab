@@ -45,9 +45,17 @@ export interface DnaAnnotation {
   openFrom: number;
 }
 
+/**
+ * Stable ids of the editor's validation messages. The interface owns their
+ * copy: it renders `sim.dna.<id>` from the locale catalog with `vars`.
+ */
+export type DnaIssueId = "empty" | "too-short" | "too-long" | "open-gene" | "max-expression" | "no-readable-gene";
+
 export interface DnaIssue {
   level: "info" | "warn";
-  text: string;
+  id: DnaIssueId;
+  /** Values interpolated into the message by the interface. */
+  vars?: Record<string, string | number>;
 }
 
 export interface SeqHunk {
@@ -268,16 +276,16 @@ export function validateSequence(annotation: DnaAnnotation): DnaIssue[] {
   const { decoded, openFrom } = annotation;
   const out: DnaIssue[] = [];
   const n = decoded.sequence.length;
-  if (n === 0) out.push({ level: "info", text: "Génome vide : ajoutez un gène ou choisissez un kit." });
-  else if (n < MIN_GENOME) out.push({ level: "warn", text: `Génome très court (${n} bases). Les organismes viables ont au moins ${MIN_GENOME} bases.` });
-  if (n >= MAX_GENOME) out.push({ level: "warn", text: `Taille maximale atteinte (${MAX_GENOME} bases). Les insertions sont tronquées.` });
-  if (openFrom >= 0) out.push({ level: "warn", text: `Gène non terminé à partir de la base ${openFrom} : ajoutez TAA, TAG ou TGA. Cette partie est ignorée.` });
+  if (n === 0) out.push({ level: "info", id: "empty" });
+  else if (n < MIN_GENOME) out.push({ level: "warn", id: "too-short", vars: { bases: n, min: MIN_GENOME } });
+  if (n >= MAX_GENOME) out.push({ level: "warn", id: "too-long", vars: { max: MAX_GENOME } });
+  if (openFrom >= 0) out.push({ level: "warn", id: "open-gene", vars: { from: openFrom } });
   for (const r of decoded.regulation) {
     if (r.multiplier >= REG_MAX - 1e-9) {
-      out.push({ level: "info", text: `Gène ${r.geneIndex + 1} à expression maximale (×${r.multiplier.toFixed(2)}) : les codons amont supplémentaires n’ajoutent rien.` });
+      out.push({ level: "info", id: "max-expression", vars: { gene: r.geneIndex + 1, multiplier: r.multiplier.toFixed(2) } });
     }
   }
-  if (n > 0 && decoded.genes.length === 0 && openFrom < 0) out.push({ level: "info", text: "Aucun gène lisible : le phénotype reste basal." });
+  if (n > 0 && decoded.genes.length === 0 && openFrom < 0) out.push({ level: "info", id: "no-readable-gene" });
   return out;
 }
 

@@ -7,7 +7,7 @@
  * parameters the user actually changed are sent to the host.
  */
 import { PARAM_SPEC, type ParamGroup, type ParamSpec, type SimParams } from "../sim/index";
-import { helpFor, modelGroupTitle, paramDescription, paramLabel, paramUnit } from "./i18n/runtime";
+import { helpFor, modelGroupTitle, paramDescription, paramLabel, paramUnit, tDynamic } from "./i18n/runtime";
 
 export const MODEL_GROUPS: readonly ParamGroup[] = [
   "world",
@@ -89,12 +89,12 @@ export class ModelPanel {
       for (const spec of PARAM_SPEC) (defaults as Record<string, unknown>)[spec.key] = spec.default;
       this.opts.apply(defaults, this.target());
       this.refresh();
-      this.opts.status("Paramètres du modèle remis aux valeurs par défaut.");
+      this.opts.status(tDynamic("model.status.reset"));
     });
     this.host.querySelector("#model-legacy")!.addEventListener("click", () => {
       this.opts.apply(LEGACY_V1_PROFILE, this.target());
       this.refresh();
-      this.opts.status("Profil v1 appliqué : prédation par voisinage, mutualisme d’origine, pas de régulation.");
+      this.opts.status(tDynamic("model.status.legacy"));
     });
     // Keep the control help catalog honest: every control advertises its text.
     for (const id of ["model-target", "model-apply", "model-reset", "model-legacy"]) {
@@ -136,14 +136,14 @@ export class ModelPanel {
     }).join("");
     this.host.innerHTML = `${groups}
       <div class="row model-actions">
-        <select id="model-target" aria-label="Monde cible">
-          <option value="both">A et B</option>
-          <option value="A">Monde A</option>
-          <option value="B">Monde B</option>
+        <select id="model-target" aria-label="${tDynamic("model.target.aria")}">
+          <option value="both">${tDynamic("model.target.both")}</option>
+          <option value="A">${tDynamic("model.target.worldA")}</option>
+          <option value="B">${tDynamic("model.target.worldB")}</option>
         </select>
-        <button type="button" id="model-apply">Appliquer</button>
-        <button type="button" id="model-reset">Défauts</button>
-        <button type="button" id="model-legacy">Profil v1</button>
+        <button type="button" id="model-apply">${tDynamic("model.apply")}</button>
+        <button type="button" id="model-reset">${tDynamic("model.reset")}</button>
+        <button type="button" id="model-legacy">${tDynamic("model.legacy")}</button>
       </div>`;
   }
 
@@ -180,12 +180,14 @@ export class ModelPanel {
       if (patch[key] !== current[key]) changed[key] = patch[key];
     }
     if (Object.keys(changed).length === 0) {
-      this.opts.status("Aucun paramètre modifié.");
+      this.opts.status(tDynamic("model.status.none"));
       return;
     }
     const target = this.target();
     this.opts.apply(changed as Partial<SimParams>, target);
     this.refresh();
-    this.opts.status(`${Object.keys(changed).length} paramètre(s) appliqué(s) à ${target === "both" ? "A et B" : "monde " + target}.`);
+    const who = target === "both" ? tDynamic("model.target.both") : tDynamic("model.target.worldOf", { world: target });
+    const count = Object.keys(changed).length;
+    this.opts.status(tDynamic(count > 1 ? "model.status.applied.many" : "model.status.applied.one", { n: count, target: who }));
   }
 }

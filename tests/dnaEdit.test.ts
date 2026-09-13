@@ -49,7 +49,7 @@ describe("DNA editor model", () => {
     const a = annotateSequence(seq);
     expect(a.openFrom).toBe(14);
     expect(a.cells.filter((c) => c.role === "open").map((c) => c.bases).join("")).toBe("ATGGAAGAA");
-    expect(validateSequence(a).some((i) => i.level === "warn" && /non terminé/.test(i.text))).toBe(true);
+    expect(validateSequence(a).some((i) => i.level === "warn" && i.id === "open-gene")).toBe(true);
     // An empty ORF (ATG then stop) is skipped by the decoder and must not count as open.
     expect(findOpenOrf("ATGTAACCC")).toBe(-1);
     expect(validateSequence(annotateSequence(""))[0]!.level).toBe("info");

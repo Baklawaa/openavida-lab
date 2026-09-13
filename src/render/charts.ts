@@ -1,3 +1,4 @@
+import { tDynamic } from "../ui/i18n/runtime";
 import type { LineageNode, MetricsSample } from "../sim/types";
 
 const INK = "#91a2a7";
@@ -56,7 +57,7 @@ function axes(ctx: CanvasRenderingContext2D, w: number, h: number, floor: number
   ctx.textAlign = "left";
   ctx.fillText(String(start), PAD.left, h - 6);
   ctx.textAlign = "right";
-  ctx.fillText(`${end} pas`, w - PAD.right, h - 6);
+  ctx.fillText(tDynamic("render.chart.axis.step", { tick: end }), w - PAD.right, h - 6);
   ctx.textAlign = "left";
 }
 
@@ -88,7 +89,7 @@ function curve(ctx: CanvasRenderingContext2D, w: number, h: number, hist: Metric
 export function drawFitness(canvas: HTMLCanvasElement, w: number, h: number, hist: MetricsSample[], marks: readonly number[] = []): void {
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
-  if (!hist.length) { empty(ctx, w, h, "La fitness apparaîtra ici"); return; }
+  if (!hist.length) { empty(ctx, w, h, tDynamic("render.chart.empty.fitness")); return; }
   const [floor, ceiling] = chartDomain(hist.flatMap(m => [m.maxFitness, m.meanFitness]));
   const start = hist[0]!.tick;
   const end = hist[hist.length - 1]!.tick;
@@ -118,7 +119,7 @@ export function drawFitness(canvas: HTMLCanvasElement, w: number, h: number, his
 export function drawShannon(canvas: HTMLCanvasElement, w: number, h: number, hist: MetricsSample[]): void {
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
-  if (!hist.length) { empty(ctx, w, h, "La diversité apparaîtra ici"); return; }
+  if (!hist.length) { empty(ctx, w, h, tDynamic("render.chart.empty.diversity")); return; }
   const ceiling = chartCeiling(hist.map(m => m.shannon));
   axes(ctx, w, h, 0, ceiling, hist[0]!.tick, hist[hist.length - 1]!.tick);
   curve(ctx, w, h, hist, "shannon", 0, ceiling, "#bcaaea", true);
@@ -141,7 +142,7 @@ export function drawPhylogeny(canvas: HTMLCanvasElement, w: number, h: number, l
   const nodes = live.concat(dead);
   const wanted = all.find(n => n.id === highlightId);
   if (wanted && !nodes.includes(wanted)) nodes.push(wanted);
-  if (!nodes.length) { empty(ctx, w, h, "Les lignées prendront racine ici"); return []; }
+  if (!nodes.length) { empty(ctx, w, h, tDynamic("render.chart.empty.lineages")); return []; }
   const ids = new Set(nodes.map(n => n.id));
   const children = new Map<number, LineageNode[]>();
   for (const n of nodes) children.set(n.parentId, [...(children.get(n.parentId) ?? []), n]);
@@ -167,7 +168,7 @@ export function drawPhylogeny(canvas: HTMLCanvasElement, w: number, h: number, l
     hits.push({ id: n.id, y, x0, x1 });
   }
   ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.fillText("0", 7, h - 6);
-  ctx.textAlign = "right"; ctx.fillText(`${tick} pas`, w - 9, h - 6); ctx.textAlign = "left";
+  ctx.textAlign = "right"; ctx.fillText(tDynamic("render.chart.axis.step", { tick }), w - 9, h - 6); ctx.textAlign = "left";
   return hits;
 }
 
@@ -195,7 +196,7 @@ export function drawGroupSeries(canvas: HTMLCanvasElement, w: number, h: number,
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
   const rows = hist.filter(m => m[field]);
-  if (!rows.length || !groups.length) { empty(ctx, w, h, "Les effectifs par groupe apparaîtront ici"); return; }
+  if (!rows.length || !groups.length) { empty(ctx, w, h, tDynamic("render.chart.empty.groups")); return; }
   let max = 0;
   for (const m of rows) for (const g of groups) max = Math.max(max, m[field]![g.key] ?? 0);
   const ceiling = chartCeiling([max]);
@@ -230,7 +231,7 @@ export interface TrialRun {
 export function drawTrialSeries(canvas: HTMLCanvasElement, w: number, h: number, runs: TrialRun[], target: number | null): void {
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
-  if (!runs.length) { empty(ctx, w, h, "Lancez des réplicats pour tracer la mesure"); return; }
+  if (!runs.length) { empty(ctx, w, h, tDynamic("render.chart.empty.trials")); return; }
   const values = runs.flatMap(r => r.series.map(p => p[1]));
   if (target !== null) values.push(target);
   const [floor, ceiling] = chartDomain(values);
@@ -324,7 +325,7 @@ export function drawStrainMap(
     ctx.fill();
   }
   if (!series.some((s) => s.points.length)) {
-    empty(ctx, w, h, "Les trajectoires de souche apparaîtront ici");
+    empty(ctx, w, h, tDynamic("render.chart.empty.strains"));
     return;
   }
   for (const s of series) {
@@ -358,7 +359,7 @@ export function drawTrackSeries(canvas: HTMLCanvasElement, w: number, h: number,
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
   const pts = series.flatMap((s) => s.points);
-  if (!pts.length) { empty(ctx, w, h, "Les trajectoires de température apparaîtront ici"); return; }
+  if (!pts.length) { empty(ctx, w, h, tDynamic("render.chart.empty.temperature")); return; }
   const values = pts.map((p) => p.value);
   const [floor, ceiling] = chartDomain(values);
   const start = Math.min(...pts.map((p) => p.tick));
@@ -383,7 +384,7 @@ export function drawSweep(canvas: HTMLCanvasElement, w: number, h: number, point
   const ctx = prepare(canvas, w, h);
   if (w <= 0) return;
   const usable = points.filter((p) => p.median !== null && p.min !== null && p.max !== null);
-  if (!usable.length) { empty(ctx, w, h, "Lancez un balayage pour tracer le délai"); return; }
+  if (!usable.length) { empty(ctx, w, h, tDynamic("render.chart.empty.sweep")); return; }
   const xs = points.map((p) => p.value);
   const ys = usable.flatMap((p) => [p.min!, p.max!, p.median!]);
   const x0 = Math.min(...xs);

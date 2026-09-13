@@ -59,29 +59,36 @@ export function normalizeOverlay(src: Float32Array, out: Float32Array): OverlayS
   return { max, producers };
 }
 
+/** Statistics of the exudate layer, formatted by the caller into the plate note. */
+export interface ExudateStats {
+  /** Living producers at the last step (`world.lastExudate`). */
+  producers: number;
+  /** Cells the overlay actually lights up (above 1 % of the peak). */
+  visible: number;
+  /** Largest value in the field; 0 means the layer holds no exudate. */
+  max: number;
+  /** Sum of the field. */
+  total: number;
+}
+
 /**
- * One line describing the exudate layer, so a faint plate is never ambiguous:
- * it either holds exudate (with its magnitude) or it does not.
+ * Statistics of the exudate layer, so a faint plate is never ambiguous: a zero
+ * maximum means the layer holds no exudate, otherwise the caller formats the
+ * plate note from these numbers.
  */
-export function describeExudate(world: World): string {
+export function describeExudate(world: World): ExudateStats {
   const field = world.fields.exudate;
   let max = 0;
   let total = 0;
-  let cells = 0;
   for (let i = 0; i < field.length; i++) {
     const v = field[i]!;
     if (v > max) max = v;
-    if (v > 0) {
-      total += v;
-      cells++;
-    }
+    if (v > 0) total += v;
   }
-  if (max <= 0) return "aucun exsudat : aucun phototrophe productif";
   // Cells the overlay actually lights up (above 1 % of the peak), not every
   // cell that holds a trace from diffusion.
   let visible = 0;
   const floor = max * 0.01;
   for (let i = 0; i < field.length; i++) if (field[i]! > floor) visible++;
-  const producers = world.lastExudate;
-  return `${producers} producteur${producers > 1 ? "s" : ""} · ${visible} cellule${visible > 1 ? "s" : ""} éclairée${visible > 1 ? "s" : ""} · max ${max.toFixed(3)} · total ${total.toFixed(2)}`;
+  return { producers: world.lastExudate, visible, max, total };
 }

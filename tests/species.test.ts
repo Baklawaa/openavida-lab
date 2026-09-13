@@ -32,7 +32,7 @@ describe("strains (founding-genome groups)", () => {
     expect(a.strainId).toBe(c.strainId);
     expect(a.strainId).not.toBe(b.strainId);
     expect(w.strains.size).toBe(2);
-    expect(w.strains.get(a.strainId)!.name).toBe("Souche 1");
+    expect(w.strains.get(a.strainId)!.name).toBe("Strain 1");
     expect(w.strains.get(a.strainId)!.genome).toBe(decodeGenome(photo).sequence);
     for (let i = 0; i < 60; i++) w.step();
     const tags = new Set(w.organisms.map((o) => o.strainId));
