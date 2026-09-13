@@ -542,7 +542,7 @@ export function mount(root: HTMLElement): void {
       tDynamic("shell.engine.title", {
         version: info.version,
         revision: info.revision,
-        hashAlgo: info.hashAlgo,
+        algo: info.hashAlgo,
         digest: paramsDigest(w.params),
       }),
     );
