@@ -11,13 +11,15 @@
     "test": "vitest run",
     "baseline": "OPENAVIDA_UPDATE_BASELINE=1 vitest run tests/engine.test.ts",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "gates": "node tools/gates.mjs",
     "sim": "node tools/build-cli.mjs && node dist-cli/openavida.mjs",
     "reproduce": "node tools/verify-reproduce.mjs",
     "launch": "node tools/launch.mjs"
   },
   "devDependencies": {
+    "@types/node": "^26.5.1",
+    "happy-dom": "^20.14.5",
     "playwright": "1.53.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",

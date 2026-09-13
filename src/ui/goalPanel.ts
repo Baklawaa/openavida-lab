@@ -4,7 +4,7 @@
  * preset), a measurable goal, and run parameters; replicates run in workers
  * and report the tick at which the goal was reached.
  */
-import { drawSweep, drawTrialSeries } from "../render/charts";
+import { drawSweep, drawTrialSeries, type TrialRun } from "../render/charts";
 import {
   FIELD_NAMES,
   SWEEP_VARIABLES,
@@ -23,7 +23,9 @@ import {
   summarizeTournament,
   worldForTrial,
   asGoals,
+  configsForManifest,
   engineInfo,
+  startSnapshot,
   makeManifest,
   worldFromSnapshot,
   type FieldName,
@@ -271,6 +273,7 @@ function template(): string {
         <span class="eyebrow">HISTORIQUE DES COURSES</span>
         <p class="micro">Les courses conservées restent dans le navigateur. Cochez-en deux à quatre pour comparer taux de réussite, médiane et effet contre la référence (la première cochée). « Manifeste » exporte la course pour le lanceur sans interface.</p>
         <div id="history-body" class="history-body"></div>
+        <div class="chart-card goal-chart"><div class="chart-heading"><h3>Courbes des courses conservées</h3><span class="micro" id="history-chart-note"></span></div><canvas id="chart-history" role="img" aria-label="Courbes des courses conservées"></canvas></div>
       </div>
 
       <div class="goal-step" id="replay-step">
@@ -1167,7 +1170,8 @@ export class GoalPanel {
     await this.refreshHistory();
   }
 
-  private async refreshHistory(): Promise<void> {
+  /** Reload the stored runs and redraw the history table. */
+  async refreshHistory(): Promise<void> {
     try {
       this.historyRecords = await this.store.listExperiments();
     } catch {
@@ -1214,12 +1218,52 @@ export class GoalPanel {
           <td>${row.successes}/${row.n} · ${pct(row.successRate)}<div class="micro">IC ${pct(row.successRateCI[0])} – ${pct(row.successRateCI[1])}</div></td>
           <td>${row.medianTicks === null ? "—" : row.medianTicks.toFixed(1)}<div class="micro">IC ${span(row.medianTicksCI)}</div></td>
           <td class="micro">${effect}</td>
-          <td>${finalSnap ? `<button type="button" class="quiet" data-history-open="${row.id}" title="Ouvrir l’état final dans le monde B">B</button>` : ""}<button type="button" class="quiet" data-history-manifest="${row.id}" title="Exporter le manifeste">Manifeste</button>
+          <td><button type="button" class="quiet" data-history-replay="${row.id}" title="Rejouer le premier réplicat de cette course dans le monde B">Rejouer</button>${finalSnap ? `<button type="button" class="quiet" data-history-open="${row.id}" title="Ouvrir l’état final dans le monde B">B</button>` : ""}<button type="button" class="quiet" data-history-manifest="${row.id}" title="Exporter le manifeste">Manifeste</button>
             <button type="button" class="quiet" data-history-remove="${row.id}" title="Retirer">×</button></td>
         </tr>`;
       })
       .join("");
     body.innerHTML = `<table class="history-table">${header}${bodyRows}</table>`;
+
+    // Overlay the stored curves of the selected runs (12 replicates each).
+    const chart = this.q<HTMLCanvasElement>("#chart-history");
+    const picked = this.historySelected
+      .map((id) => this.historyRecords.find((r) => r.id === id))
+      .filter((r): r is ExperimentRecord => Boolean(r));
+    const runs: TrialRun[] = picked.flatMap((record) =>
+      record.curves.slice(0, 12).map((curve) => ({
+        series: curve.values.map((value, i) => [i, value] as [number, number]),
+        reached: curve.reached,
+      })),
+    );
+    try {
+      drawTrialSeries(chart, Math.max(120, chart.parentElement!.clientWidth - 28), 120, runs, null);
+    } catch {
+      // A chart failure must never take the panel down (no canvas context, etc.).
+    }
+    this.q("#history-chart-note").textContent = picked.length
+      ? `${picked.length} course(s) · ${runs.length} courbe(s) · teal = objectif atteint`
+      : "Cochez une course pour tracer ses réplicats";
+  }
+
+  /** Rebuild the first replicate of a stored run from its own manifest, into world B. */
+  private replayRecord(record: ExperimentRecord, index = 0): void {
+    const config = configsForManifest(record.manifest)[index];
+    if (!config) {
+      this.opts.status("Ce manifeste ne contient aucun réplicat à rejouer.");
+      return;
+    }
+    const world = worldForTrial(startSnapshot(record.manifest), config);
+    this.opts.replayInto(world.snapshot());
+    this.q<HTMLInputElement>("#replay-seed").value = String(config.seed);
+    const known = record.results[index];
+    const expected = known
+      ? known.reachedTick !== null
+        ? `Dans la course, ce réplicat a atteint l’objectif au pas ${known.reachedTick - known.startTick}.`
+        : `Dans la course, ce réplicat n’a pas atteint l’objectif en ${known.ticks} pas.`
+      : "Aucun résultat de référence n’a été conservé pour ce réplicat.";
+    this.showReplayInfo(`<b>Monde B relancé depuis l’historique</b> · ${record.name} · pas ${world.tick}, ${world.organisms.length} organismes<br>Graine <span class="mono">${config.seed}</span> · ${expected}<br>Le monde B rejoue ce réplicat pas pour pas ; Espace met en pause, un nouveau clic sur Rejouer repart du début.`);
+    this.opts.status(`Historique : réplicat ${index + 1} de « ${record.name} » rejoué dans le monde B.`);
   }
 
   private async exportHistoryManifest(id: string): Promise<void> {
@@ -1452,6 +1496,12 @@ export class GoalPanel {
       const removeBtn = target.closest<HTMLElement>("[data-history-remove]");
       if (removeBtn?.dataset.historyRemove) {
         void this.removeHistory(removeBtn.dataset.historyRemove);
+        return;
+      }
+      const replayBtn = target.closest<HTMLElement>("[data-history-replay]");
+      if (replayBtn?.dataset.historyReplay) {
+        const record = this.historyRecords.find((r) => r.id === replayBtn.dataset.historyReplay);
+        if (record) this.replayRecord(record);
         return;
       }
       const openBtn = target.closest<HTMLElement>("[data-history-open]");

@@ -25,8 +25,14 @@ export interface ExperimentRecord {
   manifest: Manifest;
   summary: TrialSummary;
   results: TrialResult[];
-  /** Even sample of replicate curves: the metric value at each sampled tick. */
-  curves: number[][];
+  /** Even sample of replicate curves, with the outcome that colours them. */
+  curves: ExperimentCurve[];
+}
+
+export interface ExperimentCurve {
+  /** Metric value at each sampled tick. */
+  values: number[];
+  reached: boolean;
 }
 
 export interface HistoryEffect {
@@ -60,12 +66,16 @@ export function newExperimentId(now = Date.now()): string {
 }
 
 /** Even sample of replicate curves, capped so a 1000-replicate run stays drawable. */
-export function sampleCurves(results: readonly TrialResult[], max = HISTORY_CURVES): number[][] {
+export function sampleCurves(results: readonly TrialResult[], max = HISTORY_CURVES): ExperimentCurve[] {
   if (results.length === 0) return [];
   const step = Math.max(1, Math.ceil(results.length / Math.max(1, max)));
-  const out: number[][] = [];
+  const out: ExperimentCurve[] = [];
   for (let i = 0; i < results.length; i += step) {
-    out.push(results[i]!.series.map(([, value]) => value));
+    const result = results[i]!;
+    out.push({
+      values: result.series.map(([, value]) => value),
+      reached: result.reachedTick !== null,
+    });
   }
   return out;
 }

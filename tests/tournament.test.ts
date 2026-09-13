@@ -28,6 +28,7 @@ function fake(pair: [number, number], shareI: number, shareJ: number): TrialResu
     extinct: false,
     unreachable: false,
     series: [],
+    finalHash: "00000000",
     pair,
     shares: [shareI, shareJ],
   };

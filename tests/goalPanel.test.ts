@@ -3,7 +3,7 @@ import { compareResults, parseSeed } from "../src/ui/goalPanel";
 import type { TrialResult } from "../src/sim/index";
 
 const mk = (seed: number, reached: number | null, ticks: number, extinct = false): TrialResult => ({
-  seed, startTick: 100, ticks, reachedTick: reached === null ? null : 100 + reached, reachedTicks: [reached === null ? null : 100 + reached], finalValue: ticks, finalPopulation: extinct ? 0 : 5, extinct, unreachable: false, series: [],
+  seed, startTick: 100, ticks, reachedTick: reached === null ? null : 100 + reached, reachedTicks: [reached === null ? null : 100 + reached], finalValue: ticks, finalPopulation: extinct ? 0 : 5, extinct, unreachable: false, series: [], finalHash: "00000000",
 });
 
 describe("goal panel helpers", () => {

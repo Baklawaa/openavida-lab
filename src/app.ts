@@ -1235,7 +1235,7 @@ export function mount(root: HTMLElement): void {
       'Toxines <span class="legend-scale toxin-scale"></span> faible → élevé',
       'Température <span class="legend-scale temperature-scale"></span> froid → chaud',
       'Lumière <span class="legend-scale light-scale"></span> faible → élevée',
-      'Exsudat <span class="legend-scale"></span> relâché par les phototrophes productifs, consommé par les récepteurs',
+      'Exsudat <span class="legend-scale"></span> faible → élevé',
     ];
     root.querySelector("#field-legend")!.innerHTML = legends[mode]!;
   }

@@ -57,7 +57,9 @@ describe("experiment journal", () => {
     expect(rec.paramsDigest).toMatch(/^[0-9a-f]{8}$/);
     expect(rec.engine.version).toBe(engineInfo().version);
     expect(rec.curves).toHaveLength(4);
-    expect(rec.curves[0]).toEqual([1, 1]);
+    expect(rec.curves[0]!.values).toEqual([1, 1]);
+    expect(rec.curves[0]!.reached).toBe(true);
+    expect(rec.curves[3]!.reached).toBe(false);
     expect(rec.summary.successes).toBe(3);
     expect(rec.id).toMatch(/^run-/);
   });

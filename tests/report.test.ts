@@ -28,6 +28,7 @@ describe("experiment HTML report", () => {
       summary: {
         n: 3, successes: 2, successRate: 2 / 3, medianTicks: 12, meanTicks: 12, minTicks: 11, maxTicks: 13,
         p25Ticks: 11, p75Ticks: 13, meanFinalValue: 0.4, extinctions: 0, unreachable: 0,
+        successRateCI: [0.2, 0.94] as [number, number], medianTicksCI: [11, 13] as [number, number],
         perGoal: [{ successes: 2, successRate: 2 / 3, medianTicks: 12, meanTicks: 12, minTicks: 11, maxTicks: 13 }],
       },
       results,

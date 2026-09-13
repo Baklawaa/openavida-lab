@@ -116,7 +116,7 @@ describe("goal metrics", () => {
 
   it("summarizes replicates", () => {
     const mk = (reached: number | null, extinct = false): TrialResult => ({
-      seed: 1, startTick: 10, ticks: 50, reachedTick: reached, reachedTicks: [reached], finalValue: 1, finalPopulation: extinct ? 0 : 5, extinct, unreachable: false, series: [],
+      seed: 1, startTick: 10, ticks: 50, reachedTick: reached, reachedTicks: [reached], finalValue: 1, finalPopulation: extinct ? 0 : 5, extinct, unreachable: false, series: [], finalHash: "00000000",
     });
     const s = summarizeTrials([mk(30), mk(50), mk(null), mk(null, true)]);
     expect(s.n).toBe(4);
@@ -183,7 +183,7 @@ describe("goal metrics", () => {
 
   it("summarizeSweep reports one summary per value", () => {
     const mk = (reached: number | null, extinct = false): TrialResult => ({
-      seed: 1, startTick: 0, ticks: 40, reachedTick: reached, reachedTicks: [reached], finalValue: 1, finalPopulation: extinct ? 0 : 4, extinct, unreachable: false, series: [],
+      seed: 1, startTick: 0, ticks: 40, reachedTick: reached, reachedTicks: [reached], finalValue: 1, finalPopulation: extinct ? 0 : 4, extinct, unreachable: false, series: [], finalHash: "00000000",
     });
     const points = summarizeSweep([0.5, 1.5], [[mk(10), mk(20)], [mk(null), mk(null, true)]]);
     expect(points).toHaveLength(2);
