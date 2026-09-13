@@ -37,8 +37,12 @@ npm run sim -- run experiment.json --out runs/toxin --jobs 4 --resume   # after 
 ```
 
 `npm run sim` bundles `tools/openavida.ts` into `dist-cli/openavida.mjs` with
-esbuild and runs it on plain Node. Without the bundle, `npx vite-node
-tools/openavida.ts run …` works too. Replicates are independent, so `--jobs`
+esbuild and runs it on plain Node; `node tools/build-cli.mjs` followed by
+`node dist-cli/openavida.mjs run …` is the same thing in two steps. (Not with
+`vite-node`: it consumes the script path and passes no arguments, so the runner
+never sees a command. Import `runExperiment`/`runShard` from
+`tools/openavida.ts` when a test needs an in-process run.) Replicates are
+independent, so `--jobs`
 never changes a result; each shard appends one JSON line per replicate, which
 is what makes `--resume` a matter of counting the lines already written.
 Resume requires the original `--jobs`: shard files are per-layout, and the
