@@ -1,8 +1,9 @@
 /**
  * The single source of truth for simulation parameters: defaults, bounds,
  * display metadata and documentation. tests/params.test.ts asserts the table
- * covers every SimParams key exactly once, and tools/gen-model-doc.mjs writes
- * the reference table in docs/model.md from this table.
+ * covers every SimParams key exactly once, and tools/modeldoc.ts renders the
+ * reference table in docs/model.md from this table (`npm run docs`; the sync
+ * test fails when the document is stale).
  *
  * `label` is the UI string (French, like the rest of the interface until the
  * i18n pass). `description` is English and feeds the model documentation and

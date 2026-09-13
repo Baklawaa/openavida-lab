@@ -3,6 +3,9 @@
 The browser is for exploring; a run that produces a result should be a
 manifest, a command and a directory of files.
 
+The model those runs execute — its equations, constants, parameters and
+calibration record — is documented in [model.md](model.md).
+
 ## 1. Describe the run
 
 Any experiment in the **Expérience** panel — start state, goals, parameters —

@@ -105,6 +105,7 @@ describe("predators feed, grow and hunt", () => {
   });
 
   it("caps meals per predator per tick and honours a raised budget", () => {
+    // calibration:meal-budget
     const ring = () => {
       const w = arena();
       const pred = w.birth(8, 8, founderPredator(), null, false, 3)!;

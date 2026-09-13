@@ -18,6 +18,7 @@ const ENV = { nutrient: 0.5, toxin: 0, temperature: 0.5, light: 0.5, exudate: 0 
 
 describe("genome economics", () => {
   it("charges maintenance per genome base", () => {
+    // calibration:genome-economics
     const ph = decodeGenome(founderHeterotroph()).phenotype;
     const free = metabolicDelta(ph, ENV, 1, 0);
     const taxed = metabolicDelta(ph, ENV, 1, 0.00002 * 100);

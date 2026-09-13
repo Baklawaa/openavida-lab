@@ -12,6 +12,7 @@ import {
 
 describe("selection and drift", () => {
   it("recovers a known selection coefficient from a frequency trajectory", () => {
+    // calibration:selection-recovery
     const s = 0.012;
     const series: FrequencyPoint[] = [];
     for (let t = 0; t <= 200; t += 10) {

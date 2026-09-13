@@ -10,6 +10,7 @@
     "preview": "vite preview --port 4174 --strictPort --host 127.0.0.1",
     "test": "vitest run",
     "baseline": "OPENAVIDA_UPDATE_BASELINE=1 vitest run tests/engine.test.ts",
+    "docs": "OPENAVIDA_UPDATE_DOC=1 vitest run tests/modelDoc.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "gates": "node tools/gates.mjs",

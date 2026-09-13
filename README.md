@@ -12,15 +12,21 @@ npm run dev
 
 Open http://127.0.0.1:5174
 
+## Documentation
+
+- [docs/model.md](docs/model.md) — the model reference: the tick order, field transport, genome to phenotype, the energy budget, ecology, the full parameter and constant tables, the revision log and the calibration record. Its tables are generated from the code, so they cannot drift from it.
+- [docs/research.md](docs/research.md) — running experiments headlessly: manifests, the runner, what lands in a run directory, the Python reader, and how to reproduce a stored result.
+- [workbench.md](workbench.md) — the evidence log: what each upgrade stage changed, why, and what was measured.
+
 ## Interface
 
 The French interface keeps playback, field layers, world selection, and the 2D/3D view beside the simulation. The toolbox has four spaces:
 
 - **Organismes**: starter kits, placement, population injection, and the visual DNA editor.
-- **Milieu**: brushes, radius, terrain sources, random disturbances, and a timed programme (scale a field, change a parameter, or paint at a given step).
-- **Analyse**: organism inspection, traits, genome, metabolism, rankings, the death log, and an event log (lineage dominance/collapse, first predation, innovation sweep, strain extinction, population crash/boom) that opens the explorer and the nearest timeline snapshot.
+- **Milieu**: brushes, radius, terrain sources, random disturbances, a timed programme (scale a field, change a parameter, or paint at a given step), and the whole model parameter table — every field is generated from the specification that also documents it.
+- **Analyse**: organism inspection, traits, genome, metabolism, rankings, the death log, a research card (selection coefficients, neutral drift and the molecular clock, realised fitness, trait distributions), and an event log (lineage dominance/collapse, first predation, innovation sweep, strain extinction, population crash/boom) that opens the explorer and the nearest timeline snapshot.
 - **Espèces**: per-group analysis. Strains (founding genome, inherited by all descendants) or strategies (phenotype class). Population per group over time, mean traits, centroid and local environment, drift from the founder, key innovations (mutations whose lineage spread, with the environment they appeared in), deaths by cause. In strain mode, Trajectoires plots each strain's centroid path on a world-aspect map (vents as markers) and mean local temperature over time; each card reports displacement of the centre from the founder. Define named strains from the editor to compare 2–3 genomes in one environment; optionally color the plate (2D and 3D) by strain. Each strain card can overlay a 200-step occupancy heat map; the selected organism draws a 120-step trail.
-- **Expérience**: local presets, goal-directed multi-replicate runs, restore points, independent A/B steps, reset, data import/export, and experimental features.
+- **Expérience**: local presets, goal-directed multi-replicate runs, a run journal that keeps finished runs with notes, intervals, effect sizes and overlaid curves, restore points, independent A/B steps, reset, data import/export, and experimental features.
 
 ## Presets and goal runs
 
@@ -48,7 +54,7 @@ A **recette** is a tiny replayable setup: `SimParams` plus an op list (paint, pl
 
 **Programme.** In Milieu, a list of `{pas, action}` applied inside `World.step` after disturbances and before metabolism (`src/sim/schedule.ts`). Scale multiplies a field; params writes mutation rate, population cap or reproduction threshold; paint drops a blob at the plate centre. An empty list leaves the seeded core unchanged (perf hash `c2c03a81`). The fitness chart marks each scheduled tick. Snapshots, recipes (`schedule` array) and goal-run start states carry the list; `TrialConfig.schedule` can replace it.
 
-The 2D plate is letterboxed to the world aspect; charts collapse (Réduire) or move beside the plate on wide, short windows. The plate starts empty. Choose a kit and click the world, or add 24 organisms. Space toggles playback; I/O/P select inspect/place/paint; 1–5 select field layers; S saves a restore point. The expand button gives the world more space. In split view, indicators and edits follow the last clicked world. Switching to 3D shows that world individually.
+The 2D plate is letterboxed to the world aspect; charts collapse (Réduire) or move beside the plate on wide, short windows. The plate starts empty. Choose a kit and click the world, or add 24 organisms. Space toggles playback; I/O/P select inspect/place/paint; 1–6 select field layers (composite, nutrient, toxin, temperature, light, exudate); S saves a restore point. The expand button gives the world more space. In split view, indicators and edits follow the last clicked world. Switching to 3D shows that world individually.
 
 Charts use actual tick positions and a shared fitness scale, including negative values. Organisms remain visible as round markers at small cell sizes, with a ring around the selected organism. “Partager” copies the setup; JSON export preserves the current world.
 
@@ -141,4 +147,4 @@ A bare URL is still the phase-1 2D lab. Enable in the sandbox or via query:
 | Brains | `?brains=1` | Baseline perception→action traces (does not change brains-off runs) |
 | LLM brains | `?llm=1` | Optional cost-capped adapter; falls back to baseline |
 
-Inspect always shows named molecules, enzymes, and pathway fluxes derived from the genome and fields (not decorative). See `workbench.md`.
+Inspect always shows named molecules, enzymes, and pathway fluxes derived from the genome and fields (not decorative). The model itself is documented in [docs/model.md](docs/model.md); the evidence log is `workbench.md`.

@@ -18,6 +18,7 @@ import {
 
 describe("model validation", () => {
   it("conserves field mass when nothing decays and no vent feeds it", () => {
+    // calibration:field-mass-conservation
     const w = new World({ width: 24, height: 24, startPopulation: 0, seed: 4 });
     // No decay and no source: this is the diffusion kernel alone.
     Object.assign(w.params, { nutrientDecay: 0, nutrientInflow: 0, toxinDecay: 0, temperatureDecay: 0, lightDecay: 0 });
