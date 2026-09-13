@@ -1,6 +1,7 @@
 import { engineInfo, paramsDigest, type EngineInfo } from "./engine";
 import { migrateSnapshot } from "./migrate";
 import { PARAM_SPEC, QUERY_KEYS } from "./params";
+import { SNAPSHOT_BIN_MAGIC, decodeSnapshot } from "./snapshotBin";
 import { DEFAULT_PARAMS, normalizeParams, type MetricsSample, type SimParams, type WorldSnapshot } from "./types";
 import type { World } from "./world";
 
@@ -61,6 +62,26 @@ export function parseJSONSnapshot(text: string): WorldSnapshot {
     throw new Error("invalid OpenAvida snapshot");
   }
   return snap;
+}
+
+/**
+ * Read a world file without trusting its extension: the first four bytes decide
+ * the format.
+ *
+ * Two forms are accepted. The "OAV2" binary container (see ./snapshotBin) starts
+ * with SNAPSHOT_BIN_MAGIC and carries a JSON header followed by the field planes
+ * as typed arrays; the JSON text written by exportJSON is read as UTF-8. A
+ * leading byte-order mark is tolerated on the text form, because files saved by
+ * Windows tooling often carry one. A binary payload whose container is malformed
+ * or truncated throws here rather than being silently parsed as text.
+ */
+export function parseWorldBytes(bytes: ArrayBuffer): WorldSnapshot {
+  const view = new DataView(bytes);
+  if (bytes.byteLength >= 4 && view.getUint32(0, true) === SNAPSHOT_BIN_MAGIC) {
+    return decodeSnapshot(bytes);
+  }
+  const text = new TextDecoder().decode(new Uint8Array(bytes));
+  return parseJSONSnapshot(text.replace(/^\uFEFF/, ""));
 }
 
 /** Provenance record embedded in every export so a result can be tied to an engine and a run. */

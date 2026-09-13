@@ -18,6 +18,7 @@ import {
   canMutateWorld,
   handleIncoming,
   decodeGenome,
+  encodeSnapshot,
   exportEventsJSONL,
   exportJSON,
   exportMetricsCSV,
@@ -33,13 +34,13 @@ import {
   genomeForKit,
   inspectBiochem,
   mappingLegend,
-  parseJSONSnapshot,
   pathwaysHtml,
   RoomSession,
   strongestLiving,
   tallyDeaths,
   tracesHtml,
   parseShareURL,
+  parseWorldBytes,
   recipeFromQuery,
   peerColor,
   provenanceOf,
@@ -93,13 +94,21 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return n;
 }
 
-function download(filename: string, text: string, mime: string): void {
-  const blob = new Blob([text], { type: mime });
+function saveBlob(filename: string, blob: Blob): void {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+function download(filename: string, text: string, mime: string): void {
+  saveBlob(filename, new Blob([text], { type: mime }));
+}
+
+/** Binary twin of download: the .oav container is an ArrayBuffer, not text. */
+function downloadBytes(filename: string, bytes: ArrayBuffer, mime: string): void {
+  saveBlob(filename, new Blob([bytes], { type: mime }));
 }
 
 /**
@@ -1358,6 +1367,9 @@ export function mount(root: HTMLElement): void {
   root.querySelector("#btn-json")!.addEventListener("click", () => {
     download(`openavida-t${current().tick}.json`, exportJSON(current()), "application/json");
   });
+  root.querySelector("#btn-oav")!.addEventListener("click", () => {
+    downloadBytes(`openavida-t${current().tick}.oav`, encodeSnapshot(current().snapshot()), "application/octet-stream");
+  });
   root.querySelector("#btn-csv")!.addEventListener("click", () => {
     download(`openavida-metrics-t${current().tick}.csv`, exportMetricsCSV(current().history, provenanceOf(current())), "text/csv");
   });
@@ -1397,8 +1409,9 @@ export function mount(root: HTMLElement): void {
     const file = (ev.target as HTMLInputElement).files?.[0];
     if (!file) return;
     try {
-      const text = await file.text();
-      host.apply({ kind: "restore", which: sideOf(current()), snapshot: parseJSONSnapshot(text) });
+      // One import path for both world files: parseWorldBytes sniffs OAV2 vs JSON.
+      const bytes = await file.arrayBuffer();
+      host.apply({ kind: "restore", which: sideOf(current()), snapshot: parseWorldBytes(bytes) });
       selectOrganism(current(), -1);
       status(tDynamic("app.import.done"));
       refreshMetrics();

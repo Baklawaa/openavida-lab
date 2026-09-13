@@ -169,7 +169,7 @@ export const SHELL_EN = {
   "btn.phylo": "Lineages CSV",
   "btn.events": "Events JSONL",
   "btn.manifest": "Run manifest",
-  "btn.import": "Import a world JSON",
+  "btn.import": "Import a world (JSON or .oav)",
   "opt.events": "Event log",
   "opt.events.hint": "Births, deaths, meals, exudate, recombinations — bounded, for external analysis",
   "panel.experimental": "Experimental features",

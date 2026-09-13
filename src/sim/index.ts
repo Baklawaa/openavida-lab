@@ -106,6 +106,7 @@ export {
   worldFromSnapshot,
   type ExportProvenance,
 } from "./sandbox";
+export { parseWorldBytes } from "./serialize";
 export {
   genotypeShannon,
   lineageShannon,

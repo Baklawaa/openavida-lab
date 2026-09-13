@@ -553,3 +553,14 @@ First wave of stages 9–10, implemented by three subagents on disjoint files. *
 - One deliberate copy change, confirmed line by line: both goldens gained exactly the new button label (`Importer un manifeste` / `Import a manifest`).
 - GATES: typecheck ok (both configs); vitest **283/283** (64 files); build ok; ten browser verifier runs OK; baseline unchanged `e953dcdc`.
 
+
+## Upgrade Stage 9.2 / 10a — binary world files, and the Expérience panel split (2026-09-14)
+
+Second wave, two subagents on disjoint files. **No model change: the perf hash stays `e953dcdc`.**
+
+- **9.2 World files.** `parseWorldBytes(bytes)` (`src/sim/serialize.ts`, now exported from the sim barrel) sniffs the container: the little-endian magic `0x4f415632` selects `decodeSnapshot`, anything else is UTF-8 JSON with a BOM tolerated. The header keeps **Exporter le monde** (JSON) and the Expérience data row gains **Exporter en .oav** (the `OAV2` container, ~4× smaller, exact round trip) beside **Importer un monde (JSON ou .oav)**; the import reads bytes, so the extension never decides. `tests/worldBytes.test.ts` covers the binary round trip (including `hashState` after `worldFromSnapshot`), JSON, BOM JSON, a truncated container and noise; `verify-interface` exports a `.oav`, checks the four magic bytes and re-imports it after bottling the world, asserting population and tick come back. `docs/research.md` gained a "World files" section (and now states the on-disk magic correctly: the bytes read `2VAO`, the word is `OAV2`).
+- **10a `goalPanel.ts` split, 1898 → 690 lines** with no behaviour change: `goalContext.ts` (state + services contract), `goalWizard.ts` (goal definition), `goalRunView.ts` (progress, results, chart, CSV, report, persistence), `goalSweep.ts` (sweep + tournament) and `goalHistoryView.ts` (journal, replay, catalogue); `goalPanel.ts` keeps the template, `bind()`, presets, recipe, `run()`, `manifest()` and `loadManifest()`. The public API and every DOM id and catalog key are unchanged, and `goalPanel.ts` still re-exports `compareResults`/`parseSeed`/`RESULT_SORTS`/the ceilings/`SEED_HINT` so no import site or test moved. The split is proved by the copy goldens staying byte-identical apart from the deliberate `.oav` strings.
+- Two follow-ups I made after the wave: the new parser is exported from `src/sim/index.ts` (the barrel is the public sim API), and the import copy no longer claims JSON-only (`btn.import`, `help.btn-import`, `help.btn-json`, plus a new `help.btn-oav` tooltip).
+- One design correction the gate caught: the `.oav` export button started in the header and pushed the 360 px layout into overflow; it moved into the Expérience data row next to the import, which is also where a world file belongs. `verify-interface`'s five responsive widths pass again.
+- GATES: typecheck ok (both configs); vitest **288/288** (65 files); build ok; ten browser verifier runs OK; baseline unchanged `e953dcdc`.
+

@@ -148,9 +148,12 @@ export const APP_FR = {
   "app.eventsLog.on": "Journal d’événements activé (borné, export JSONL).",
   "app.eventsLog.off": "Journal d’événements désactivé.",
 
+  /* world files -------------------------------------------------------------- */
+  "btn.oav": "Exporter en .oav",
+
   /* import ------------------------------------------------------------------- */
   "app.import.done": "Monde importé avec succès.",
-  "app.import.failed": "Import impossible : choisissez un fichier JSON exporté depuis OpenAvida.",
+  "app.import.failed": "Import impossible : choisissez un fichier JSON ou .oav exporté depuis OpenAvida.",
 
   /* editor and selection ----------------------------------------------------- */
   "app.dna.opened": "ADN de l’organisme {id} ouvert dans l’éditeur. Modifiez-le, puis appliquez-le ou placez un nouvel organisme.",

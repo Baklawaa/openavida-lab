@@ -112,3 +112,26 @@ Results recorded under an older engine reproduce from the annotated tag
 `engine-v1` (pre-upgrade) or by running the engine version named in the
 manifest; `tests/baselines/engine.json` pins the canonical behaviour hash for
 the current revision.
+
+## 6. World files
+
+The interface writes a world in two interchangeable forms, and the import
+sniffs the content, so the extension never decides how a file is read.
+
+- **JSON** (`openavida-t<tick>.json`): the `WorldSnapshot` as readable text,
+  easy to diff and inspect by hand.
+- **`.oav`** (`openavida-t<tick>.oav`): the compact binary container
+  (`src/sim/snapshotBin.ts`). A little-endian header — the magic word
+  `0x4f415632` (which spells `OAV2` when read as bytes from the high end, so a
+  hex dump shows `2VAO`), the format version, the header length and the snapshot
+  JSON — is followed by one `Float32` plane per field and a `Uint8` terrain
+  plane. Field grids are already `Float32Array`-backed in the world, so the
+  round trip is exact and the file is roughly four times smaller than the JSON
+  form.
+
+Both restore the same state through the Experiment panel's import control,
+which reads the file as bytes and calls `parseWorldBytes`
+(`src/sim/serialize.ts`): the binary magic selects the decoder, and
+anything else is parsed as JSON text with a leading BOM tolerated. A truncated
+or foreign payload fails the import with a visible status message rather than
+half-loading a world.

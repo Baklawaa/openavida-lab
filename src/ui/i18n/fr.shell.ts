@@ -174,7 +174,7 @@ export const SHELL_FR = {
   "btn.phylo": "Lignées CSV",
   "btn.events": "Événements JSONL",
   "btn.manifest": "Manifeste de la course",
-  "btn.import": "Importer un monde JSON",
+  "btn.import": "Importer un monde (JSON ou .oav)",
   "opt.events": "Journal d’événements",
   "opt.events.hint": "Naissances, morts, repas, exsudat, recombinaisons — borné, pour l’analyse externe",
   "panel.experimental": "Fonctions expérimentales",

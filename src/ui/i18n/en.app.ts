@@ -143,9 +143,12 @@ export const APP_EN = {
   "app.eventsLog.on": "Event log enabled (bounded, JSONL export).",
   "app.eventsLog.off": "Event log disabled.",
 
+  /* world files -------------------------------------------------------------- */
+  "btn.oav": "Export as .oav",
+
   /* import ------------------------------------------------------------------- */
   "app.import.done": "World imported successfully.",
-  "app.import.failed": "Import failed: choose a JSON file exported from OpenAvida.",
+  "app.import.failed": "Import failed: choose a JSON or .oav file exported from OpenAvida.",
 
   /* editor and selection ----------------------------------------------------- */
   "app.dna.opened": "DNA of organism {id} opened in the editor. Edit it, then apply it or place a new organism.",

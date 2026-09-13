@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 // End-to-end checks against the running app; use the installed Chrome browser.
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -273,6 +273,22 @@ try {
   await page.locator('#import-file').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('invalid') });
   await page.waitForFunction(() => document.querySelector('#status-line').textContent.includes('Import impossible'));
   assert.equal((await probe()).population, exportedPopulation);
+
+  // The .oav container is the compact form of the same world; import sniffs it.
+  const exportedTick = (await probe()).tick;
+  const oavEvent = page.waitForEvent('download');
+  await page.locator('#btn-oav').click();
+  const oav = await oavEvent;
+  assert.match(oav.suggestedFilename(), /openavida.*\.oav/);
+  await oav.saveAs('scratch/interface/export.oav');
+  // The container magic is the little-endian uint32 0x4f415632, so the four
+  // bytes on disk read "2VAO" (the header, fields and terrain follow).
+  assert.deepEqual([...readFileSync('scratch/interface/export.oav').subarray(0, 4)], [0x32, 0x56, 0x41, 0x4f]);
+  await page.locator('#btn-bottle').click();
+  assert.ok((await probe()).population < exportedPopulation);
+  await page.locator('#import-file').setInputFiles('scratch/interface/export.oav');
+  await page.waitForFunction(n => window.__openavida.population === n, exportedPopulation);
+  assert.equal((await probe()).tick, exportedTick);
 
   // Presets: save, load into the active world, remove until the list is empty.
   while (await page.locator('.preset-row [data-act="remove"]').count()) {
