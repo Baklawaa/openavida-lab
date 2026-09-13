@@ -5,9 +5,11 @@
  * reference table in docs/model.md from this table (`npm run docs`; the sync
  * test fails when the document is stale).
  *
- * `label` is the UI string (French, like the rest of the interface until the
- * i18n pass). `description` is English and feeds the model documentation and
- * the research exports.
+ * `unit` is a unit **id** (cells, perTick, energy/base, …), never display text:
+ * the interface resolves it through its locale catalog (src/ui/i18n), which also
+ * owns every parameter label and the French column of the descriptions.
+ * `description` is English and feeds the model documentation, the panel's
+ * English text and the research exports.
  */
 import type { SimParams } from "./types";
 
@@ -15,7 +17,7 @@ export type ParamGroup = "world" | "metabolism" | "ecology" | "evolution" | "che
 
 export interface ParamSpec {
   key: keyof SimParams;
-  label: string;
+  /** Unit id, resolved to display text by the interface catalog. */
   unit: string;
   group: ParamGroup;
   kind: "number" | "boolean";
@@ -29,197 +31,197 @@ export interface ParamSpec {
 
 const PARAM_SPEC_LIST = [
   {
-    key: "width", label: "Largeur", unit: "cellules", group: "world", kind: "number",
+    key: "width", unit: "cells", group: "world", kind: "number",
     min: 8, max: 256, step: 1, integer: true, default: 128,
     description: "Plate width in cells.",
   },
   {
-    key: "height", label: "Hauteur", unit: "cellules", group: "world", kind: "number",
+    key: "height", unit: "cells", group: "world", kind: "number",
     min: 8, max: 256, step: 1, integer: true, default: 128,
     description: "Plate height in cells.",
   },
   {
-    key: "seed", label: "Graine", unit: "", group: "world", kind: "number",
+    key: "seed", unit: "", group: "world", kind: "number",
     min: 1, max: 4294967295, step: 1, integer: true, default: 0xa7f31ab,
     description: "Master seed of the mulberry32 stream. All simulation randomness derives from it.",
   },
   {
-    key: "startPopulation", label: "Population initiale", unit: "organismes", group: "world", kind: "number",
+    key: "startPopulation", unit: "organisms", group: "world", kind: "number",
     min: 0, max: 100000, step: 1, integer: true, default: 0,
     description: "Founders placed at construction (kits first, then random genomes). Capped by maxPopulation.",
   },
   {
-    key: "maxPopulation", label: "Population maximale", unit: "organismes", group: "world", kind: "number",
+    key: "maxPopulation", unit: "organisms", group: "world", kind: "number",
     min: 16, max: 1000000, step: 1, integer: true, default: 1100,
     description: "Hard ceiling on living organisms; a soft density-dependent fecundity gate applies below it.",
   },
   {
-    key: "randomTerrain", label: "Relief aléatoire", unit: "", group: "world", kind: "boolean",
+    key: "randomTerrain", unit: "", group: "world", kind: "boolean",
     min: 0, max: 1, step: 1, default: false,
     description: "Seed vents, walls and shade at construction.",
   },
   {
-    key: "disturbances", label: "Événements aléatoires", unit: "", group: "world", kind: "boolean",
+    key: "disturbances", unit: "", group: "world", kind: "boolean",
     min: 0, max: 1, step: 1, default: false,
     description: "Enable stochastic toxin pulses, droughts and crashes during the run.",
   },
   {
-    key: "diffusionRate", label: "Diffusion", unit: "par pas", group: "metabolism", kind: "number",
+    key: "diffusionRate", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.22,
     description: "Jacobi diffusion coefficient for nutrient, toxin and temperature (0 = no mixing).",
   },
   {
-    key: "nutrientInflow", label: "Recyclage des nutriments", unit: "par pas", group: "metabolism", kind: "number",
+    key: "nutrientInflow", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 0.2, step: 0.001, default: 0.004,
     description: "Uniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay.",
   },
   {
-    key: "nutrientDecay", label: "Décroissance nutriments", unit: "par pas", group: "metabolism", kind: "number",
+    key: "nutrientDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.007,
     description: "Fractional loss of the nutrient field per tick.",
   },
   {
-    key: "toxinDecay", label: "Décroissance toxines", unit: "par pas", group: "metabolism", kind: "number",
+    key: "toxinDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.006,
     description: "Fractional loss of the toxin field per tick.",
   },
   {
-    key: "temperatureDecay", label: "Décroissance thermique", unit: "par pas", group: "metabolism", kind: "number",
+    key: "temperatureDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.002,
     description: "Relaxation of the temperature field towards 0 per tick.",
   },
   {
-    key: "lightDecay", label: "Décroissance lumière", unit: "par pas", group: "metabolism", kind: "number",
+    key: "lightDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.03,
     description: "Fractional loss of the light field per tick before solar recharge.",
   },
   {
-    key: "reproduceEnergy", label: "Seuil de reproduction", unit: "énergie", group: "metabolism", kind: "number",
+    key: "reproduceEnergy", unit: "energy", group: "metabolism", kind: "number",
     min: 0.05, max: 100, step: 0.05, default: 1.55,
     description: "Base energy a cell must hold to divide; scaled by the fecundity trait.",
   },
   {
-    key: "maxAge", label: "Âge maximal", unit: "pas", group: "metabolism", kind: "number",
+    key: "maxAge", unit: "steps", group: "metabolism", kind: "number",
     min: 1, max: 100000, step: 1, integer: true, default: 260,
     description: "Hard age ceiling. With senescenceRate > 0 most deaths happen well before it.",
   },
   {
-    key: "predationThreshold", label: "Seuil de prédation", unit: "agression", group: "metabolism", kind: "number",
+    key: "predationThreshold", unit: "aggression", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.26,
     description: "Minimum aggression for an organism to be a predator at all.",
   },
   {
-    key: "maxMealsPerTick", label: "Repas par pas", unit: "proies", group: "metabolism", kind: "number",
+    key: "maxMealsPerTick", unit: "prey", group: "metabolism", kind: "number",
     min: 1, max: 8, step: 1, integer: true, default: 1,
     description: "Maximum prey a predator can eat in one tick across all phases; density-independent attack limit.",
   },
   {
-    key: "kinThreshold", label: "Seuil de parenté", unit: "agression", group: "ecology", kind: "number",
+    key: "kinThreshold", unit: "aggression", group: "ecology", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.1,
     description: "Minimum aggression gap required for a kill. 0 allows cannibalism of identical phenotypes.",
   },
   {
-    key: "mutationRate", label: "Taux de mutation", unit: "par naissance", group: "evolution", kind: "number",
+    key: "mutationRate", unit: "perBirth", group: "evolution", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.12,
     description: "Probability that a birth draws a mutation; scaled per organism by the mutator trait.",
   },
   {
-    key: "pointWeight", label: "Poids ponctuel", unit: "relatif", group: "evolution", kind: "number",
+    key: "pointWeight", unit: "relative", group: "evolution", kind: "number",
     min: 0, max: 10, step: 0.05, default: 0.7,
     description: "Relative weight of single-base substitutions among mutations.",
   },
   {
-    key: "indelWeight", label: "Poids indels", unit: "relatif", group: "evolution", kind: "number",
+    key: "indelWeight", unit: "relative", group: "evolution", kind: "number",
     min: 0, max: 10, step: 0.05, default: 0.2,
     description: "Relative weight of insertions and deletions (1 to 3 bases) among mutations.",
   },
   {
-    key: "duplicationWeight", label: "Poids duplications", unit: "relatif", group: "evolution", kind: "number",
+    key: "duplicationWeight", unit: "relative", group: "evolution", kind: "number",
     min: 0, max: 10, step: 0.05, default: 0.1,
     description: "Relative weight of tandem duplications among mutations.",
   },
   {
-    key: "recombinationRate", label: "Recombinaison", unit: "par naissance", group: "evolution", kind: "number",
+    key: "recombinationRate", unit: "perBirth", group: "evolution", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0,
     description: "Probability that a birth takes a single-point crossover with a nearby neighbour (sex and horizontal transfer share this operator).",
   },
   {
-    key: "recombinationRadius", label: "Rayon de recombinaison", unit: "cellules", group: "evolution", kind: "number",
+    key: "recombinationRadius", unit: "cells", group: "evolution", kind: "number",
     min: 0, max: 32, step: 1, integer: true, default: 3,
     description: "Chebyshev radius within which a recombination partner is drawn.",
   },
   {
-    key: "regulationEnabled", label: "Régulation cis", unit: "", group: "evolution", kind: "boolean",
+    key: "regulationEnabled", unit: "", group: "evolution", kind: "boolean",
     min: 0, max: 1, step: 1, default: true,
     description: "Amplify a gene by the codons upstream of its ATG (cis-regulatory layer). Off restores the purely additive decoder.",
   },
   {
-    key: "lightDiffusion", label: "Diffusion lumière", unit: "par pas", group: "metabolism", kind: "number",
+    key: "lightDiffusion", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0,
     description: "Diffusion of the light field. 0 keeps light where the solar recharge and shade put it.",
   },
   {
-    key: "senescenceRate", label: "Sénescence", unit: "risque", group: "metabolism", kind: "number",
+    key: "senescenceRate", unit: "risk", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.005, default: 0.02,
     description: "Scale of the age-dependent mortality hazard (1 - exp(-rate (age/maxAge)^2)). 0 = hard maxAge cutoff only.",
   },
   {
-    key: "exudateLeak", label: "Fuite d’exsudat", unit: "fraction", group: "chemistry", kind: "number",
+    key: "exudateLeak", unit: "fraction", group: "chemistry", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.15,
     description: "Share of the photosynthetic surplus a phototroph leaks into the exudate field.",
   },
   {
-    key: "exudateDecay", label: "Décroissance exsudat", unit: "par pas", group: "chemistry", kind: "number",
+    key: "exudateDecay", unit: "perTick", group: "chemistry", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.03,
     description: "Fractional loss of the exudate field per tick.",
   },
   {
-    key: "exudateDiffusion", label: "Diffusion exsudat", unit: "par pas", group: "chemistry", kind: "number",
+    key: "exudateDiffusion", unit: "perTick", group: "chemistry", kind: "number",
     min: 0, max: 1, step: 0.01, default: 0.5,
     description: "Diffusion of the exudate field; how far a leak travels from its producer.",
   },
   {
-    key: "genomeUpkeep", label: "Coût du génome", unit: "énergie/base/pas", group: "evolution", kind: "number",
+    key: "genomeUpkeep", unit: "energyPerBasePerTick", group: "evolution", kind: "number",
     min: 0, max: 0.01, step: 0.00001, default: 0.00002,
     description: "Maintenance cost per genome base per tick, so longer genomes are not free.",
   },
   {
-    key: "replicationCost", label: "Coût de réplication", unit: "énergie/base", group: "evolution", kind: "number",
+    key: "replicationCost", unit: "energyPerBase", group: "evolution", kind: "number",
     min: 0, max: 0.05, step: 0.0001, default: 0.001,
     description: "Energy charged per genome base at division, on top of the daughter's share.",
   },
   {
-    key: "toxinPulseRate", label: "Risque de pic toxique", unit: "par pas", group: "world", kind: "number",
+    key: "toxinPulseRate", unit: "perTick", group: "world", kind: "number",
     min: 0, max: 1, step: 0.0005, default: 0.015625,
     description: "Per-tick hazard of a random toxin pulse when disturbances are enabled (default 1/64).",
   },
   {
-    key: "droughtRate", label: "Risque de sécheresse", unit: "par pas", group: "world", kind: "number",
+    key: "droughtRate", unit: "perTick", group: "world", kind: "number",
     min: 0, max: 1, step: 0.0005, default: 0.011363636363636364,
     description: "Per-tick hazard of a nutrient drought when disturbances are enabled (default 1/88).",
   },
   {
-    key: "crashRate", label: "Risque de crise", unit: "par pas", group: "world", kind: "number",
+    key: "crashRate", unit: "perTick", group: "world", kind: "number",
     min: 0, max: 1, step: 0.0005, default: 0.008333333333333333,
     description: "Per-tick hazard of a population crash when disturbances are enabled (default 1/120).",
   },
   {
-    key: "recordTraitDistribution", label: "Distributions de traits", unit: "", group: "world", kind: "boolean",
+    key: "recordTraitDistribution", unit: "", group: "world", kind: "boolean",
     min: 0, max: 1, step: 1, default: true,
     description: "Store mean, sd and quantiles of every trait on each history sample (analysis without re-simulation).",
   },
   {
-    key: "recordEvents", label: "Journal d’événements", unit: "", group: "world", kind: "boolean",
+    key: "recordEvents", unit: "", group: "world", kind: "boolean",
     min: 0, max: 1, step: 1, default: false,
     description: "Record every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring).",
   },
   {
-    key: "dilutionRate", label: "Taux de dilution", unit: "par pas", group: "world", kind: "number",
+    key: "dilutionRate", unit: "perTick", group: "world", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0,
     description: "Chemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. 0 = closed batch world.",
   },
   {
-    key: "inflowNutrient", label: "Nutriment d’entrée", unit: "concentration", group: "world", kind: "number",
+    key: "inflowNutrient", unit: "concentration", group: "world", kind: "number",
     min: 0, max: 4, step: 0.01, default: 0.12,
     description: "Nutrient concentration the inflow restores when dilutionRate > 0.",
   },

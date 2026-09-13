@@ -1,5 +1,6 @@
 /** Presentation only: simulation state and event handlers live in app.ts. */
-import { LOCALES, locale, t } from "./i18n/runtime";
+import { DNA_KITS } from "../sim/kits";
+import { LOCALES, kitDescription, kitLabel, kitShort, locale, t } from "./i18n/runtime";
 
 export function icon(name: string): string {
   const paths: Record<string, string> = {
@@ -33,13 +34,34 @@ export function icon(name: string): string {
   return `<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.life}</svg>`;
 }
 
-export const KIT_COPY: Record<string, { label: string; short: string; description: string; icon: string }> = {
-  phototroph: { label: "Phototrophe", short: "photo ×6 · size ×2 · resist ×1", description: "Gain d’énergie proportionnel au champ lumineux local. Dépend de la lumière, pas des nutriments.", icon: "sun" },
-  heterotroph: { label: "Hétérotrophe", short: "uptake ×6 · motility ×3 · fecundity ×2", description: "Prélève le nutriment local. Sans apport de nutriments, la population s’effondre.", icon: "leaf" },
-  resistant: { label: "Résistant", short: "resist ×5 · uptake ×3 · tpref ×2", description: "Ignore une fraction des dommages des toxines. Témoin utile face aux sources toxiques.", icon: "shield" },
-  predator: { label: "Prédateur", short: "aggression ×5 · motility ×3 · uptake ×2", description: "Prélève l’énergie des voisins plus faibles. Requiert une population établie.", icon: "hunt" },
-  mutualist: { label: "Mutualiste", short: "signal ×2 · uptake ×3 · photo ×2", description: "Photosynthétise et porte un récepteur (signal ≥ 1) : il consomme l’exsudat relâché par les phototrophes productifs voisins.", icon: "mutual" },
+export interface KitCopy {
+  label: string;
+  short: string;
+  description: string;
+  icon: string;
+}
+
+/** Icons are presentation, so they stay with the layout; the copy is catalogued. */
+const KIT_ICON: Record<string, string> = {
+  phototroph: "sun",
+  heterotroph: "leaf",
+  resistant: "shield",
+  predator: "hunt",
+  mutualist: "mutual",
 };
+
+/** Presentation copy of every starter kit, in the active locale. */
+export const KIT_COPY: Record<string, KitCopy> = Object.fromEntries(
+  DNA_KITS.map((kit) => [
+    kit.id,
+    {
+      label: kitLabel(kit.id),
+      short: kitShort(kit.id),
+      description: kitDescription(kit.id),
+      icon: KIT_ICON[kit.id] ?? "life",
+    },
+  ]),
+);
 
 /** Options of the language picker, with the active locale selected. */
 function languageOptions(): string {

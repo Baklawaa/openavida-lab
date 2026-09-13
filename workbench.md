@@ -518,3 +518,14 @@ Localisation, first chunk of the approved plan. **No model change: the perf hash
 - **`tools/verify-i18n.mjs`** renders the same scripted state in both locales and requires every migrated panel to change language, no French left in the English copy, the picker to round-trip, and the English header not to overflow at 390 px. It carries the same shrinking discipline (pending buckets, and a pending flag for the help catalog).
 - GATES: `npm run typecheck` ok (both configs); `npx vitest run` 271/271; `node tools/gates.mjs` nine verifiers OK; baseline unchanged `e953dcdc`.
 
+
+## Upgrade Stage 8.2 — help, labels, kits and parameters (2026-09-14)
+
+Localisation, second chunk. **No model change: the perf hash stays `e953dcdc`.**
+
+- **Help catalog moved.** The 223 `CONTROL_HELP` entries left `src/ui/help.ts` for `src/ui/i18n/fr.help.ts` (keys `help.<controlId>`, text verbatim) with a full English translation in `en.help.ts`. `src/ui/help.ts` is now only the accessor: `helpIds()`, `helpFor(id)`, `controlHelp()` for the probe, and `attachControlHelp`. The lint test reported `src/ui/help.ts` as migrated, so it left the pending list in the same commit.
+- **Label catalogs.** `fr.labels.ts`/`en.labels.ts` (about 190 keys) own traits (label, hint, abbreviation), death causes (long and short), brushes, field units, strategies, starter-kit copy and model groups. `src/ui/labels.ts` now *builds* the same maps from the catalog, so all ~50 existing call sites (`TRAIT_LABEL[t]`, `Object.keys(DEATH_LABEL)`) keep working while the copy lives in one place. `STRATEGY_LABEL` and the species-panel abbreviations moved out of `src/sim/species.ts` and `speciesPanel.ts`; the sim layer keeps ids and colours only.
+- **Parameters.** `PARAM_SPEC` no longer carries copy: `label` is gone and `unit` is a unit **id** (`cells`, `perTick`, `energyPerBase`, …). `fr.params.ts`/`en.params.ts` hold 39 labels, 39 descriptions and 14 unit names each. The **English descriptions are byte-identical to `PARAM_SPEC.description`** and a test enforces it, so the panel, the reference document and the research exports cannot drift. The French descriptions are new: the panel used to show the English spec text as its sub-label.
+- **One deliberate copy change**, confirmed by the fixture gate: the French rendering differs only in the model panel's sub-labels, which are now French (`ui-copy.fr.json` regenerated).
+- GATES: typecheck ok (both configs); vitest 272/272 (63 files); build ok; nine browser verifiers OK; baseline unchanged `e953dcdc`.
+

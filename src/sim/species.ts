@@ -117,13 +117,7 @@ export function phenotypeChanges(parent: Phenotype, child: Phenotype): TraitChan
 
 export type Strategy = "phototroph" | "heterotroph" | "mixotroph" | "predator" | "mutualist";
 export const STRATEGIES: readonly Strategy[] = ["phototroph", "heterotroph", "mixotroph", "predator", "mutualist"];
-export const STRATEGY_LABEL: Record<Strategy, string> = {
-  phototroph: "Phototrophes",
-  heterotroph: "Hétérotrophes",
-  mixotroph: "Mixotrophes",
-  predator: "Prédateurs",
-  mutualist: "Mutualistes",
-};
+/* Display names live in the interface catalog (src/ui/labels.ts). */
 export const STRATEGY_COLOR: Record<Strategy, string> = {
   phototroph: "#f0d35a",
   heterotroph: "#3ee0c0",

@@ -31,7 +31,10 @@ const PENDING_BUCKETS = [
 ];
 /** The picker names each language in its own language, in every locale. */
 const LANGUAGE_NAMES = /Français/g;
-/** True while src/ui/help.ts still holds the French help catalog (chunk 8.2). */
+/**
+ * True while some `data-help` text is still generated in French outside the
+ * catalog (the DNA editor's codon tiles until chunk 8.3).
+ */
 const PENDING_HELP = true;
 
 const browser = await chromium.launch({ headless: true, channel: "chrome" });

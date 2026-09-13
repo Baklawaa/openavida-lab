@@ -62,7 +62,7 @@ import {
 } from "./sim/index";
 import { shouldWriteEditor, type EditorSyncReason } from "./ui/editorSync";
 import { formatSpeed, ticksDue } from "./ui/speed";
-import { CONTROL_HELP, attachControlHelp } from "./ui/help";
+import { attachControlHelp, controlHelp } from "./ui/help";
 import { applyTool, pointerAction, type LabTool } from "./ui/pointer";
 import { makeSelf, openRoomChannel } from "./ui/roomChannel";
 import { createLabLayout, icon, KIT_COPY } from "./ui/layout";
@@ -1603,7 +1603,7 @@ export function mount(root: HTMLElement): void {
   tip.hidden = true;
   document.body.append(tip);
   attachControlHelp(root, tip);
-  window.__openavidaHelp = CONTROL_HELP;
+  window.__openavidaHelp = controlHelp();
 
   let chartsPref = "1";
   try { chartsPref = localStorage.getItem("openavida.charts") ?? "1"; } catch { /* storage unavailable */ }

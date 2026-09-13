@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BRUSH_KINDS, DNA_KITS, PARAM_SPEC } from "../src/sim/index";
 import { BRUSH_LABEL, BRUSH_ORDER, FIELD_LABEL, TRAIT_HINT, TRAIT_LABEL } from "../src/ui/labels";
 import { KIT_COPY } from "../src/ui/layout";
+import { paramDescription as paramDescriptionLocale, paramLabel as paramLabelLocale } from "../src/ui/i18n/runtime";
 import { FIELD_NAMES, TRAIT_NAMES } from "../src/sim/index";
 
 describe("UI copy stays in sync with the simulation", () => {
@@ -26,6 +27,9 @@ describe("UI copy stays in sync with the simulation", () => {
       expect(TRAIT_HINT[trait]!.length).toBeGreaterThan(10);
     }
     for (const field of FIELD_NAMES) expect(FIELD_LABEL[field]!.length).toBeGreaterThan(1);
-    for (const spec of PARAM_SPEC) expect(spec.label.length).toBeGreaterThan(1);
+    for (const spec of PARAM_SPEC) {
+      expect(paramLabelLocale(spec.key).length, spec.key).toBeGreaterThan(1);
+      expect(paramDescriptionLocale(spec.key).length, spec.key).toBeGreaterThan(10);
+    }
   });
 });

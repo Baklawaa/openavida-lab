@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { paramLabel } from "../src/ui/i18n/runtime";
 import {
   DEFAULT_PARAMS,
   PARAMS_EXHAUSTIVE,
@@ -57,7 +58,8 @@ describe("parameter spec", () => {
     expect(paramSpec("width")?.integer).toBe(true);
     expect(paramSpec("disturbances")?.kind).toBe("boolean");
     for (const spec of PARAM_SPEC) {
-      expect(spec.label.length, spec.key).toBeGreaterThan(1);
+      // Labels are interface copy and live in the locale catalogs now.
+      expect(paramLabel(spec.key), spec.key).not.toBe(`param.${spec.key}.label`);
       expect(spec.description.length, spec.key).toBeGreaterThan(10);
     }
   });

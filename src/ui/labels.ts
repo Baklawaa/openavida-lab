@@ -1,33 +1,48 @@
+/**
+ * Label maps for the interface, built from the locale catalog.
+ *
+ * The active locale is fixed for the life of a page — switching language
+ * reloads — so these can be plain objects built once at module load: every call
+ * site keeps indexing them (`TRAIT_LABEL[trait]`, `Object.keys(DEATH_LABEL)`)
+ * while the copy itself lives in src/ui/i18n.
+ */
 import type { TraitName } from "../sim/mapping";
+import { TRAIT_NAMES } from "../sim/mapping";
+import type { Strategy } from "../sim/species";
+import { STRATEGIES } from "../sim/species";
+import { BRUSH_KINDS, type BrushKind, type DeathCause } from "../sim/types";
 import type { FieldName } from "../sim/fields";
-import type { BrushKind, DeathCause } from "../sim/types";
+import { FIELD_NAMES } from "../sim/fields";
+import {
+  brushLabel,
+  deathLabel,
+  deathShortLabel,
+  fieldLabel,
+  schedParamLabel,
+  strategyLabel,
+  traitAbbr,
+  traitHint,
+  traitLabel,
+} from "./i18n/runtime";
 
-export const DEATH_LABEL: Record<DeathCause, string> = {
-  starvation: "Manque de nourriture ou de lumière", toxin: "Intoxication", crowding: "Surpopulation",
-  "old-age": "Vieillesse", predation: "Prédation", competition: "Compétition",
-  crash: "Événement aléatoire", wipe: "Retrait au pinceau", bottleneck: "Goulot d’étranglement",
-  washout: "Évacuation (changement de milieu)",
-};
+function labelMap<T extends string>(keys: readonly T[], value: (key: T) => string): Record<T, string> {
+  return Object.fromEntries(keys.map((key) => [key, value(key)])) as Record<T, string>;
+}
 
-export const TRAIT_LABEL: Record<TraitName, string> = {
-  uptake: "Nutrition", photo: "Photosynthèse", resist: "Résistance", tpref: "Température",
-  motility: "Mobilité", aggression: "Prédation", signal: "Coopération", hue: "Couleur",
-  fecundity: "Reproduction", size: "Taille", mutator: "Mutabilité",
-};
+/** Every death cause; the simulation keeps the list, the labels live here. */
+export const DEATH_CAUSES: readonly DeathCause[] = [
+  "starvation", "toxin", "crowding", "old-age", "predation",
+  "competition", "crash", "wipe", "bottleneck", "washout",
+];
 
-export const TRAIT_HINT: Record<TraitName, string> = {
-  uptake: "Absorbe les nutriments disponibles dans le milieu.",
-  photo: "Transforme la lumière locale en énergie.",
-  resist: "Réduit les dommages causés par les toxines.",
-  tpref: "Définit la température idéale de l’organisme.",
-  motility: "Augmente la capacité à se déplacer.",
-  aggression: "Permet de tirer de l’énergie de ses proies.",
-  signal: "Définit le canal de coopération entre organismes.",
-  hue: "Modifie la couleur, sans effet sur la fitness.",
-  fecundity: "Modifie la capacité à se reproduire.",
-  size: "Modifie la taille et le coût énergétique d’entretien.",
-  mutator: "Multiplie le taux de mutation des naissances de cet organisme (0,25 à 4).",
-};
+export const DEATH_LABEL: Record<DeathCause, string> = labelMap(DEATH_CAUSES, deathLabel);
+export const DEATH_SHORT: Record<DeathCause, string> = labelMap(DEATH_CAUSES, deathShortLabel);
+export const TRAIT_LABEL: Record<TraitName, string> = labelMap(TRAIT_NAMES, traitLabel);
+export const TRAIT_HINT: Record<TraitName, string> = labelMap(TRAIT_NAMES, traitHint);
+export const TRAIT_ABBR: Record<TraitName, string> = labelMap(TRAIT_NAMES, traitAbbr);
+export const BRUSH_LABEL: Record<BrushKind, string> = labelMap(BRUSH_KINDS, brushLabel);
+export const FIELD_LABEL: Record<FieldName, string> = labelMap(FIELD_NAMES, fieldLabel);
+export const STRATEGY_LABEL: Record<Strategy, string> = labelMap(STRATEGIES, strategyLabel);
 
 /** Every brush, in the order the Milieu palette shows them. */
 export const BRUSH_ORDER: readonly BrushKind[] = [
@@ -35,31 +50,7 @@ export const BRUSH_ORDER: readonly BrushKind[] = [
   "nutrientVent", "toxinVent", "thermalVent", "shade", "wipeOrgs",
 ];
 
-export const BRUSH_LABEL: Record<BrushKind, string> = {
-  barrier: "Obstacle",
-  erase: "Gomme",
-  nutrientVent: "Source nutritive",
-  toxinVent: "Source toxique",
-  thermalVent: "Source de chaleur",
-  shade: "Ombre",
-  nutrientBlob: "Nutriments",
-  toxinBlob: "Toxines",
-  heatBlob: "Chaleur",
-  lightBlob: "Lumière",
-  wipeOrgs: "Retirer la vie",
-};
-
-export const FIELD_LABEL: Record<FieldName, string> = {
-  nutrient: "nutriments",
-  toxin: "toxines",
-  temperature: "température",
-  light: "lumière",
-  exudate: "exsudat",
-};
-
 /** Parameters a scheduled programme can write. */
-export const SCHED_PARAM_LABEL: Record<string, string> = {
-  mutationRate: "taux de mutation",
-  maxPopulation: "population max",
-  reproduceEnergy: "seuil de reproduction",
-};
+export const SCHED_PARAM_LABEL: Record<string, string> = Object.fromEntries(
+  ["mutationRate", "maxPopulation", "reproduceEnergy"].map((key) => [key, schedParamLabel(key)]),
+);

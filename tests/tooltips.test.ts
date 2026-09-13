@@ -1,15 +1,19 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { TRAIT_NAMES } from "../src/sim/index";
-import { CONTROL_HELP, LAB_CONTROL_IDS, attachControlHelp } from "../src/ui/help";
+import { LAB_CONTROL_IDS, attachControlHelp, controlHelp } from "../src/ui/help";
+import { helpFor, setLocale } from "../src/ui/i18n/runtime";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appSrc = ["src/app.ts", "src/ui/layout.ts", "src/ui/dnaEditor.ts", "src/ui/speciesPanel.ts", "src/ui/goalPanel.ts", "src/ui/explorer.ts", "src/ui/labels.ts", "src/ui/modelPanel.ts"].map(path => readFileSync(resolve(root, path), "utf8")).join("\n");
 
 describe("control help catalog", () => {
+  beforeEach(() => setLocale("fr", { persist: false }));
+
   it("covers every labeled lab control with a non-empty explanation", () => {
+    const CONTROL_HELP = controlHelp();
     expect(LAB_CONTROL_IDS.length).toBeGreaterThan(30);
     expect(appSrc).toContain("attachControlHelp");
     for (const id of LAB_CONTROL_IDS) {
@@ -51,8 +55,8 @@ describe("control help catalog", () => {
     const attached = attachControlHelp(fakeRoot as unknown as ParentNode, { hidden: true } as HTMLElement);
     expect(attached).toBe(3);
     for (const id of want) {
-      expect(store.get(id)?.title).toBe(CONTROL_HELP[id]);
-      expect(store.get(id)?.["data-help"]).toBe(CONTROL_HELP[id]);
+      expect(store.get(id)?.title).toBe(helpFor(id));
+      expect(store.get(id)?.["data-help"]).toBe(helpFor(id));
     }
   });
 });

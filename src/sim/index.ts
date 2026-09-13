@@ -177,7 +177,6 @@ export {
   STRAIN_COLORS,
   STRATEGIES,
   STRATEGY_COLOR,
-  STRATEGY_LABEL,
   groupStats,
   innovationSpread,
   keyInnovations,

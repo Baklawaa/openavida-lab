@@ -206,6 +206,34 @@ export function strategyLabel(strategy: string): string {
   return tDynamic(`strategy.${strategy}`);
 }
 
+/** Short trait abbreviation used by the species strip and the explorer. */
+export function traitAbbr(trait: string): string {
+  return tDynamic(`trait.${trait}.abbr`);
+}
+
+/** Scheduled-parameter name in the programme list. */
+export function schedParamLabel(key: string): string {
+  return tDynamic(`schedParam.${key}`);
+}
+
+/** Model parameter group heading. */
+export function modelGroupTitle(group: string): string {
+  return tDynamic(`model.group.${group}`);
+}
+
+/** Starter-kit copy; the icon is presentation and stays in layout.ts. */
+export function kitLabel(id: string): string {
+  return tDynamic(`kit.${id}.label`);
+}
+
+export function kitShort(id: string): string {
+  return tDynamic(`kit.${id}.short`);
+}
+
+export function kitDescription(id: string): string {
+  return tDynamic(`kit.${id}.description`);
+}
+
 /* ----------------------------------------------------------- completeness */
 
 /** Keys the active (or given) locale does not translate yet. */

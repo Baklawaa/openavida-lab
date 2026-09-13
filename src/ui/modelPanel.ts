@@ -7,7 +7,7 @@
  * parameters the user actually changed are sent to the host.
  */
 import { PARAM_SPEC, type ParamGroup, type ParamSpec, type SimParams } from "../sim/index";
-import { CONTROL_HELP } from "./help";
+import { helpFor, modelGroupTitle, paramDescription, paramLabel, paramUnit } from "./i18n/runtime";
 
 export const MODEL_GROUPS: readonly ParamGroup[] = [
   "world",
@@ -16,14 +16,6 @@ export const MODEL_GROUPS: readonly ParamGroup[] = [
   "chemistry",
   "evolution",
 ];
-
-const GROUP_TITLE: Record<ParamGroup, string> = {
-  world: "Monde",
-  metabolism: "Métabolisme",
-  ecology: "Écologie",
-  chemistry: "Exsudat et chimie",
-  evolution: "Évolution",
-};
 
 /**
  * Values that restore the shape of the pre-upgrade engine. Not promised to be
@@ -107,9 +99,10 @@ export class ModelPanel {
     // Keep the control help catalog honest: every control advertises its text.
     for (const id of ["model-target", "model-apply", "model-reset", "model-legacy"]) {
       const el = this.host.querySelector<HTMLElement>("#" + id);
-      if (el && CONTROL_HELP[id]) {
-        el.setAttribute("title", CONTROL_HELP[id]!);
-        el.setAttribute("data-help", CONTROL_HELP[id]!);
+      const text = helpFor(id);
+      if (el && text && text !== `help.${id}`) {
+        el.setAttribute("title", text);
+        el.setAttribute("data-help", text);
       }
     }
   }
@@ -134,10 +127,12 @@ export class ModelPanel {
             spec.kind === "boolean"
               ? `<input type="checkbox" data-param="${spec.key}" id="param-${spec.key}">`
               : `<input type="number" data-param="${spec.key}" id="param-${spec.key}" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
-          return `<label class="model-row" for="param-${spec.key}" title="${spec.description}"><span>${spec.label}<small>${spec.description}</small></span><span class="model-input">${control}<em>${spec.unit}</em></span></label>`;
+          const label = paramLabel(spec.key);
+          const description = paramDescription(spec.key);
+          return `<label class="model-row" for="param-${spec.key}" title="${description}"><span>${label}<small>${description}</small></span><span class="model-input">${control}<em>${paramUnit(spec.unit)}</em></span></label>`;
         })
         .join("");
-      return `<div class="model-group"><h3>${GROUP_TITLE[group]}</h3>${rows}</div>`;
+      return `<div class="model-group"><h3>${modelGroupTitle(group)}</h3>${rows}</div>`;
     }).join("");
     this.host.innerHTML = `${groups}
       <div class="row model-actions">

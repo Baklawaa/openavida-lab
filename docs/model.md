@@ -235,44 +235,44 @@ research events.
 
 | Key | Group | Type | Default | Bounds | Step | Unit | Meaning |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `width` | world | number | 128 | 8-256 | 1 | cellules | Plate width in cells. |
-| `height` | world | number | 128 | 8-256 | 1 | cellules | Plate height in cells. |
+| `width` | world | number | 128 | 8-256 | 1 | cells | Plate width in cells. |
+| `height` | world | number | 128 | 8-256 | 1 | cells | Plate height in cells. |
 | `seed` | world | number | 0xa7f31ab (176107947) | 1-4294967295 | 1 | - | Master seed of the mulberry32 stream. All simulation randomness derives from it. |
-| `startPopulation` | world | number | 0 | 0-100000 | 1 | organismes | Founders placed at construction (kits first, then random genomes). Capped by maxPopulation. |
-| `maxPopulation` | world | number | 1100 | 16-1000000 | 1 | organismes | Hard ceiling on living organisms; a soft density-dependent fecundity gate applies below it. |
+| `startPopulation` | world | number | 0 | 0-100000 | 1 | organisms | Founders placed at construction (kits first, then random genomes). Capped by maxPopulation. |
+| `maxPopulation` | world | number | 1100 | 16-1000000 | 1 | organisms | Hard ceiling on living organisms; a soft density-dependent fecundity gate applies below it. |
 | `randomTerrain` | world | flag | false | 0-1 | 1 | - | Seed vents, walls and shade at construction. |
 | `disturbances` | world | flag | false | 0-1 | 1 | - | Enable stochastic toxin pulses, droughts and crashes during the run. |
-| `diffusionRate` | metabolism | number | 0.22 | 0-1 | 0.01 | par pas | Jacobi diffusion coefficient for nutrient, toxin and temperature (0 = no mixing). |
-| `nutrientInflow` | metabolism | number | 0.004 (1/250) | 0-0.2 | 0.001 | par pas | Uniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay. |
-| `nutrientDecay` | metabolism | number | 0.007 | 0-1 | 0.001 | par pas | Fractional loss of the nutrient field per tick. |
-| `toxinDecay` | metabolism | number | 0.006 | 0-1 | 0.001 | par pas | Fractional loss of the toxin field per tick. |
-| `temperatureDecay` | metabolism | number | 0.002 (1/500) | 0-1 | 0.001 | par pas | Relaxation of the temperature field towards 0 per tick. |
-| `lightDecay` | metabolism | number | 0.03 | 0-1 | 0.001 | par pas | Fractional loss of the light field per tick before solar recharge. |
-| `reproduceEnergy` | metabolism | number | 1.55 | 0.05-100 | 0.05 | énergie | Base energy a cell must hold to divide; scaled by the fecundity trait. |
-| `maxAge` | metabolism | number | 260 | 1-100000 | 1 | pas | Hard age ceiling. With senescenceRate > 0 most deaths happen well before it. |
-| `predationThreshold` | metabolism | number | 0.26 | 0-1 | 0.01 | agression | Minimum aggression for an organism to be a predator at all. |
-| `maxMealsPerTick` | metabolism | number | 1 | 1-8 | 1 | proies | Maximum prey a predator can eat in one tick across all phases; density-independent attack limit. |
-| `kinThreshold` | ecology | number | 0.1 (1/10) | 0-1 | 0.01 | agression | Minimum aggression gap required for a kill. 0 allows cannibalism of identical phenotypes. |
-| `mutationRate` | evolution | number | 0.12 | 0-1 | 0.01 | par naissance | Probability that a birth draws a mutation; scaled per organism by the mutator trait. |
-| `pointWeight` | evolution | number | 0.7 | 0-10 | 0.05 | relatif | Relative weight of single-base substitutions among mutations. |
-| `indelWeight` | evolution | number | 0.2 (1/5) | 0-10 | 0.05 | relatif | Relative weight of insertions and deletions (1 to 3 bases) among mutations. |
-| `duplicationWeight` | evolution | number | 0.1 (1/10) | 0-10 | 0.05 | relatif | Relative weight of tandem duplications among mutations. |
-| `recombinationRate` | evolution | number | 0 | 0-1 | 0.01 | par naissance | Probability that a birth takes a single-point crossover with a nearby neighbour (sex and horizontal transfer share this operator). |
-| `recombinationRadius` | evolution | number | 3 | 0-32 | 1 | cellules | Chebyshev radius within which a recombination partner is drawn. |
+| `diffusionRate` | metabolism | number | 0.22 | 0-1 | 0.01 | perTick | Jacobi diffusion coefficient for nutrient, toxin and temperature (0 = no mixing). |
+| `nutrientInflow` | metabolism | number | 0.004 (1/250) | 0-0.2 | 0.001 | perTick | Uniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay. |
+| `nutrientDecay` | metabolism | number | 0.007 | 0-1 | 0.001 | perTick | Fractional loss of the nutrient field per tick. |
+| `toxinDecay` | metabolism | number | 0.006 | 0-1 | 0.001 | perTick | Fractional loss of the toxin field per tick. |
+| `temperatureDecay` | metabolism | number | 0.002 (1/500) | 0-1 | 0.001 | perTick | Relaxation of the temperature field towards 0 per tick. |
+| `lightDecay` | metabolism | number | 0.03 | 0-1 | 0.001 | perTick | Fractional loss of the light field per tick before solar recharge. |
+| `reproduceEnergy` | metabolism | number | 1.55 | 0.05-100 | 0.05 | energy | Base energy a cell must hold to divide; scaled by the fecundity trait. |
+| `maxAge` | metabolism | number | 260 | 1-100000 | 1 | steps | Hard age ceiling. With senescenceRate > 0 most deaths happen well before it. |
+| `predationThreshold` | metabolism | number | 0.26 | 0-1 | 0.01 | aggression | Minimum aggression for an organism to be a predator at all. |
+| `maxMealsPerTick` | metabolism | number | 1 | 1-8 | 1 | prey | Maximum prey a predator can eat in one tick across all phases; density-independent attack limit. |
+| `kinThreshold` | ecology | number | 0.1 (1/10) | 0-1 | 0.01 | aggression | Minimum aggression gap required for a kill. 0 allows cannibalism of identical phenotypes. |
+| `mutationRate` | evolution | number | 0.12 | 0-1 | 0.01 | perBirth | Probability that a birth draws a mutation; scaled per organism by the mutator trait. |
+| `pointWeight` | evolution | number | 0.7 | 0-10 | 0.05 | relative | Relative weight of single-base substitutions among mutations. |
+| `indelWeight` | evolution | number | 0.2 (1/5) | 0-10 | 0.05 | relative | Relative weight of insertions and deletions (1 to 3 bases) among mutations. |
+| `duplicationWeight` | evolution | number | 0.1 (1/10) | 0-10 | 0.05 | relative | Relative weight of tandem duplications among mutations. |
+| `recombinationRate` | evolution | number | 0 | 0-1 | 0.01 | perBirth | Probability that a birth takes a single-point crossover with a nearby neighbour (sex and horizontal transfer share this operator). |
+| `recombinationRadius` | evolution | number | 3 | 0-32 | 1 | cells | Chebyshev radius within which a recombination partner is drawn. |
 | `regulationEnabled` | evolution | flag | true | 0-1 | 1 | - | Amplify a gene by the codons upstream of its ATG (cis-regulatory layer). Off restores the purely additive decoder. |
-| `lightDiffusion` | metabolism | number | 0 | 0-1 | 0.01 | par pas | Diffusion of the light field. 0 keeps light where the solar recharge and shade put it. |
-| `senescenceRate` | metabolism | number | 0.02 (1/50) | 0-1 | 0.005 | risque | Scale of the age-dependent mortality hazard (1 - exp(-rate (age/maxAge)^2)). 0 = hard maxAge cutoff only. |
+| `lightDiffusion` | metabolism | number | 0 | 0-1 | 0.01 | perTick | Diffusion of the light field. 0 keeps light where the solar recharge and shade put it. |
+| `senescenceRate` | metabolism | number | 0.02 (1/50) | 0-1 | 0.005 | risk | Scale of the age-dependent mortality hazard (1 - exp(-rate (age/maxAge)^2)). 0 = hard maxAge cutoff only. |
 | `exudateLeak` | chemistry | number | 0.15 | 0-1 | 0.01 | fraction | Share of the photosynthetic surplus a phototroph leaks into the exudate field. |
-| `exudateDecay` | chemistry | number | 0.03 | 0-1 | 0.001 | par pas | Fractional loss of the exudate field per tick. |
-| `exudateDiffusion` | chemistry | number | 0.5 (1/2) | 0-1 | 0.01 | par pas | Diffusion of the exudate field; how far a leak travels from its producer. |
-| `genomeUpkeep` | evolution | number | 0.00002 (1/50000) | 0-0.01 | 0.00001 | énergie/base/pas | Maintenance cost per genome base per tick, so longer genomes are not free. |
-| `replicationCost` | evolution | number | 0.001 (1/1000) | 0-0.05 | 0.0001 | énergie/base | Energy charged per genome base at division, on top of the daughter's share. |
-| `toxinPulseRate` | world | number | 0.015625 (1/64) | 0-1 | 0.0005 | par pas | Per-tick hazard of a random toxin pulse when disturbances are enabled (default 1/64). |
-| `droughtRate` | world | number | 0.011363636363636364 (1/88) | 0-1 | 0.0005 | par pas | Per-tick hazard of a nutrient drought when disturbances are enabled (default 1/88). |
-| `crashRate` | world | number | 0.008333333333333333 (1/120) | 0-1 | 0.0005 | par pas | Per-tick hazard of a population crash when disturbances are enabled (default 1/120). |
+| `exudateDecay` | chemistry | number | 0.03 | 0-1 | 0.001 | perTick | Fractional loss of the exudate field per tick. |
+| `exudateDiffusion` | chemistry | number | 0.5 (1/2) | 0-1 | 0.01 | perTick | Diffusion of the exudate field; how far a leak travels from its producer. |
+| `genomeUpkeep` | evolution | number | 0.00002 (1/50000) | 0-0.01 | 0.00001 | energyPerBasePerTick | Maintenance cost per genome base per tick, so longer genomes are not free. |
+| `replicationCost` | evolution | number | 0.001 (1/1000) | 0-0.05 | 0.0001 | energyPerBase | Energy charged per genome base at division, on top of the daughter's share. |
+| `toxinPulseRate` | world | number | 0.015625 (1/64) | 0-1 | 0.0005 | perTick | Per-tick hazard of a random toxin pulse when disturbances are enabled (default 1/64). |
+| `droughtRate` | world | number | 0.011363636363636364 (1/88) | 0-1 | 0.0005 | perTick | Per-tick hazard of a nutrient drought when disturbances are enabled (default 1/88). |
+| `crashRate` | world | number | 0.008333333333333333 (1/120) | 0-1 | 0.0005 | perTick | Per-tick hazard of a population crash when disturbances are enabled (default 1/120). |
 | `recordTraitDistribution` | world | flag | true | 0-1 | 1 | - | Store mean, sd and quantiles of every trait on each history sample (analysis without re-simulation). |
 | `recordEvents` | world | flag | false | 0-1 | 1 | - | Record every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring). |
-| `dilutionRate` | world | number | 0 | 0-1 | 0.001 | par pas | Chemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. 0 = closed batch world. |
+| `dilutionRate` | world | number | 0 | 0-1 | 0.001 | perTick | Chemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. 0 = closed batch world. |
 | `inflowNutrient` | world | number | 0.12 | 0-4 | 0.01 | concentration | Nutrient concentration the inflow restores when dilutionRate > 0. |
 <!-- /generated:params -->
 

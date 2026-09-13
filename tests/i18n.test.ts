@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { PARAM_SPEC } from "../src/sim/index";
 import { EN, EN_SECTIONS } from "../src/ui/i18n/en";
 import { FR, FR_SECTIONS } from "../src/ui/i18n/fr";
 import {
@@ -12,12 +13,16 @@ import {
   locale,
   localeFromQuery,
   missingTranslations,
+  paramDescription,
+  paramLabel,
+  paramUnit,
   normalizeLocale,
   resetLocale,
   resolveLocale,
   setLocale,
   t,
   tn,
+  type MessageKey,
 } from "../src/ui/i18n/runtime";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,17 +37,12 @@ const PENDING_MIGRATION: readonly string[] = [
   "src/sim/catalog.ts",
   "src/sim/dnaEdit.ts",
   "src/sim/events.ts",
-  "src/sim/params.ts",
-  "src/sim/species.ts",
   "src/sim/tournament.ts",
   "src/sim/world.ts",
   "src/ui/dnaEditor.ts",
   "src/ui/explorer.ts",
   "src/ui/experimentHistory.ts",
   "src/ui/goalPanel.ts",
-  "src/ui/help.ts",
-  "src/ui/labels.ts",
-  "src/ui/layout.ts",
   "src/ui/modelPanel.ts",
   "src/ui/presetStore.ts",
   "src/ui/report.ts",
@@ -141,8 +141,31 @@ describe("message catalogs", () => {
       "diag.fixation",
       "diag.extinctions",
       "guide.eyebrow",
+      "trait.fecundity.label",
+      "param.diffusionRate.label",
+      "unit.aggression",
+      "unit.concentration",
+      "unit.fraction",
     ]);
-    for (const key of identical) expect(allowed.has(key), `${key} is untranslated`).toBe(true);
+    // Trait abbreviations are symbols and the kit summaries name trait ids, so
+    // some of them coincide across locales by design.
+    const allowedShape = /^(trait\.[a-z]+\.abbr|kit\.[a-z]+\.short)$/;
+    for (const key of identical) {
+      expect(allowed.has(key) || allowedShape.test(key), `${key} is untranslated`).toBe(true);
+    }
+  });
+
+  it("documents every parameter in both locales, matching the specification", () => {
+    for (const spec of PARAM_SPEC) {
+      // The English column of docs/model.md is the spec's own text: no drift.
+      expect((EN as Record<MessageKey, string | undefined>)[`param.${spec.key}.desc` as MessageKey], spec.key).toBe(
+        spec.description,
+      );
+      expect(paramLabel(spec.key), spec.key).not.toContain("param.");
+      expect(paramLabel(spec.key).length, spec.key).toBeGreaterThan(1);
+      expect(paramDescription(spec.key).length, spec.key).toBeGreaterThan(10);
+      if (spec.unit !== "") expect(paramUnit(spec.unit).length, spec.unit).toBeGreaterThan(1);
+    }
   });
 
   it("interpolates named placeholders and leaves unknown ones visible", () => {

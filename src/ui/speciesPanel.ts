@@ -10,7 +10,6 @@ import {
   CAUSE_COLOR,
   STRATEGIES,
   STRATEGY_COLOR,
-  STRATEGY_LABEL,
   TERRAIN,
   TRAIT_COLOR,
   TRAIT_NAMES,
@@ -31,9 +30,9 @@ import {
   type TraitChange,
   type TraitName,
 } from "../sim/index";
-import { CONTROL_HELP } from "./help";
+import { helpFor } from "./i18n/runtime";
 import type { DeathRecord } from "../sim/types";
-import { DEATH_LABEL, TRAIT_LABEL } from "./labels";
+import { DEATH_LABEL, STRATEGY_LABEL, TRAIT_ABBR, TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
 
 export type GroupMode = "strains" | "strategies";
@@ -52,11 +51,6 @@ export interface SpeciesPanelOptions {
   onHeatStrain(strainId: number | null): void;
   openMutation(innovation: Innovation): void;
 }
-
-const TRAIT_ABBR: Record<TraitName, string> = {
-  uptake: "Nut", photo: "Pho", resist: "Rés", tpref: "T°", motility: "Mob",
-  aggression: "Pré", signal: "Coo", hue: "Cou", fecundity: "Rep", size: "Tai", mutator: "Mut",
-};
 
 function pct(t: TraitName, v: number): number {
   return t === "signal" ? (v / 7) * 100 : Math.max(0, Math.min(100, v * 50));
@@ -229,7 +223,7 @@ export class SpeciesPanel {
       ? `<input class="group-name" value="${strain.name.replace(/"/g, "&quot;")}" data-strain="${strain.id}" aria-label="Nom de la souche" maxlength="32">`
       : `<b class="group-label">${s.label}</b>`;
     const ops = strain
-      ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="Charger ce génome dans l’éditeur et activer Placer">Placer</button><button type="button" data-act="inject" data-strain="${strain.id}" title="Injecter 24 organismes de cette souche">+24</button><button type="button" data-act="heat" data-strain="${strain.id}" class="${w.heatStrainId === strain.id ? "active" : ""}" title="${CONTROL_HELP["btn-heat-strain"]}">Carte de présence</button></span>`
+      ? `<span class="chip-ops"><button type="button" data-act="place" data-strain="${strain.id}" title="Charger ce génome dans l’éditeur et activer Placer">Placer</button><button type="button" data-act="inject" data-strain="${strain.id}" title="Injecter 24 organismes de cette souche">+24</button><button type="button" data-act="heat" data-strain="${strain.id}" class="${w.heatStrainId === strain.id ? "active" : ""}" title="${helpFor("btn-heat-strain")}">Carte de présence</button></span>`
       : "";
     const state = extinct ? `<span class="tiny group-state">${everLived ? "éteinte" : "non placée"}</span>` : `<span class="tiny">${(s.share * 100).toFixed(0)} %</span>`;
     const path = strainTrack(w.history, s.key, Math.max(1, w.history.length - 1));
@@ -258,7 +252,7 @@ export class SpeciesPanel {
         innov = `<div class="group-innov"><span class="eyebrow">CHANGEMENTS CLÉS</span><ul>${inns
           .map((i) => {
             const see = i.genome && i.parentGenome
-              ? `<button type="button" class="quiet btn-see-mutation" data-act="mutation" data-inn="${i.id}" title="${CONTROL_HELP["btn-see-mutation"]}" data-help="${CONTROL_HELP["btn-see-mutation"]}">Voir la mutation</button>`
+              ? `<button type="button" class="quiet btn-see-mutation" data-act="mutation" data-inn="${i.id}" title="${helpFor("btn-see-mutation")}" data-help="${helpFor("btn-see-mutation")}">Voir la mutation</button>`
               : "";
             return `<li><b class="mono">pas ${i.tick}</b> ${i.changes.map(changeText).join(" · ")}${see}<div class="tiny">${i.living} descendant${i.living > 1 ? "s" : ""} vivant${i.living > 1 ? "s" : ""} · né à T ${fmt(i.env.temperature)}, nutr ${fmt(i.env.nutrient)}, lum ${fmt(i.env.light)}</div></li>`;
           })

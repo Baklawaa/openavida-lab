@@ -14,7 +14,6 @@ import {
   CATALOG_SORTS,
   STRATEGIES,
   STRATEGY_COLOR,
-  STRATEGY_LABEL,
   TRAIT_COLOR,
   TRAIT_NAMES,
   World,
@@ -43,7 +42,7 @@ import {
 import type { LineageNode } from "../sim/types";
 import { LineageTreeView } from "../render/lineageTreeCanvas";
 import { layoutLineageTree, lineageStrainMap, type TreeNode } from "../render/lineageTreeLayout";
-import { DEATH_LABEL, TRAIT_LABEL } from "./labels";
+import { DEATH_LABEL, DEATH_SHORT, STRATEGY_LABEL, TRAIT_LABEL } from "./labels";
 import { icon } from "./layout";
 import type { PresetStore, SavedOrganism, SavedOrganismMeta } from "./presetStore";
 
@@ -310,7 +309,7 @@ export class Explorer {
   }
 
   private rowHtml(e: CatalogEntry): string {
-    const state = e.alive ? `<span class="hit">vivant</span>` : `<span class="dead" title="${esc(DEATH_LABEL[e.cause!])} au pas ${e.deathTick}">${esc(CAUSE_SHORT_FR[e.cause!] ?? e.cause!)}</span>`;
+    const state = e.alive ? `<span class="hit">vivant</span>` : `<span class="dead" title="${esc(DEATH_LABEL[e.cause!])} au pas ${e.deathTick}">${esc(DEATH_SHORT[e.cause!] ?? e.cause!)}</span>`;
     const sel = this.selected?.id === e.id && this.selected.alive === e.alive ? " selected" : "";
     return `<tr class="ex-row${sel}" data-id="${e.id}" data-alive="${e.alive ? 1 : 0}"><td class="mono">${e.id}</td><td>${state}</td><td class="mono num">${e.age}</td><td class="mono num">${fmt(e.fitness)}</td><td class="mono num">${e.energy === null ? "—" : fmt(e.energy, 2)}</td><td class="mono num">${e.kills}</td><td class="mono num">${e.births}</td><td class="mono num">${fmt(e.mass, 2)}</td><td class="mono">${e.lineageId}</td></tr>`;
   }
@@ -825,11 +824,6 @@ export class Explorer {
     }
   }
 }
-
-const CAUSE_SHORT_FR: Partial<Record<DeathCause, string>> = {
-  starvation: "faim", toxin: "toxines", crowding: "surpopulation", "old-age": "vieillesse", predation: "prédation",
-  competition: "compétition", crash: "événement", wipe: "pinceau", bottleneck: "goulot",
-};
 
 /** Vertical evolution branch: one card per lineage from the founder, mutations that opened it, biggest changes marked. */
 export function ancestryHtml(steps: readonly AncestryStep[], now: number): string {
