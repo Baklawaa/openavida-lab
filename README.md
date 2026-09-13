@@ -14,8 +14,10 @@ Open http://127.0.0.1:5174
 
 ## Documentation
 
+- [docs/README.md](docs/README.md) — the documentation index: what each page covers, and who it is written for.
 - [docs/model.md](docs/model.md) — the model reference: the tick order, field transport, genome to phenotype, the energy budget, ecology, the full parameter and constant tables, the revision log and the calibration record. Its tables are generated from the code, so they cannot drift from it.
 - [docs/research.md](docs/research.md) — running experiments headlessly: manifests, the runner, what lands in a run directory, the Python reader, and how to reproduce a stored result.
+- [docs/formats.md](docs/formats.md) — the persisted formats and their compatibility rules: the world snapshot, the OAV2 container, the manifest, the recipe, the browser stores, the engine lineage and the research exports.
 - [workbench.md](workbench.md) — the evidence log: what each upgrade stage changed, why, and what was measured.
 
 ## Language

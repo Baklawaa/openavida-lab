@@ -280,6 +280,9 @@ export class GoalPanel {
     const w = ctx.world();
     const name = ctx.q<HTMLInputElement>("#preset-name").value.trim();
     const meta = await ctx.store.save(name, w.snapshot(), ctx.activeWorld());
+    // A refused write reports itself through the store's problem listener; it
+    // must not be followed by a success message.
+    if (!meta) return;
     ctx.q<HTMLInputElement>("#preset-name").value = "";
     await this.refreshPresets();
     ctx.q<HTMLSelectElement>("#goal-source").value = meta.id;

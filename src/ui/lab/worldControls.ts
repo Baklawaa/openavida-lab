@@ -164,7 +164,14 @@ export function createWorldControls(ctx: LabContext): WorldControls {
     });
   });
   const helpDialog = root.querySelector<HTMLDialogElement>("#help-dialog")!;
-  root.querySelector("#btn-help")!.addEventListener("click", () => helpDialog.showModal());
+  const helpButton = root.querySelector<HTMLElement>("#btn-help")!;
+  helpButton.addEventListener("click", () => {
+    helpDialog.showModal();
+    // showModal() runs the focusing steps and moves focus inside the dialog;
+    // the native close event — the Escape path included — hands it back to the
+    // control that opened it, so the keyboard resumes where it left off.
+    helpDialog.addEventListener("close", () => helpButton.focus(), { once: true });
+  });
   root.querySelector(".brand")!.addEventListener("click", ev => { ev.preventDefault(); openPanel("organisms"); });
   root.querySelector("#btn-focus")!.addEventListener("click", () => {
     const focused = root.classList.toggle("focus-mode");

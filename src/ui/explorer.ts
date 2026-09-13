@@ -187,6 +187,8 @@ export class Explorer {
   private treeFocus = -1;
   private treeObserver: ResizeObserver | null = null;
   private compare: { first: string; second: string; firstLabel: string; secondLabel: string } | null = null;
+  /** Control focused when the dialog opened; the close event focuses it again. */
+  private opener: HTMLElement | null = null;
 
   constructor(dialog: HTMLDialogElement, opts: ExplorerOptions) {
     this.dialog = dialog;
@@ -210,7 +212,14 @@ export class Explorer {
   }
 
   open(view: ExplorerView = {}): void {
-    if (!this.dialog.open) this.dialog.showModal();
+    if (!this.dialog.open) {
+      // Read the opener before showModal() runs the focusing steps and moves
+      // focus inside the dialog. The body is not a useful return point: a click
+      // on the lineage-tree canvas leaves nothing to focus there.
+      const active = document.activeElement;
+      this.opener = active instanceof HTMLElement && active !== document.body ? active : null;
+      this.dialog.showModal();
+    }
     this.reload();
     if (view.filter || view.sort) this.setFilterInputs(view.filter ?? {}, view.sort);
     if (view.tab) this.setTab(view.tab);
@@ -654,7 +663,10 @@ export class Explorer {
       strainName: w.strains.get(e.strainId)?.name ?? "—",
     };
     if (includeWorld) rec.snapshot = w.snapshot();
-    await this.opts.store.saveOrganism(rec);
+    const stored = await this.opts.store.saveOrganism(rec);
+    // The store reports a refused write itself; a success message on top of it
+    // would contradict what actually happened.
+    if (!stored) return;
     this.q("#ex-save-form").hidden = true;
     await this.refreshSaved();
     this.opts.status(tDynamic("explorer.save.done", { id: e.id, name: rec.name, world: includeWorld ? tDynamic("explorer.save.withWorld") : "" }));
@@ -690,6 +702,20 @@ export class Explorer {
 
   private bind(): void {
     const d = this.dialog;
+    // Escape, the close button and every programmatic close fire this, so the
+    // keyboard comes back to the control that opened the explorer.
+    d.addEventListener("close", () => {
+      const opener = this.opener;
+      this.opener = null;
+      if (opener?.isConnected) {
+        opener.focus();
+        return;
+      }
+      // Opened from the lineage-tree canvas, which cannot take focus: drop the
+      // focus the dialog's own controls held, so Tab resumes from the document
+      // instead of a button hidden inside a closed dialog.
+      if (d.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    });
     d.querySelectorAll<HTMLElement>("[data-etab]").forEach((b) => b.addEventListener("click", () => this.setTab(b.dataset.etab as ExplorerTab)));
     this.q("#ex-close").addEventListener("click", () => this.close());
     this.q("#ex-refresh").addEventListener("click", () => this.reload());

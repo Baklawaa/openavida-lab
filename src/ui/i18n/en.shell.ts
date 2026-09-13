@@ -169,6 +169,9 @@ export const SHELL_EN = {
   "btn.phylo": "Lineages CSV",
   "btn.events": "Events JSONL",
   "btn.manifest": "Run manifest",
+  // See fr.shell.ts: the other help texts live in en.help.ts; this one belongs
+  // to the data row and sits next to the copy of the button it explains.
+  "help.btn-manifest-import": "Load a manifest exported from OpenAvida: it fixes the starting state, goals, seed and parameters of the next targeted run until it is cleared.",
   "btn.import": "Import a world (JSON or .oav)",
   "opt.events": "Event log",
   "opt.events.hint": "Births, deaths, meals, exudate, recombinations — bounded, for external analysis",
@@ -209,5 +212,6 @@ export const SHELL_EN = {
   "guide.layers": "Environment layers",
   "guide.snap": "Remember",
   "guide.footer": "3D: drag to rotate, wheel to zoom. A / B shows two worlds in 2D; the metrics follow the last world you clicked.",
+  "guide.reducedMotion": "Reduced motion: when your system asks for it, the plate updates at the interface cadence and the trail is dropped.",
   "explorer.dialog.aria": "Explorer of organisms and lineages",
 } as const;

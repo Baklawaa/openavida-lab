@@ -79,7 +79,7 @@ No code changes. GATES on the uncommitted tree:
 - `node tools/verify-interface.mjs` → Interface verified
 - `node tools/launch.mjs http://127.0.0.1:5174/` exit 0, ×2, frac 1.0, inspect genome 49 bases
 
-Did not include `.claude/` or `docs/grok-gauntlet.md` (agent scratch, not product).
+Did not include `.claude/` or `docs/archive/grok-gauntlet.md` (agent scratch, not product; the transcripts moved to `docs/archive/` in Stage 12).
 
 ## Task 1 — Parameter sweeps (2026-09-06)
 
@@ -614,4 +614,25 @@ The five inspected offenders are fixed, with a before/after bench in a throwaway
 The limit list no longer claims there is no manifest import and no binary export (Stage 9 fixed both). What remains is honest: `Profil v1` is not bit-identical to `engine-v1`, the 3D view has no exudate plane (Stage 12), and nutrient inflow is a source term by design.
 
 - GATES: typecheck ok (both configs); vitest **298/298** (66 files); build ok; ten browser verifier runs OK; copy FR/EN byte-identical; baseline unchanged `e953dcdc`.
+
+
+## Upgrade Stage 11 (part 2) + Stage 12a/12b/12d — perf gate, accessibility, persistence, docs (2026-09-14)
+
+Second wave, four subagents on disjoint files. **No model change: the perf hash stays `e953dcdc`.**
+
+### 11.3 A browser performance gate that measures the real plate
+`tools/verify-perf.mjs` drives the app to a **mature plate** and measures it: 180 founders from the query string (`startPopulation`, the same seed as the node harness), stepped to tick 400 → **672 organisms**, then 20 × 5 steps for the engine cost, 5 s of live rAF deltas for the frame budget, and the JS heap after an idle window. Measured on this machine: **step 1.98 ms mean / 2.5 ms p95**, **frame 16.7 ms mean / 16.7 ms p95 with 0 long frames**, **heap 68 MB** — the interface holds 60 fps at maturity, and the step cost is a fifth of the frame. The gate is in `tools/gates.mjs` (11 verifiers now) with 5× headroom on the step and frame budgets and a printed note when the plate is lighter than the anchor. The subagent's own finding is why this is real: injecting the default kit 8× settles near 100 organisms, a fifth of the load the budget assumes, so the URL now pins the founders.
+Scaling note recorded for honesty: the node harness reports ~5 ms/step for the same 672-organism plate while the browser reports ~2 ms; the difference is the node process running three scenarios back to back, not the browser being special.
+
+### 12a Accessibility and motion
+`prefers-reduced-motion` is honoured — the simulation clock is untouched (same ticks, speed, batching and backpressure) but the plate is redrawn on the 250 ms UI cadence and the trail is skipped; the media query is watched, so toggling it is live. Both dialogs return focus to the control that opened them (Escape and × included), the Expérience data-row controls are all keyboard-operable, and `tests/contrast.test.ts` computes WCAG ratios from the stylesheet and caught a real failure: `.trait-delta` was 4.4986:1 (AA needs 4.5) and is now 4.69:1. `verify-interface` gained a reduced-motion case and two focus assertions.
+
+### 12b Persistence durability
+`ensureStores()` is now a pure, tested function: a fresh database gains all three stores, a v1 database keeps its presets and gains the two new ones, a v2 database gains only the experiments store, and an existing store is never recreated (which would wipe data). Quota failures are caught **by name**, reported through a listener with a dedicated message, and leave nothing behind — including in the memory fallback. When IndexedDB is unavailable the journal says once that it is keeping data for this session only. Follow-up I applied: `save()` and `saveOrganism()` now return their outcome, so the preset and saved-organism paths no longer print "saved" over the top of a quota warning.
+
+### 12d Documentation consolidation
+`docs/README.md` indexes the set; `docs/formats.md` is the compatibility matrix (snapshot v2 + v1 migration, OAV2 v1 with the caveat that `decodeSnapshot` does not itself migrate, manifest v1, recipe v1, IndexedDB v3, the engine lineage table 1.0.0/r1 `c2c03a81` → 2.2.0/r4 `e953dcdc`, and the research exports), stating explicitly that the engine revision is the only shape with no backwards path. The three `grok-gauntlet*.md` build transcripts moved to `docs/archive/` (git records content-identical renames) with a note on what they are. A link check over all ten tracked markdown files reports 15 links, 0 broken.
+
+- Goldens: regenerated deliberately for exactly two new strings (the guide's reduced-motion line and the manifest-import tooltip) — 223 controls covered now.
+- GATES: typecheck ok (both configs); vitest **330/330** (68 files); build ok; **eleven** browser verifier runs OK; baseline unchanged `e953dcdc`.
 

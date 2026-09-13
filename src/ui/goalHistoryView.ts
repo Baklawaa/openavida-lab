@@ -32,9 +32,12 @@ export async function keepLastRun(ctx: GoalContext, manifest: Manifest | null): 
     return;
   }
   const record = recordFromRun({ manifest, results, summary: summarizeTrials(results) });
-  await ctx.store.saveExperiment(record);
-  state.historySelected = [record.id];
-  ctx.status(tDynamic("goal.history.kept", { name: record.name, count: record.results.length }));
+  // A refused record is not listed, and the store has already put its quota message on the status line.
+  const kept = await ctx.store.saveExperiment(record);
+  if (kept) {
+    state.historySelected = [record.id];
+    ctx.status(tDynamic("goal.history.kept", { name: record.name, count: record.results.length }));
+  }
   await refreshHistory(ctx);
 }
 
@@ -48,6 +51,22 @@ export async function refreshHistory(ctx: GoalContext): Promise<void> {
   }
   state.historySelected = state.historySelected.filter((id) => state.historyRecords.some((r) => r.id === id));
   renderHistory(ctx);
+  await noteMemoryOnly(ctx);
+}
+
+/**
+ * Say once, above the run journal, that nothing will survive the tab when the
+ * browser gave the store no database. The element itself is the flag, so a
+ * refresh never repeats it.
+ */
+async function noteMemoryOnly(ctx: GoalContext): Promise<void> {
+  if (await ctx.store.isDurable()) return;
+  if (ctx.root.querySelector("#history-storage-note")) return;
+  const note = document.createElement("p");
+  note.id = "history-storage-note";
+  note.className = "micro";
+  note.textContent = tDynamic("goal.storage.memoryOnly");
+  ctx.q("#history-body").before(note);
 }
 
 function download(name: string, text: string): void {
@@ -310,6 +329,10 @@ function catalogFor(ctx: GoalContext, config: TrialConfig, ticks: number, label:
 /** The stored-runs table: manifest export, removal, replay and "open the final state". */
 export function bindHistory(ctx: GoalContext): void {
   const state = ctx.state;
+  // Every save of this store (presets, journal, saved organisms) shares one status line for refusals.
+  ctx.store.onProblem((problem) => {
+    if (problem.kind === "quota") ctx.status(tDynamic("goal.storage.full", { name: problem.label }));
+  });
   const historyBody = ctx.q("#history-body");
   historyBody.addEventListener("click", (ev) => {
     const target = ev.target as HTMLElement;

@@ -182,6 +182,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('#ex-saved .ex-row').length === 0);
   await page.locator('#ex-close').click();
   await page.waitForFunction(() => document.querySelector('#explorer-dialog')?.open === false);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'btn-explorer', 'Closing the explorer returns focus to its opener');
   // Lineage tree: hovering a drawn lineage shows its title; clicking opens the explorer on that lineage.
   const phy = await page.locator('#chart-phy').boundingBox();
   let hovered = '';
@@ -363,6 +364,7 @@ try {
   await visible('#help-dialog');
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#help-dialog').isVisible(), false);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'btn-help', 'Escape returns focus to the button that opened the guide');
   await page.locator('#tab-organisms').focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('#tab-environment').getAttribute('aria-selected'), 'true');
@@ -398,6 +400,25 @@ try {
   await page.locator('#btn-step-once').click();
   await page.waitForFunction(t => window.__openavida.tick > t, firstRecorded, { timeout: 5000 });
 
+  // Reduced motion: the plate repaints on the UI cadence instead of every
+  // animation frame, but the clock keeps its speed and its batching, so the
+  // world must still advance — at 2 steps/s, ~5 ticks in a 2.6 s window — and
+  // the reload must raise no page error.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await page.waitForFunction(() => window.__openavida, null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), true, 'the reduced-motion feature is emulated');
+  await page.locator('#btn-slow').click(); // 2 steps/s: the observation speed
+  const quietFrom = (await probe()).tick;
+  await page.waitForTimeout(2600);
+  const quietTicks = (await probe()).tick - quietFrom;
+  assert.ok(quietTicks >= 3, `reduced motion keeps the clock running (${quietTicks} ticks in 2.6 s at 2 steps/s)`);
+  assert.ok(quietTicks <= 10, `reduced motion keeps the chosen speed (${quietTicks} ticks in 2.6 s at 2 steps/s)`);
+  // Toggling the preference back is live too: no reload, no error, clock going.
+  await page.emulateMedia({ reducedMotion: null });
+  assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), false, 'the preference can be released without a reload');
+  await page.waitForFunction(t => window.__openavida.tick > t, (await probe()).tick, { timeout: 8000 });
+
   for (const [width, height] of [[1440, 900], [1100, 768], [768, 1024], [390, 844], [360, 800]]) {
     await page.setViewportSize({ width, height });
     await page.waitForTimeout(150);
@@ -415,7 +436,7 @@ try {
     }
   }
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, explorer (catalogue, branch, saved organisms, lineage tree click), presets, goal runs, replicate catalogue, timeline, keyboard, and 5 responsive sizes.');
+  console.log('Interface verified: placement, inspection, visual DNA editing (genes, strip, palette, undo), painting, 2D/3D, A/B targeting, snapshots, imports/exports, species, explorer (catalogue, branch, saved organisms, lineage tree click), presets, goal runs, replicate catalogue, timeline, keyboard, reduced motion (live toggle, clock at speed, no page errors), and 5 responsive sizes.');
 } finally {
   await browser.close();
 }

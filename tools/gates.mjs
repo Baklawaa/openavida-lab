@@ -22,6 +22,8 @@ const base = `http://127.0.0.1:${port}/`;
 const TOOLS = [
   ["tools/verify-interface.mjs"],
   ["tools/verify-exudate.mjs"],
+  // Interface perf: step and frame budgets measured on the live page.
+  ["tools/verify-perf.mjs"],
   ["tools/verify-research.mjs"],
   ["tools/verify-history.mjs"],
   // Interface copy is pinned in both locales: French must never move silently,

@@ -270,7 +270,8 @@ textarea#genome-edit { width: 100%; min-height: 90px; resize: vertical; color: v
 .dna-pheno-head { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 6px; }
 table.pheno-diff .trait-bar { position: relative; }
 table.pheno-diff .trait-bar u { position: absolute; top: 50%; width: 2px; height: 9px; margin-left: -1px; transform: translateY(-50%); background: #e4eceb99; border-radius: 1px; }
-.trait-delta { width: 60px; text-align: right; font: 10px var(--mono); color: #6f8288; padding-left: 8px !important; white-space: nowrap; }
+/* Unchanged deltas sit on --panel: #72858b is the lightest grey that still keeps the designer's cast at 4.69:1, the AA floor for normal text. */
+.trait-delta { width: 60px; text-align: right; font: 10px var(--mono); color: #72858b; padding-left: 8px !important; white-space: nowrap; }
 tr.up .trait-delta { color: var(--teal); } tr.down .trait-delta { color: var(--rose); }
 .dna-actions { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 6px; margin-top: 14px; }
 .dna-actions .primary { grid-column: 1 / -1; }

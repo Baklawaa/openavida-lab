@@ -174,6 +174,9 @@ export const SHELL_FR = {
   "btn.phylo": "Lignées CSV",
   "btn.events": "Événements JSONL",
   "btn.manifest": "Manifeste de la course",
+  // The other help texts live in fr.help.ts; this one belongs to the data row
+  // and is declared next to the copy of the button it explains.
+  "help.btn-manifest-import": "Charge un manifeste exporté depuis OpenAvida : il fixe l’état de départ, les objectifs, la graine et les paramètres de la prochaine course ciblée, jusqu’à son retrait.",
   "btn.import": "Importer un monde (JSON ou .oav)",
   "opt.events": "Journal d’événements",
   "opt.events.hint": "Naissances, morts, repas, exsudat, recombinaisons — borné, pour l’analyse externe",
@@ -214,5 +217,6 @@ export const SHELL_FR = {
   "guide.layers": "Couches du milieu",
   "guide.snap": "Mémoriser",
   "guide.footer": "3D : glisser pour tourner, molette pour zoomer. A / B affiche deux mondes en 2D ; les indicateurs suivent le dernier monde cliqué.",
+  "guide.reducedMotion": "Mouvement réduit : si votre système le demande, la plaque se met à jour à la cadence de l’interface et la trace disparaît.",
   "explorer.dialog.aria": "Explorateur des organismes et des lignées",
 } as const;

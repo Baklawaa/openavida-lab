@@ -91,10 +91,13 @@ export function createExports(ctx: LabContext): void {
       ? tDynamic("app.eventsLog.on")
       : tDynamic("app.eventsLog.off"));
   });
-  root.querySelector("#btn-import")!.addEventListener("click", () => {
-    (root.querySelector("#import-file") as HTMLInputElement).click();
-  });
-  (root.querySelector("#import-file") as HTMLInputElement).addEventListener("change", async (ev) => {
+  const importFile = root.querySelector<HTMLInputElement>("#import-file")!;
+  // The hidden input is a picker proxy, never a control of its own: the button
+  // is its only way in and its only tab stop, so Enter or Space on the button
+  // opens the picker without a stray focusable input in the row.
+  importFile.tabIndex = -1;
+  root.querySelector("#btn-import")!.addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", async (ev) => {
     const file = (ev.target as HTMLInputElement).files?.[0];
     if (!file) return;
     try {

@@ -242,6 +242,10 @@ export const GOAL_EN = {
   "goal.report.empty": "No replicate to report.",
   "goal.report.done": "HTML report: {count} replicates.",
 
+  /* local storage -------------------------------------------------------- */
+  "goal.storage.full": "Storage full: “{name}” could not be saved. Free some space (presets or kept runs), then try again.",
+  "goal.storage.memoryOnly": "Local storage unavailable: presets and kept runs are kept in this tab only, for this session.",
+
   /* replay --------------------------------------------------------------- */
   "goal.step.replay": "5 · REPLAY A REPLICATE IN WORLD B",
   "goal.replay.hint": "Paste the seed of a replicate (table above, or the seed column of the CSV). World B is rebuilt from the start state of the last run, with this seed and the run parameters, then playback starts: the simulation reproduces the replicate step by step. Clicking again restarts from the beginning. “Catalogue at the end” replays the replicate without rendering it up to its last step, then opens the organism explorer on that final state.",

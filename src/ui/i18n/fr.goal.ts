@@ -248,6 +248,10 @@ export const GOAL_FR = {
   "goal.report.empty": "Aucun réplicat à rapporter.",
   "goal.report.done": "Rapport HTML : {count} réplicats.",
 
+  /* local storage -------------------------------------------------------- */
+  "goal.storage.full": "Stockage plein : « {name} » n’a pas pu être enregistré. Libérez de la place (préréglages ou courses conservées), puis réessayez.",
+  "goal.storage.memoryOnly": "Stockage local indisponible : préréglages et courses conservées ne sont gardés que dans cet onglet, le temps de la session.",
+
   /* replay --------------------------------------------------------------- */
   "goal.step.replay": "5 · REJOUER UN RÉPLICAT DANS LE MONDE B",
   "goal.replay.hint": "Collez la graine d’un réplicat (tableau ci-dessus, ou colonne seed du CSV). Le monde B est reconstruit à l’état de départ de la dernière course, avec cette graine et les paramètres de la course, puis la lecture démarre : la simulation reproduit le réplicat pas pour pas. Un nouveau clic repart du début. « Catalogue à la fin » rejoue le réplicat sans l’afficher jusqu’à son dernier pas, puis ouvre l’explorateur des organismes sur cet état final.",

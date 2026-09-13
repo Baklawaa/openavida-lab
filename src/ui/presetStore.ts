@@ -55,9 +55,50 @@ const LAST_RUN_ID = "__last-run__";
 
 const DB_NAME = "openavida-lab";
 const DB_VERSION = 3;
-const STORE = "presets";
-const ORG_STORE = "organisms";
-const EXP_STORE = "experiments";
+
+/** Object stores of the schema, named once so the upgrade and every write agree. */
+export const STORE_PRESETS = "presets";
+export const STORE_ORGANISMS = "organisms";
+export const STORE_EXPERIMENTS = "experiments";
+/** Every record of every store is keyed by its own id. */
+export const STORE_KEY_PATH = "id";
+
+/** The stores the schema needs, in creation order. */
+export const STORE_DEFS: ReadonlyArray<{ name: string; keyPath: string }> = [
+  { name: STORE_PRESETS, keyPath: STORE_KEY_PATH },
+  { name: STORE_ORGANISMS, keyPath: STORE_KEY_PATH },
+  { name: STORE_EXPERIMENTS, keyPath: STORE_KEY_PATH },
+];
+
+/**
+ * Create only the stores the schema is missing, and return the names created.
+ * An upgrade must never recreate a store it already has: `createObjectStore`
+ * would add a second, empty store under the same name and take the presets,
+ * organisms or runs held by a v1 or v2 database with it.
+ */
+export function ensureStores(db: Pick<IDBDatabase, "objectStoreNames" | "createObjectStore">): string[] {
+  const created: string[] = [];
+  for (const { name, keyPath } of STORE_DEFS) {
+    if (db.objectStoreNames.contains(name)) continue;
+    db.createObjectStore(name, { keyPath });
+    created.push(name);
+  }
+  return created;
+}
+
+/** A write the browser refused. Quota is the one the user can act on. */
+export interface StoreProblem {
+  kind: "quota";
+  /** Name of the record that was refused, for the message. */
+  label: string;
+}
+
+export type StoreProblemListener = (problem: StoreProblem) => void;
+
+/** Quota is a DOMException in browsers but a plain object in some test doubles: match on the name. */
+export function isQuotaExceeded(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { name?: unknown }).name === "QuotaExceededError";
+}
 
 function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
@@ -70,10 +111,7 @@ function openDb(): Promise<IDBDatabase | null> {
       return;
     }
     req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(ORG_STORE)) db.createObjectStore(ORG_STORE, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(EXP_STORE)) db.createObjectStore(EXP_STORE, { keyPath: "id" });
+      ensureStores(req.result);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => resolve(null);
@@ -98,10 +136,28 @@ export class PresetStore {
   private readonly memory = new Map<string, PresetRecord>();
   private readonly memoryOrganisms = new Map<string, SavedOrganism>();
   private readonly memoryExperiments = new Map<string, ExperimentRecord>();
+  private readonly problemListeners = new Set<StoreProblemListener>();
+
+  /** Subscribe to refused writes; the panel turns them into catalog copy. Returns the unsubscribe. */
+  onProblem(listener: StoreProblemListener): () => void {
+    this.problemListeners.add(listener);
+    return () => {
+      this.problemListeners.delete(listener);
+    };
+  }
+
+  private report(problem: StoreProblem): void {
+    for (const listener of this.problemListeners) listener(problem);
+  }
 
   private open(): Promise<IDBDatabase | null> {
     if (!this.db) this.db = openDb();
     return this.db;
+  }
+
+  /** True when the database opened: what is written survives a reload. False means this tab only. */
+  async isDurable(): Promise<boolean> {
+    return (await this.open()) !== null;
   }
 
   async list(): Promise<PresetMeta[]> {
@@ -110,7 +166,7 @@ export class PresetStore {
     if (!db) records = [...this.memory.values()];
     else {
       try {
-        records = await request(db.transaction(STORE, "readonly").objectStore(STORE).getAll() as IDBRequest<PresetRecord[]>);
+        records = await request(db.transaction(STORE_PRESETS, "readonly").objectStore(STORE_PRESETS).getAll() as IDBRequest<PresetRecord[]>);
       } catch {
         records = [...this.memory.values()];
       }
@@ -120,17 +176,24 @@ export class PresetStore {
 
   /* ---------- saved organisms ---------- */
 
-  async saveOrganism(rec: SavedOrganism): Promise<void> {
+  /** Returns false when the browser refused the write (quota): nothing was stored. */
+  async saveOrganism(rec: SavedOrganism): Promise<boolean> {
     const db = await this.open();
     if (db) {
       try {
-        await request(db.transaction(ORG_STORE, "readwrite").objectStore(ORG_STORE).put(rec));
-        return;
-      } catch {
+        await request(db.transaction(STORE_ORGANISMS, "readwrite").objectStore(STORE_ORGANISMS).put(rec));
+        return true;
+      } catch (err) {
+        if (isQuotaExceeded(err)) {
+          // A refused record must not look saved: report it and cache nothing.
+          this.report({ kind: "quota", label: rec.name });
+          return false;
+        }
         /* fall through */
       }
     }
     this.memoryOrganisms.set(rec.id, rec);
+    return true;
   }
 
   async listOrganisms(): Promise<SavedOrganismMeta[]> {
@@ -138,7 +201,7 @@ export class PresetStore {
     let records: SavedOrganism[] = [...this.memoryOrganisms.values()];
     if (db) {
       try {
-        records = await request(db.transaction(ORG_STORE, "readonly").objectStore(ORG_STORE).getAll() as IDBRequest<SavedOrganism[]>);
+        records = await request(db.transaction(STORE_ORGANISMS, "readonly").objectStore(STORE_ORGANISMS).getAll() as IDBRequest<SavedOrganism[]>);
       } catch {
         /* keep memory */
       }
@@ -152,7 +215,7 @@ export class PresetStore {
     const db = await this.open();
     if (db) {
       try {
-        const rec = (await request(db.transaction(ORG_STORE, "readonly").objectStore(ORG_STORE).get(id) as IDBRequest<SavedOrganism | undefined>)) ?? null;
+        const rec = (await request(db.transaction(STORE_ORGANISMS, "readonly").objectStore(STORE_ORGANISMS).get(id) as IDBRequest<SavedOrganism | undefined>)) ?? null;
         if (rec) return rec;
       } catch {
         /* fall through */
@@ -166,7 +229,7 @@ export class PresetStore {
     const db = await this.open();
     if (!db) return;
     try {
-      await request(db.transaction(ORG_STORE, "readwrite").objectStore(ORG_STORE).delete(id));
+      await request(db.transaction(STORE_ORGANISMS, "readwrite").objectStore(STORE_ORGANISMS).delete(id));
     } catch {
       /* ignore */
     }
@@ -174,17 +237,26 @@ export class PresetStore {
 
   /* ---------- experiment journal ---------- */
 
-  async saveExperiment(record: ExperimentRecord): Promise<void> {
+  /**
+   * Store one run. Resolves false when the browser refused it (quota), so the
+   * caller can avoid claiming it was kept; a refused record is never cached.
+   */
+  async saveExperiment(record: ExperimentRecord): Promise<boolean> {
     const db = await this.open();
     if (db) {
       try {
-        await request(db.transaction(EXP_STORE, "readwrite").objectStore(EXP_STORE).put(record));
-        return;
-      } catch {
+        await request(db.transaction(STORE_EXPERIMENTS, "readwrite").objectStore(STORE_EXPERIMENTS).put(record));
+        return true;
+      } catch (err) {
+        if (isQuotaExceeded(err)) {
+          this.report({ kind: "quota", label: record.name });
+          return false;
+        }
         /* fall through to memory */
       }
     }
     this.memoryExperiments.set(record.id, record);
+    return true;
   }
 
   /** Stored runs, newest first. */
@@ -193,7 +265,7 @@ export class PresetStore {
     let records: ExperimentRecord[] = [...this.memoryExperiments.values()];
     if (db) {
       try {
-        records = await request(db.transaction(EXP_STORE, "readonly").objectStore(EXP_STORE).getAll() as IDBRequest<ExperimentRecord[]>);
+        records = await request(db.transaction(STORE_EXPERIMENTS, "readonly").objectStore(STORE_EXPERIMENTS).getAll() as IDBRequest<ExperimentRecord[]>);
       } catch {
         /* keep memory */
       }
@@ -205,7 +277,7 @@ export class PresetStore {
     const db = await this.open();
     if (db) {
       try {
-        const rec = (await request(db.transaction(EXP_STORE, "readonly").objectStore(EXP_STORE).get(id) as IDBRequest<ExperimentRecord | undefined>)) ?? null;
+        const rec = (await request(db.transaction(STORE_EXPERIMENTS, "readonly").objectStore(STORE_EXPERIMENTS).get(id) as IDBRequest<ExperimentRecord | undefined>)) ?? null;
         if (rec) return rec;
       } catch {
         /* fall through */
@@ -219,7 +291,7 @@ export class PresetStore {
     const db = await this.open();
     if (!db) return;
     try {
-      await request(db.transaction(EXP_STORE, "readwrite").objectStore(EXP_STORE).delete(id));
+      await request(db.transaction(STORE_EXPERIMENTS, "readwrite").objectStore(STORE_EXPERIMENTS).delete(id));
     } catch {
       /* ignore */
     }
@@ -230,9 +302,14 @@ export class PresetStore {
     const db = await this.open();
     if (db) {
       try {
-        await request(db.transaction(STORE, "readwrite").objectStore(STORE).put(rec));
+        await request(db.transaction(STORE_PRESETS, "readwrite").objectStore(STORE_PRESETS).put(rec));
         return;
-      } catch {
+      } catch (err) {
+        if (isQuotaExceeded(err)) {
+          // The previous last run (if any) stays in place; the refused one is cached nowhere.
+          this.report({ kind: "quota", label: run.label });
+          return;
+        }
         /* fall through to memory */
       }
     }
@@ -243,7 +320,7 @@ export class PresetStore {
     const db = await this.open();
     if (db) {
       try {
-        const rec = (await request(db.transaction(STORE, "readonly").objectStore(STORE).get(LAST_RUN_ID) as IDBRequest<(LastRunRecord & { id: string }) | undefined>)) ?? null;
+        const rec = (await request(db.transaction(STORE_PRESETS, "readonly").objectStore(STORE_PRESETS).get(LAST_RUN_ID) as IDBRequest<(LastRunRecord & { id: string }) | undefined>)) ?? null;
         if (rec) return rec;
       } catch {
         /* fall through */
@@ -252,7 +329,8 @@ export class PresetStore {
     return (this.memory.get(LAST_RUN_ID) as unknown as LastRunRecord | undefined) ?? null;
   }
 
-  async save(name: string, snapshot: WorldSnapshot, world: "A" | "B"): Promise<PresetMeta> {
+  /** Returns null when the browser refused the write (quota): nothing was stored. */
+  async save(name: string, snapshot: WorldSnapshot, world: "A" | "B"): Promise<PresetMeta | null> {
     const rec: PresetRecord = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       name: name.trim() || tDynamic("render.preset.defaultName", { tick: snapshot.tick }),
@@ -267,9 +345,14 @@ export class PresetStore {
     const db = await this.open();
     if (db) {
       try {
-        await request(db.transaction(STORE, "readwrite").objectStore(STORE).put(rec));
+        await request(db.transaction(STORE_PRESETS, "readwrite").objectStore(STORE_PRESETS).put(rec));
         return presetMeta(rec);
-      } catch {
+      } catch (err) {
+        if (isQuotaExceeded(err)) {
+          // The list reads storage, so a refused preset simply does not appear; cache nothing.
+          this.report({ kind: "quota", label: rec.name });
+          return null;
+        }
         /* fall through to memory */
       }
     }
@@ -281,7 +364,7 @@ export class PresetStore {
     const db = await this.open();
     if (db) {
       try {
-        const rec = (await request(db.transaction(STORE, "readonly").objectStore(STORE).get(id) as IDBRequest<PresetRecord | undefined>)) ?? null;
+        const rec = (await request(db.transaction(STORE_PRESETS, "readonly").objectStore(STORE_PRESETS).get(id) as IDBRequest<PresetRecord | undefined>)) ?? null;
         if (rec) return rec;
       } catch {
         /* fall through */
@@ -295,7 +378,7 @@ export class PresetStore {
     const db = await this.open();
     if (!db) return;
     try {
-      await request(db.transaction(STORE, "readwrite").objectStore(STORE).delete(id));
+      await request(db.transaction(STORE_PRESETS, "readwrite").objectStore(STORE_PRESETS).delete(id));
     } catch {
       /* ignore */
     }

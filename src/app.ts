@@ -44,6 +44,13 @@ import { createSchedulePanel } from "./ui/lab/schedulePanel";
 import { createTimelineBar } from "./ui/lab/timelineBar";
 import { createWorldControls } from "./ui/lab/worldControls";
 
+/**
+ * Cadence of the throttled interface refresh (charts, feeds, probe) and, under
+ * prefers-reduced-motion, of the plate repaint: one clock keeps the two in
+ * lockstep instead of letting them drift apart.
+ */
+const UI_CADENCE_MS = 250;
+
 export function mount(root: HTMLElement): void {
   const q = typeof location !== "undefined" ? location.search : "";
   const sharedRecipe = recipeFromQuery(q);
@@ -527,7 +534,7 @@ export function mount(root: HTMLElement): void {
     ctx.refreshTimeline();
     ctx.refreshScheduleList();
     const now = performance.now();
-    if (now - state.lastUi > 250) {
+    if (now - state.lastUi > UI_CADENCE_MS) {
       drawCharts();
       ctx.paintFeeds();
       // The pathway markup only moves on selection, so the probe's copy is
@@ -845,6 +852,17 @@ export function mount(root: HTMLElement): void {
     }
   }
 
+  /**
+   * Reduced motion draws no trail. Wiping the layer is what removes a trail the
+   * preference was toggled on after it had already been painted.
+   */
+  function clearTrail(): void {
+    const trailCtx = trailCanvas.getContext("2d");
+    if (!trailCtx) return;
+    trailCtx.setTransform(1, 0, 0, 1, 0, 0);
+    trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+  }
+
   /** Which layer the renderer's heat colour was last set for: -1 none, -2 exudate, else strain id. */
   const EXUDATE_LAYER = -2;
   let heatColorId: number | null = -1;
@@ -860,6 +878,15 @@ export function mount(root: HTMLElement): void {
   let lastFrame = performance.now();
   let tickAccum = 0;
   let lastLoopError = 0;
+  /**
+   * prefers-reduced-motion: the simulation clock keeps running as before, but
+   * the plate is only repainted on the UI cadence and the trail — the layer
+   * that reads as motion — is left blank. The media query is watched so a
+   * system toggle applies to the next frame without a reload.
+   */
+  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let reducedMotion = motionQuery.matches;
+  motionQuery.addEventListener("change", (ev) => { reducedMotion = ev.matches; });
   /** Keep the rAF loop alive when a frame throws; report at most once per second. */
   const reportLoopError = (err: unknown): void => {
     const t = performance.now();
@@ -879,6 +906,17 @@ export function mount(root: HTMLElement): void {
     } else {
       tickAccum = 0;
     }
+    // A room host broadcasts on the simulation clock, not on the drawing clock:
+    // keep it before the reduced-motion gate so a quiet plate does not thin it.
+    if (state.room?.isHost && !state.paused && state.speed > 0 && current().tick % 10 === 0) {
+      state.roomPost?.({ kind: "snapshot", snap: current().snapshot() });
+    }
+    // Reduced motion: draw the plate on the UI cadence instead of every frame.
+    // The clock block above is untouched, so ticks per second, batching and
+    // backpressure are exactly those of the animated path; repainting on the
+    // same clock the UI refresh uses keeps metrics and charts in lockstep with
+    // the plate. lastUi is 0 until the first refresh: the first frame paints.
+    if (reducedMotion && state.lastUi !== 0 && now - state.lastUi <= UI_CADENCE_MS) return;
     if (state.surface === "3d") {
       ensure3d().draw(viewWorld());
     } else {
@@ -915,10 +953,8 @@ export function mount(root: HTMLElement): void {
         }
       }
       renderer.draw(a, b, now / 1000);
-      drawTrail(shown);
-    }
-    if (state.room?.isHost && !state.paused && state.speed > 0 && current().tick % 10 === 0) {
-      state.roomPost?.({ kind: "snapshot", snap: current().snapshot() });
+      if (reducedMotion) clearTrail();
+      else drawTrail(shown);
     }
     refreshMetrics();
   };
