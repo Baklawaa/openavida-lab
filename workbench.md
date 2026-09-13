@@ -464,3 +464,14 @@ Two "not bugs" turned out to be defects once looked at, plus three further bugs 
 ### Verification
 - `npm run typecheck` (src + tests/tools), `npm test` **241/241**, `node tools/gates.mjs` → all five browser checks including the new `tools/verify-exudate.mjs`, baseline `185d6460`.
 - `tools/verify-exudate.mjs` measures the plate: violet mean −5.45 without the layer, −2.18 with it (delta 3.27, threshold 0.4), note naming 56 producers, no page errors, notes clear of the HUD.
+
+## Round: a habitable fresh plate (2026-09-13)
+
+User report: "when I put a random organism, they all die in just a few seconds". Measured cause: with `randomTerrain: false` the plate has no nutrient source at all, so the 0.12 starting pool is all there is; a founding heterotroph earns ≈0.02/tick against ≈0.07 upkeep and starves in about 20 steps (≈10 s at the default 2 ticks/s). Phototrophs only survive in the bright rows.
+
+- New parameter **`nutrientInflow`** (metabolism, default **0.004/tick**): uniform nutrient regeneration applied in `Fields.applyVentsAndDecay`, i.e. detritus recycling. It gives a ventless plate an equilibrium of inflow / decay ≈ 0.57, above the break-even of a stock heterotroph (maintenance / (uptake × 0.21) ≈ 0.42), so a closed plate stays habitable instead of running down.
+- Starting nutrient raised 0.12 → **0.35** in `seedEnvironment` and `clearPresetTerrain`.
+- Measured after the change: one heterotroph dropped on a fresh plate lives **260 steps** (was ~20) and founds a growing population; one phototroph lives 134; a 180-founder plate reaches 263 at tick 100, peaks at **924** (below the 1100 cap) and holds 670–780 organisms with Shannon **5.9** at tick 400. Plate nutrient self-regulates between 0.13 and 0.41 as the population grazes it.
+- **Engine 2.2.0 / revision 4, baseline `185d6460` → `e953dcdc`.** Perf unchanged in practice: 3.85 ms/step on the canonical world (target 16.67).
+- The two model-validation tests that isolate the diffusion kernel now zero the inflow, because it is a source ("conserves field mass when nothing decays and no vent feeds it").
+- Tuning: Milieu → Modèle → **Recyclage des nutriments**. 0 restores the old run-down behaviour, higher values make a richer plate; `Défauts` returns to 0.004.

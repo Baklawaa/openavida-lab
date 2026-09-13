@@ -19,7 +19,8 @@ import {
 describe("model validation", () => {
   it("conserves field mass when nothing decays and no vent feeds it", () => {
     const w = new World({ width: 24, height: 24, startPopulation: 0, seed: 4 });
-    Object.assign(w.params, { nutrientDecay: 0, toxinDecay: 0, temperatureDecay: 0, lightDecay: 0 });
+    // No decay and no source: this is the diffusion kernel alone.
+    Object.assign(w.params, { nutrientDecay: 0, nutrientInflow: 0, toxinDecay: 0, temperatureDecay: 0, lightDecay: 0 });
     w.fields.nutrient.fill(0);
     // Stay below the field clamp (4): clamping is a documented bound, not a
     // conservation rule, so it must not confound this check.
@@ -32,7 +33,7 @@ describe("model validation", () => {
 
   it("does not let a barrier pass field flux", () => {
     const w = new World({ width: 16, height: 16, startPopulation: 0, seed: 4 });
-    Object.assign(w.params, { nutrientDecay: 0 });
+    Object.assign(w.params, { nutrientDecay: 0, nutrientInflow: 0 });
     w.fields.nutrient.fill(0);
     // Vertical wall at x = 8.
     for (let y = 0; y < w.h; y++) w.terrain[w.fields.idx(8, y)] = TERRAIN.barrier;

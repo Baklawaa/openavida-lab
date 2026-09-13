@@ -195,7 +195,10 @@ export class World {
         fields.solar[i] = sun;
         fields.light[i] = sun;
         fields.temperature[i] = 0.5;
-        fields.nutrient[i] = 0.12;
+        // A habitable starting plate: with nutrientInflow recycling, 0.35 puts
+        // the equilibrium above the break-even of a stock heterotroph
+        // (maintenance / (uptake × 0.21) ≈ 0.42) once a few cells are grazed.
+        fields.nutrient[i] = 0.35;
         fields.toxin[i] = 0;
       }
     }
@@ -253,7 +256,7 @@ export class World {
     this.randomTerrain = false;
     this.terrain.fill(TERRAIN.empty);
     this.fields.toxin.fill(0);
-    this.fields.nutrient.fill(0.12);
+    this.fields.nutrient.fill(0.35);
   }
 
   seedPopulation(): void {

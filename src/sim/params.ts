@@ -68,6 +68,11 @@ const PARAM_SPEC_LIST = [
     description: "Jacobi diffusion coefficient for nutrient, toxin and temperature (0 = no mixing).",
   },
   {
+    key: "nutrientInflow", label: "Recyclage des nutriments", unit: "par pas", group: "metabolism", kind: "number",
+    min: 0, max: 0.2, step: 0.001, default: 0.004,
+    description: "Uniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay.",
+  },
+  {
     key: "nutrientDecay", label: "Décroissance nutriments", unit: "par pas", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.007,
     description: "Fractional loss of the nutrient field per tick.",

@@ -80,6 +80,12 @@ export interface SimParams {
   regulationEnabled: boolean;
   diffusionRate: number;
   nutrientDecay: number;
+  /**
+   * Uniform nutrient regeneration per tick (detritus recycling). Without it a
+   * closed plate only ever loses nutrient, so a placed heterotroph starves
+   * before it can divide.
+   */
+  nutrientInflow: number;
   toxinDecay: number;
   temperatureDecay: number;
   lightDecay: number;

@@ -153,7 +153,12 @@ export class Fields {
       if (t === TERRAIN.nutrientVent) this.nutrient[i] = this.nutrient[i]! + 0.08;
       if (t === TERRAIN.toxinVent) this.toxin[i] = this.toxin[i]! + 0.07;
       if (t === TERRAIN.thermalVent) this.temperature[i] = this.temperature[i]! + 0.05;
-      this.nutrient[i] = clamp(this.nutrient[i]! * (1 - params.nutrientDecay), 0, 4);
+      // Recycling keeps a ventless plate habitable: equilibrium ≈ inflow / decay.
+      this.nutrient[i] = clamp(
+        this.nutrient[i]! * (1 - params.nutrientDecay) + params.nutrientInflow,
+        0,
+        4,
+      );
       this.toxin[i] = clamp(this.toxin[i]! * (1 - params.toxinDecay), 0, 4);
       this.temperature[i] = clamp(this.temperature[i]! * (1 - params.temperatureDecay), 0, 1.5);
       this.exudate[i] = clamp(this.exudate[i]! * (1 - params.exudateDecay), 0, 4);
