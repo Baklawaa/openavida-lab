@@ -15,8 +15,8 @@ import {
   sampleNeighborEffects,
   shadeOccupied,
 } from "./ecology";
-import { AMBIENT_TEMPERATURE, Fields, nutrientEquilibrium } from "./fields";
-import { fitness, reproduceThreshold } from "./fitness";
+import { Fields, nutrientEquilibrium } from "./fields";
+import { fitness, reproduceThreshold, upkeepRates } from "./fitness";
 import {
   decodeGenome,
   founderHeterotroph,
@@ -200,7 +200,7 @@ export class World {
         const i = y * w + x;
         fields.solar[i] = sun;
         fields.light[i] = sun;
-        fields.temperature[i] = AMBIENT_TEMPERATURE;
+        fields.temperature[i] = this.params.ambientTemperature;
         // A habitable starting plate: start at the ventless equilibrium itself
         // (nutrientInflow / nutrientDecay), so a dropped organism grazes a full
         // cell instead of waiting for the plate to fill up around it.
@@ -500,7 +500,7 @@ export class World {
       this.params,
     );
     const upkeep = this.params.genomeUpkeep * org.genome.length;
-    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org), upkeep);
+    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org), upkeep, upkeepRates(this.params));
   }
 
   rebuildOccupancy(): void {

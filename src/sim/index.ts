@@ -52,7 +52,7 @@ export {
   type DecodedGenome,
   type GenomeTrack,
 } from "./genome";
-export { fitness, metabolicDelta, reproduceThreshold } from "./fitness";
+export { fitness, maintenanceCost, metabolicDelta, reproduceThreshold, upkeepRates } from "./fitness";
 export {
   DNA_KITS,
   genomeForKit,
@@ -92,6 +92,7 @@ export {
   exportEventsJSONL,
   exportMetricsCSV,
   exportPhylogenyCSV,
+  exportTraitsCSV,
   injectStrain,
   paintTerrain,
   placeOrganismAt,
@@ -122,12 +123,14 @@ export type { ResearchEvent, ResearchEventKind } from "./types";
 export { SNAPSHOT_BIN_MAGIC, SNAPSHOT_BIN_VERSION, decodeSnapshot, encodeSnapshot } from "./snapshotBin";
 export { migrateSnapshot, snapshotVersion } from "./migrate";
 export {
+  DEFAULT_UPKEEP,
   PARAMS_EXHAUSTIVE,
   PARAM_SPEC,
   QUERY_KEYS,
   paramSpec,
   type ParamGroup,
   type ParamSpec,
+  type UpkeepRates,
 } from "./params";
 export {
   CAUSE_COLOR,

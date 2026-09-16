@@ -151,6 +151,7 @@ export const HELP_FR = {
   "help.btn-share": "Copie un lien de configuration : graine, paramètres et options. Pour conserver les organismes et l’état courant, exportez le monde en JSON.",
   "help.btn-json": "Télécharge un monde complet en JSON : organismes, champs, lignées et historique. Réimportable depuis Expérience ; le conteneur binaire .oav est plus compact.",
   "help.btn-csv": "Télécharge l’historique des indicateurs au format CSV.",
+  "help.btn-traits": "Télécharge les séries par trait au format CSV : une ligne par pas et par trait, avec moyenne, écart-type et quantiles 5 %, 50 % et 95 %. Nécessite « Distributions de traits » activé dans Expérience.",
   "help.btn-phylo": "Télécharge les lignées, leurs parents, dates d’apparition et d’extinction au format CSV.",
   "help.btn-events": "Télécharge le journal d’événements par organisme (JSON Lines : naissances, morts, repas, exsudat). Activez d’abord le journal dans Expérience.",
   "help.btn-goal-keep": "Conserve la dernière course (résultats, résumé, manifeste) dans l’historique du navigateur pour la comparer aux suivantes.",

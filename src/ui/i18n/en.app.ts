@@ -138,6 +138,8 @@ export const APP_EN = {
   "app.share.copied": "Configuration link copied. To share the current state, export the world.",
   "app.manifest.none": "No run to describe: start a targeted experiment, then export its manifest.",
   "app.manifest.exported": "Manifest exported: {name} · {replicates} replicates · {digest}.",
+  "app.traitsExport.empty": "No trait distributions recorded: turn on “Trait distributions” and let the simulation run.",
+  "app.traitsExport.done": "{rows} rows over {traits} traits exported.",
   "app.eventsExport.empty": "Event log empty: turn on “Event log” and let the simulation run.",
   "app.eventsExport.done": "{count} events exported.",
   "app.eventsLog.on": "Event log enabled (bounded, JSONL export).",

@@ -171,6 +171,7 @@ export const SHELL_FR = {
   "btn.bottle": "Goulot d’étranglement : garder 10 %",
   "panel.data.title": "Données de l’expérience",
   "btn.csv": "Métriques CSV",
+  "btn.traits": "Traits CSV",
   "btn.phylo": "Lignées CSV",
   "btn.events": "Événements JSONL",
   "btn.manifest": "Manifeste de la course",

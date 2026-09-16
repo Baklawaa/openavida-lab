@@ -166,6 +166,7 @@ export const SHELL_EN = {
   "btn.bottle": "Bottleneck: keep 10 %",
   "panel.data.title": "Experiment data",
   "btn.csv": "Metrics CSV",
+  "btn.traits": "Traits CSV",
   "btn.phylo": "Lineages CSV",
   "btn.events": "Events JSONL",
   "btn.manifest": "Run manifest",

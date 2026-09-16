@@ -15,6 +15,7 @@ import {
   inspectBiochem,
   pathwaysHtml,
   strongestLiving,
+  upkeepRates,
   tallyDeaths,
   toGenomeTrack,
   tracesHtml,
@@ -202,7 +203,7 @@ export function createFeeds(ctx: LabContext): Feeds {
     pEl.innerHTML = phenotypeTableHtml(org.ph);
     genesEl.innerHTML = genesHtml(track);
     const env = world.fields.sample(org.x, org.y);
-    pwEl.innerHTML = pathwaysHtml(inspectBiochem(decoded, env, org));
+    pwEl.innerHTML = pathwaysHtml(inspectBiochem(decoded, env, org, undefined, upkeepRates(world.params)));
     // The probe reports this text; cache it here so no frame has to read the DOM.
     state.pathwaysText = pwEl.textContent ?? "";
     brEl.innerHTML = tracesHtml(world.brain?.traces ?? [], org.id);

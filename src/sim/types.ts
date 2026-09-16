@@ -110,6 +110,14 @@ export interface SimParams {
   genomeUpkeep: number;
   /** Energy charged per genome base at division. */
   replicationCost: number;
+  /** Energy per tick per unit of longevity above 1. See UpkeepRates. */
+  longevityUpkeep: number;
+  /** Energy per tick per unit of aggression (the hunting apparatus). */
+  aggressionUpkeep: number;
+  /** Nutrient a cell can be stripped of per tick, per unit of uptake. */
+  nutrientUptakeCap: number;
+  /** Temperature the field relaxes towards, and where the initial plate starts. */
+  ambientTemperature: number;
   /** Per-tick hazards of the three disturbance kinds when disturbances are enabled. */
   toxinPulseRate: number;
   droughtRate: number;
@@ -133,7 +141,17 @@ export interface SimParams {
  * truth shared by the UI model panel, the query string and the docs).
  * Re-exported here so every existing `from "./types"` import keeps working.
  */
-export { DEFAULT_PARAMS, PARAM_SPEC, QUERY_KEYS, normalizeParams, paramSpec, type ParamGroup, type ParamSpec } from "./params";
+export {
+  DEFAULT_PARAMS,
+  DEFAULT_UPKEEP,
+  PARAM_SPEC,
+  QUERY_KEYS,
+  normalizeParams,
+  paramSpec,
+  type ParamGroup,
+  type ParamSpec,
+  type UpkeepRates,
+} from "./params";
 
 export interface EnvSample {
   nutrient: number;

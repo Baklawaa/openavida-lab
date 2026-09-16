@@ -10,12 +10,11 @@
  *
  * Regenerate with `npm run docs`.
  */
-import { EXUDATE_FITNESS, EXUDATE_MAX, EXUDATE_UPTAKE_PER_UPTAKE, EXUDATE_YIELD, NUTRIENT_UPTAKE_CAP, PHOTO_GAIN, UPTAKE_GAIN } from "../src/sim/chemistry";
+import { EXUDATE_FITNESS, EXUDATE_MAX, EXUDATE_UPTAKE_PER_UPTAKE, EXUDATE_YIELD, PHOTO_GAIN, UPTAKE_GAIN } from "../src/sim/chemistry";
 import { KIN_THRESHOLD, MASS_DECAY, MASS_HUNT_BONUS, MASS_KILL_AGGRESSION, MASS_MAINTENANCE, MASS_PER_KILL, MASS_SIZE_GAIN, MASS_TO_BREED, MEAL_BODY_BONUS, PREY_ATTRACTION, PREY_SENSE_RADIUS } from "../src/sim/body";
 import { ALPHABET, CODON_LEN, MAX_GENOME, MIN_GENOME, REG_CROSS, REG_MAX, REG_SELF, REG_WINDOW, START_CODON, STOP_CODONS } from "../src/sim/mapping";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX, LINEAGE_TOP_N, RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX, SNAPSHOT_VERSION } from "../src/sim/types";
 import { HISTORY_KEEP, HISTORY_MAX, NEUTRAL_LOG_MAX } from "../src/sim/world";
-import { AMBIENT_TEMPERATURE } from "../src/sim/fields";
 import { EVENT_LOG_MAX, EVENT_WINDOW } from "../src/sim/events";
 import { HEAT_STEPS, TRAIL_LENGTH } from "../src/sim/heat";
 import { DEFAULT_TIMELINE_BUDGET, DEFAULT_TIMELINE_EVERY } from "../src/sim/timeline";
@@ -24,7 +23,7 @@ import { TOURNAMENT_DRAW, TOURNAMENT_INJECT } from "../src/sim/tournament";
 import { RECIPE_QUERY_MAX, RECIPE_VERSION } from "../src/sim/recipe";
 import { MANIFEST_VERSION } from "../src/sim/manifest";
 import { HASH_ALGO, ENGINE_VERSION, MODEL_REVISION, engineInfo } from "../src/sim/engine";
-import { AGGRESSION_UPKEEP, LONGEVITY_UPKEEP } from "../src/sim/fitness";
+
 import { PARAM_SPEC } from "../src/sim/params";
 import { DEFAULT_OVERLAY_ALPHA, EXUDATE_OVERLAY_ALPHA, OVERLAY_GAMMA } from "../src/render/overlay";
 import { HISTORY_CURVES, HISTORY_RESULTS_CAP } from "../src/ui/experimentHistory";
@@ -105,10 +104,6 @@ const num = (v: number): string => String(v);
 export const MODEL_CONSTANTS: readonly ConstantEntry[] = [
   { group: "Metabolism", name: "UPTAKE_GAIN", value: num(UPTAKE_GAIN), source: "src/sim/chemistry.ts", note: "Energy gained per unit of nutrient × uptake." },
   { group: "Metabolism", name: "PHOTO_GAIN", value: num(PHOTO_GAIN), source: "src/sim/chemistry.ts", note: "Energy gained per unit of light × photo." },
-  { group: "Metabolism", name: "NUTRIENT_UPTAKE_CAP", value: num(NUTRIENT_UPTAKE_CAP), source: "src/sim/chemistry.ts", note: "Per-tick nutrient consumption capacity per unit of uptake." },
-  { group: "Metabolism", name: "LONGEVITY_UPKEEP", value: num(LONGEVITY_UPKEEP), source: "src/sim/fitness.ts", note: "Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for." },
-  { group: "Metabolism", name: "AGGRESSION_UPKEEP", value: num(AGGRESSION_UPKEEP), source: "src/sim/fitness.ts", note: "Energy per tick per unit of aggression (the hunting apparatus). Free aggression sweeps to fixation and eats the plate extinct." },
-  { group: "Fields", name: "AMBIENT_TEMPERATURE", value: num(AMBIENT_TEMPERATURE), source: "src/sim/fields.ts", note: "Temperature a ventless plate relaxes towards; without it the field decays to 0 and the thermal term becomes a countdown." },
   { group: "Exudate", name: "EXUDATE_YIELD", value: num(EXUDATE_YIELD), source: "src/sim/chemistry.ts", note: "Energy a consumer gains per unit of exudate taken up; the rest dissipates." },
   { group: "Exudate", name: "EXUDATE_UPTAKE_PER_UPTAKE", value: num(EXUDATE_UPTAKE_PER_UPTAKE), source: "src/sim/chemistry.ts", note: "Per-tick uptake capacity per unit of uptake, scaled by signal / 7." },
   { group: "Exudate", name: "EXUDATE_FITNESS", value: num(EXUDATE_FITNESS), source: "src/sim/chemistry.ts", note: "Weight of exudate in the comparable fitness score." },
@@ -269,10 +264,10 @@ export const REVISION_LOG: readonly RevisionEntry[] = [
     date: "2026-09-14",
     headline: "Heritable lifespan, a standing climate, and a food web with prices",
     changes: [
-      "A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling. It rides on the threonine codons ACT/ACC/ACA/ACG (+0.06) and the cysteines TGT/TGC (+0.08), so a genome that predates it keeps its phenotype, and LONGEVITY_UPKEEP (0.012 per unit above 1) charges for the extra life in both ledgers.",
-      "The climate has a floor: the temperature field relaxes towards AMBIENT_TEMPERATURE (0.5) instead of decaying to 0. A one-way decay was a countdown — every organism's |temperature - tpref| cost grew without bound, so the plate froze into mass starvation by tick ~500 whatever it ate.",
-      "Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and NUTRIENT_UPTAKE_CAP only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.",
-      "Aggression is priced: AGGRESSION_UPKEEP (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.",
+      "A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling. It rides on the threonine codons ACT/ACC/ACA/ACG (+0.06) and the cysteines TGT/TGC (+0.08), so a genome that predates it keeps its phenotype, and params.longevityUpkeep (0.012 per unit above 1) charges for the extra life in both ledgers.",
+      "The climate has a floor: the temperature field relaxes towards params.ambientTemperature (0.5) instead of decaying to 0. A one-way decay was a countdown — every organism's |temperature - tpref| cost grew without bound, so the plate froze into mass starvation by tick ~500 whatever it ate.",
+      "Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and params.nutrientUptakeCap only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.",
+      "Aggression is priced: params.aggressionUpkeep (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.",
       "Hunting follows need: a predator only attacks while it is below its own division threshold, so a fed predator is blocked by prey instead of hoarding meals.",
       "The two specialist kits can feed themselves: Resistant is resist x5 / uptake x5 / motility x3 (uptake x3 left its income ceiling below its own maintenance, so a dropped Resistant starved in fifteen ticks) and the Mutualist gains motility x3. randomGenome() now derives its trait list from TRAIT_NAMES, so no trait can be missing from the random founders.",
       "Snapshot schema v3 with a v2 -> v3 migration: a version-2 payload predates longevity, and restoring its stored phenotype verbatim left ph.longevity undefined, lifespan() NaN and the next reap() empty. World.restore and parseWorldBytes now migrate every reader, so file import, presets, in-session snapshots and the worker op all pass through one choke point.",
@@ -290,7 +285,7 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     measured: "First birth at tick 22, six organisms at tick 150 (the founder still among them) and twenty-five at tick 260; mean nutrient 0.994 at tick 100. Before the climate and harvest repairs the same founder never divided at all: it peaked at 1.008 energy against a 1.542 threshold and died childless at tick 260.",
     tolerance: "The founder is alive at step 150, the population has grown past it, and mean nutrient at step 100 is at least 0.42.",
     check: { kind: "test", file: "tests/calibration.test.ts" },
-    source: "src/sim/world.ts seedEnvironment, src/sim/fields.ts AMBIENT_TEMPERATURE",
+    source: "src/sim/world.ts seedEnvironment, params.ambientTemperature",
   },
   {
     id: "nutrient-equilibrium",
@@ -398,7 +393,7 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     measured: "Mean aggression falls to 0.020 / 0.020 / 0.023 on seeds 1 / 7 / 21, i.e. back to the phototroph baseline: the hunters cannot pay AGGRESSION_UPKEEP without prey. Free aggression instead swept the mature plate to mean 0.91 and extinction.",
     tolerance: "Every seed stays populated and drops below 0.05 mean aggression.",
     check: { kind: "test", file: "tests/calibration.test.ts" },
-    source: "src/sim/fitness.ts AGGRESSION_UPKEEP, src/sim/ecology.ts hungry",
+    source: "src/sim/fitness.ts aggressionUpkeep, params.aggressionUpkeep, src/sim/ecology.ts hungry",
   },
   {
     id: "plate-persistence",

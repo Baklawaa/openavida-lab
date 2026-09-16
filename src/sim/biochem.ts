@@ -5,6 +5,7 @@
  */
 import { TRAIT_COLOR, TRAIT_NAMES, type Phenotype, type TraitName } from "./mapping";
 import { maintenanceCost, metabolicDelta } from "./fitness";
+import { DEFAULT_UPKEEP, type UpkeepRates } from "./params";
 import { EXUDATE_YIELD, PHOTO_GAIN, UPTAKE_GAIN } from "./chemistry";
 import type { DecodedGenome } from "./genome";
 import type { EnvSample, Organism } from "./types";
@@ -311,6 +312,7 @@ export function pathwayFluxes(
   ph: Phenotype,
   env: EnvSample,
   neighbors: { predationGain: number } = { predationGain: 0 },
+  upkeep: UpkeepRates = DEFAULT_UPKEEP,
 ): PathwayFlux[] {
   const carbon = ph.uptake * env.nutrient * UPTAKE_GAIN;
   const photo = ph.photo * env.light * PHOTO_GAIN;
@@ -318,7 +320,7 @@ export function pathwayFluxes(
   const therm = Math.abs(env.temperature - ph.tpref) * 0.12;
   // Read from the ledger itself: a hand-copied formula drifts the moment a
   // term is added (longevity and aggression upkeeps both landed after this).
-  const maintain = maintenanceCost(ph);
+  const maintain = maintenanceCost(ph, 1, 0, upkeep);
   // Potential overflow out of the organism plus the uptake a receptor enables.
   const exudation =
     ph.photo * env.light * PHOTO_GAIN +
@@ -350,13 +352,14 @@ export function inspectBiochem(
   env: EnvSample,
   org: Pick<Organism, "energy" | "ph">,
   neighbors?: { predationGain: number },
+  upkeep: UpkeepRates = DEFAULT_UPKEEP,
 ): BiochemInspect {
-  const pathways = pathwayFluxes(org.ph, env, neighbors);
+  const pathways = pathwayFluxes(org.ph, env, neighbors, upkeep);
   return {
     enzymes: enzymesFromDecoded(decoded),
     molecules: moleculeAmounts(env, org),
     pathways,
-    netDelta: metabolicDelta(org.ph, env),
+    netDelta: metabolicDelta(org.ph, env, 1, 0, upkeep),
   };
 }
 

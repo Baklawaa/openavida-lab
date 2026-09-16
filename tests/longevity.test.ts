@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { World, decodeGenome, founderHeterotroph, genomeForKit, placeOrganismAt } from "../src/sim/index";
 import { BASAL, MIN_GENOME, START_CODON } from "../src/sim/mapping";
 import { lifespan, energyCap } from "../src/sim/body";
-import { LONGEVITY_UPKEEP, fitness, maintenanceCost, metabolicDelta } from "../src/sim/fitness";
+import { fitness, maintenanceCost, metabolicDelta } from "../src/sim/fitness";
+import { DEFAULT_UPKEEP } from "../src/sim/index";
 
 /**
  * The longevity trait: a heritable age ceiling whose upkeep is paid every tick,
@@ -75,7 +76,7 @@ describe("longevity trait", () => {
     expect(long.ph.longevity).toBeGreaterThan(short.ph.longevity);
     // Same phenotype otherwise, so the difference is the upkeep term alone.
     expect(maintenanceCost(long.ph) - maintenanceCost(short.ph)).toBeCloseTo(
-      LONGEVITY_UPKEEP * (long.ph.longevity - short.ph.longevity),
+      DEFAULT_UPKEEP.longevity * (long.ph.longevity - short.ph.longevity),
       10,
     );
     const env = { nutrient: 0.5, toxin: 0, temperature: 0.5, light: 0.5, exudate: 0 };

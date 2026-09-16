@@ -147,6 +147,7 @@ export const HELP_EN = {
   "help.btn-share": "Copy a configuration link: seed, parameters and options. To keep the organisms and the current state, export the world as JSON.",
   "help.btn-json": "Download a complete world as JSON: organisms, fields, lineages and history. Re-importable from Experiment; the .oav binary container is more compact.",
   "help.btn-csv": "Download the metric history as CSV.",
+  "help.btn-traits": "Download the per-trait time series as CSV: one row per step and trait, with the mean, the sd and the 5 %, 50 % and 95 % quantiles. Needs \"Trait distributions\" switched on in Experiment.",
   "help.btn-phylo": "Download the lineages, their parents and their birth and extinction steps as CSV.",
   "help.btn-events": "Download the per-organism event log (JSON Lines: births, deaths, meals, exudate). Switch the log on in Experiment first.",
   "help.btn-goal-keep": "Keep the last run (results, summary, manifest) in the browser's journal to compare it with the next ones.",

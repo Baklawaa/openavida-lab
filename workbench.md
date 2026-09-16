@@ -722,3 +722,27 @@ An integration audit of the longevity trait (the entry above) found the trait wi
 
 - GATES: typecheck ok (both configs); vitest **339/339** (69 files); build ok; **eleven** browser verifier runs OK; baseline re-pinned at `f0d4b39e` (revision 5); perf canonical 4.36 ms/step at 160 organisms, mature 5.27 ms/step at 1033, chemostat 5.66 ms/step at 1089.
 
+## Round: the trade-offs become parameters, and the traits reach CSV (2026-09-14)
+
+Two of the three things I said I would fix next. **No behaviour change: the pinned hash stays `f0d4b39e`,** because every new parameter defaults to the constant it replaced.
+
+### The four load-bearing constants are now parameters
+
+`AGGRESSION_UPKEEP` (0.30), `LONGEVITY_UPKEEP` (0.012), `NUTRIENT_UPTAKE_CAP` (0.16) and `AMBIENT_TEMPERATURE` (0.5) decided whether the ecosystem lives or dies, but only code could change them — while `PARAM_SPEC` is documented as the single source for tuning. They are now `params.aggressionUpkeep`, `params.longevityUpkeep`, `params.nutrientUptakeCap` and `params.ambientTemperature`:
+
+- `fitness()`, `maintenanceCost()` and `metabolicDelta()` take an `UpkeepRates` (defaulting to `DEFAULT_UPKEEP`, built from the spec) instead of reading module constants, so the two ledgers and the panel cannot disagree about the price of a trait. `upkeepRates(params)` is the one adapter, used by `metabolize`, the fitness refresh, the biochem readout and the pathway fluxes.
+- `fields.applyVentsAndDecay` relaxes towards `params.ambientTemperature` and `seedEnvironment` starts there; `metabolize` rations the graze with `params.nutrientUptakeCap`.
+- The retired constants are gone from the source and from the generated constant table; the parameters table, the model panel, the query string, the share links and the recipe all pick them up from the spec automatically. Labels and descriptions landed in both catalogs (`tests/i18n.test.ts` asserts the English text is byte-identical to the spec).
+- `tests/params.test.ts` gained three wiring tests — the upkeep delta reaches **both** ledgers, the climate relaxes to the ambient it is given, and a smaller intake cap strips less per tick — so a future refactor cannot quietly re-hardcode them.
+
+### Per-trait series reach a CSV-only pipeline
+
+The wide `metrics.csv` carries no trait column at all — all twelve traits lived only in `results.jsonl`. `exportTraitsCSV` now writes them long-format, one row per sample and trait (`tick,trait,mean,sd,q05,q50,q95`), because twelve traits by five statistics would have been sixty unreadable columns:
+
+- UI: a **Traits CSV** button in Expérience's data row, with a help text, a status message when the recorder is off, and the row count when it is not; it is next to Metrics CSV and Lineages CSV.
+- Headless: the runner writes `traits.csv` beside `metrics.csv` whenever the reference replicate recorded distributions, and `RunReport.traitsPath` reports it. Verified end to end: a 24×24 run of 40 ticks produced `traits.csv` with the provenance comment, the header and 492 rows (41 samples × 12 traits, every trait present).
+- `tests/sandbox.test.ts` pins the header, the row count, the trait set (longevity included) and the header-only file when `recordTraitDistribution` is off; `docs/formats.md` §7 and `docs/model.md` §8 document the format and why it is a separate file.
+
+- Goldens: both copy fixtures moved for the new parameter rows, the new button and its help (224 → 225 controls).
+- GATES: typecheck ok (both configs); vitest **343/343** (69 files); build ok; `dist` 2.83 MB / 4.00 MB budget; **eleven** browser verifier runs OK; baseline unchanged `f0d4b39e`.
+

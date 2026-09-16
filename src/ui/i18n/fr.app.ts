@@ -143,6 +143,8 @@ export const APP_FR = {
   "app.share.copied": "Lien de configuration copié. Pour partager l’état actuel, exportez le monde.",
   "app.manifest.none": "Aucune course à décrire : lancez une expérience ciblée, puis exportez son manifeste.",
   "app.manifest.exported": "Manifeste exporté : {name} · {replicates} réplicats · {digest}.",
+  "app.traitsExport.empty": "Aucune distribution de traits enregistrée : activez « Distributions de traits » puis laissez tourner la simulation.",
+  "app.traitsExport.done": "{rows} lignes sur {traits} traits exportées.",
   "app.eventsExport.empty": "Journal d’événements vide : activez « Journal d’événements » puis laissez tourner la simulation.",
   "app.eventsExport.done": "{count} événements exportés.",
   "app.eventsLog.on": "Journal d’événements activé (borné, export JSONL).",

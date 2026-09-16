@@ -19,7 +19,7 @@ when those move, this page moves with them.
 | Recipe in `?recipe=` | `RECIPE_VERSION = 1` (`src/sim/recipe.ts`) | `recipeFromWorld`, `recipeToQuery` | `parseRecipe`, `recipeFromQuery` | ignored | ignored |
 | Browser stores | IndexedDB `openavida-lab` version 3 (`src/ui/presetStore.ts`) | `PresetStore` | `PresetStore` | upgrade adds stores in place; a stored snapshot of any version is migrated by `World.restore` | unknown fields ignored |
 | Engine identity | `2.3.0` / revision `5` / `f0d4b39e` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
-| Research exports | no version field (CSV, JSONL) | `src/sim/serialize.ts`, `tools/openavida.ts` | `parseCSV`, `tools/openavida_reader.py` | additive changes only, comment lines skipped | additive readers must skip unknown columns/keys |
+| Research exports | no version field (CSV, JSONL) | `src/sim/serialize.ts`, `tools/openavida.ts` | `parseCSV`, `tools/openavida_reader.py` | additive changes only, comment lines skipped; `metrics.csv` and `traits.csv` are separate files because traits are long, not wide | additive readers must skip unknown columns/keys |
 
 The one thing that is **not** backwards compatible is the engine revision
 itself: no migration makes a result recorded under revision 1 reproduce under
@@ -246,6 +246,23 @@ field; their contract is additive and comment-aware.
   The runner writes it as `metrics.csv` for the reference replicate
   (`tools/openavida.ts`); the UI writes `openavida-metrics-t<tick>.csv`
   (`src/ui/lab/exports.ts`).
+- **Traits CSV.** `exportTraitsCSV` writes the long-format per-trait series
+  — one row per sample and trait, so a CSV-only pipeline sees every trait (the
+  wide metrics table above carries none of them):
+
+  ```text
+  tick,trait,mean,sd,q05,q50,q95
+  0,uptake,0.18,0,0.18,0.18,0.18
+  0,photo,0.02,0,0.02,0.02,0.02
+  ```
+
+  Rows exist only for samples that stored a distribution, i.e. while
+  `recordTraitDistribution` was on; with it off the file is the header alone.
+  Twelve traits times the sampled ticks makes it the longest export, which is
+  why it is a separate file rather than sixty more columns in `metrics.csv`.
+  The runner writes `traits.csv` when the reference replicate recorded
+  distributions (`tools/openavida.ts`); the UI writes
+  `openavida-traits-t<tick>.csv` (`src/ui/lab/exports.ts`).
 - **Phylogeny CSV.** `exportPhylogenyCSV` writes the header
   `id,parentId,bornTick,extinctTick,count,peakCount,hue,signature`, with the
   same provenance comment first, always (the UI's

@@ -38,7 +38,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { engineInfo } from "../src/sim/engine";
 import { runTrial, summarizeTrials, type TrialResult } from "../src/sim/goals";
 import { configsForManifest, startSnapshot, validateManifest, type Manifest } from "../src/sim/manifest";
-import { exportMetricsCSV, type ExportProvenance } from "../src/sim/serialize";
+import { exportMetricsCSV, exportTraitsCSV, type ExportProvenance } from "../src/sim/serialize";
 
 export interface RunOptions {
   outDir: string;
@@ -61,6 +61,8 @@ export interface RunReport {
   resultsPath: string;
   summaryPath: string;
   metricsPath: string | null;
+  /** Long-format per-trait series; null when the recorder stored no distributions. */
+  traitsPath: string | null;
   eventsPath: string | null;
 }
 
@@ -222,9 +224,16 @@ export function runExperiment(manifest: Manifest, opts: RunOptions): RunReport {
     tick: reference?.history?.at(-1)?.tick ?? 0,
   };
   let metricsPath: string | null = null;
+  let traitsPath: string | null = null;
   if (reference?.history?.length) {
     writeFileSync(join(outDir, "metrics.csv"), exportMetricsCSV(reference.history, provenance));
     metricsPath = "metrics.csv";
+    // Per-trait series live only in results.jsonl otherwise, which a CSV-only
+    // pipeline cannot read. Written whenever the recorder stored distributions.
+    if (reference.history.some((m) => m.traitDist)) {
+      writeFileSync(join(outDir, "traits.csv"), exportTraitsCSV(reference.history, provenance));
+      traitsPath = "traits.csv";
+    }
   }
   let eventsPath: string | null = null;
   if (reference?.events?.length) {
@@ -256,6 +265,7 @@ export function runExperiment(manifest: Manifest, opts: RunOptions): RunReport {
     resultsPath,
     summaryPath,
     metricsPath,
+    traitsPath,
     eventsPath,
   };
 }

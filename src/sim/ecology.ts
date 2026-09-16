@@ -3,11 +3,10 @@ import {
   EXUDATE_MAX,
   EXUDATE_UPTAKE_PER_UPTAKE,
   EXUDATE_YIELD,
-  NUTRIENT_UPTAKE_CAP,
   PHOTO_GAIN,
   photosyntheticSurplus,
 } from "./chemistry";
-import { maintenanceCost, metabolicDelta, reproduceThreshold } from "./fitness";
+import { maintenanceCost, metabolicDelta, reproduceThreshold, upkeepRates } from "./fitness";
 import type { Fields } from "./fields";
 import type { Organism, SimParams } from "./types";
 import type { Rng } from "./rng";
@@ -99,19 +98,22 @@ export function metabolize(org: Organism, fields: Fields, params: SimParams): Me
   const env = fields.sample(org.x, org.y);
   // Harvest is the documented mass-action law, uptake x local concentration x
   // UPTAKE_GAIN, so the break-even concentration is maintenance / (uptake x
-  // UPTAKE_GAIN) and income is linear in the uptake trait. NUTRIENT_UPTAKE_CAP
+  // UPTAKE_GAIN) and income is linear in the uptake trait. nutrientUptakeCap
   // only limits the *rate* at which a cell can be stripped; it must not scale
   // the yield, which is what made income quadratic in uptake and let one
   // constant set the whole plate's energy budget.
-  fields.consumeNutrient(org.x, org.y, org.ph.uptake * NUTRIENT_UPTAKE_CAP);
+  fields.consumeNutrient(org.x, org.y, org.ph.uptake * params.nutrientUptakeCap);
   const upkeep = params.genomeUpkeep * org.genome.length;
-  const delta = metabolicDelta(org.ph, env, maintenanceScale(org), upkeep);
+  const delta = metabolicDelta(org.ph, env, maintenanceScale(org), upkeep, upkeepRates(params));
   org.energy += delta;
 
   let leaked = 0;
   if (params.exudateLeak > 0 && org.energy > 0 && org.ph.photo > 0 && env.light > 0) {
     const gross = org.ph.photo * env.light * PHOTO_GAIN;
-    const surplus = photosyntheticSurplus(gross, maintenanceCost(org.ph, maintenanceScale(org), upkeep));
+    const surplus = photosyntheticSurplus(
+      gross,
+      maintenanceCost(org.ph, maintenanceScale(org), upkeep, upkeepRates(params)),
+    );
     if (surplus > 0) {
       // Never leak past the field clamp: what does not fit stays in the cell,
       // so the transfer can never destroy energy silently.

@@ -259,7 +259,9 @@ population, mean and max fitness, Shannon diversity of phenotypes and genotypes,
 lineage count, extinctions, fixation, per-strain and per-strategy counts, up to
 `LINEAGE_TOP_N` living lineages, Hill numbers, evenness, mean offspring per
 adult that died, and — when `recordTraitDistribution` is on — mean, sd and
-quantiles for every trait. `World.neutralLog` records neutral substitutions for
+quantiles for every trait — exported as the long-format `traits.csv` /
+`openavida-traits-t<tick>.csv`, one row per sample and trait, because the wide
+`metrics.csv` carries no trait column at all. `World.neutralLog` records neutral substitutions for
 the molecular clock — a birth whose phenotype is unchanged in every trait except
 the display-only hue, which covers synonymous codon swaps, substitutions outside
 ORFs and pure hue moves — and `World.eventLog` (off by default) records every
@@ -286,7 +288,7 @@ What caps each structure that grows with the run, read from the constants themse
 ## 9. Parameters
 
 <!-- generated:params -->
-39 parameters. `PARAM_SPEC` in `src/sim/params.ts` is the single source: the interface form, the URL query keys (`QUERY_KEYS`), `normalizeParams` bounds and this table are all generated from it.
+43 parameters. `PARAM_SPEC` in `src/sim/params.ts` is the single source: the interface form, the URL query keys (`QUERY_KEYS`), `normalizeParams` bounds and this table are all generated from it.
 
 | Key | Group | Type | Default | Bounds | Step | Unit | Meaning |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -300,8 +302,10 @@ What caps each structure that grows with the run, read from the constants themse
 | `diffusionRate` | metabolism | number | 0.22 | 0-1 | 0.01 | perTick | Jacobi diffusion coefficient for nutrient, toxin and temperature (0 = no mixing). |
 | `nutrientInflow` | metabolism | number | 0.004 (1/250) | 0-0.2 | 0.001 | perTick | Uniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay. |
 | `nutrientDecay` | metabolism | number | 0.004 (1/250) | 0-1 | 0.001 | perTick | Fractional loss of the nutrient field per tick. |
+| `nutrientUptakeCap` | metabolism | number | 0.16 | 0.01-2 | 0.01 | concentration | Nutrient a cell can be stripped of per tick, per unit of uptake. It rations the graze — a smaller cap makes a cell last longer — while the energy gained is uptake x nutrient x UPTAKE_GAIN either way. |
 | `toxinDecay` | metabolism | number | 0.006 | 0-1 | 0.001 | perTick | Fractional loss of the toxin field per tick. |
 | `temperatureDecay` | metabolism | number | 0.002 (1/500) | 0-1 | 0.001 | perTick | Relaxation of the temperature field towards the ambient (0.5) per tick. |
+| `ambientTemperature` | metabolism | number | 0.5 (1/2) | 0-1.5 | 0.01 | relative | Temperature the field relaxes towards, and where the initial plate starts. A ventless plate without it would decay to zero, and the thermal cost is \|temperature - tpref\| x 0.12 per tick. |
 | `lightDecay` | metabolism | number | 0.03 | 0-1 | 0.001 | perTick | Fractional loss of the light field per tick before solar recharge. |
 | `reproduceEnergy` | metabolism | number | 1.55 | 0.05-100 | 0.05 | energy | Base energy a cell must hold to divide; scaled by the fecundity trait. |
 | `maxAge` | metabolism | number | 260 | 1-100000 | 1 | steps | Base age ceiling; each organism's own is round(maxAge x longevity). With senescenceRate > 0 most deaths happen well before it. |
@@ -322,6 +326,8 @@ What caps each structure that grows with the run, read from the constants themse
 | `exudateDiffusion` | chemistry | number | 0.5 (1/2) | 0-1 | 0.01 | perTick | Diffusion of the exudate field; how far a leak travels from its producer. |
 | `genomeUpkeep` | evolution | number | 0.00002 (1/50000) | 0-0.01 | 0.00001 | energyPerBasePerTick | Maintenance cost per genome base per tick, so longer genomes are not free. |
 | `replicationCost` | evolution | number | 0.001 (1/1000) | 0-0.05 | 0.0001 | energyPerBase | Energy charged per genome base at division, on top of the daughter's share. |
+| `longevityUpkeep` | evolution | number | 0.012 | 0-0.5 | 0.001 | energy | Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for. 0 makes lifespan free and the trait walks to its cap. |
+| `aggressionUpkeep` | evolution | number | 0.3 | 0-2 | 0.01 | energy | Energy per tick charged per unit of aggression: the hunting apparatus. 0 makes aggression free, and a free trait sweeps to fixation and eats the plate extinct. |
 | `toxinPulseRate` | world | number | 0.015625 (1/64) | 0-1 | 0.0005 | perTick | Per-tick hazard of a random toxin pulse when disturbances are enabled (default 1/64). |
 | `droughtRate` | world | number | 0.011363636363636364 (1/88) | 0-1 | 0.0005 | perTick | Per-tick hazard of a nutrient drought when disturbances are enabled (default 1/88). |
 | `crashRate` | world | number | 0.008333333333333333 (1/120) | 0-1 | 0.0005 | perTick | Per-tick hazard of a population crash when disturbances are enabled (default 1/120). |
@@ -346,10 +352,6 @@ Values the model hard-codes rather than exposing as parameters. Each row is read
 | --- | --- | --- | --- | --- |
 | Metabolism | `UPTAKE_GAIN` | `0.21` | `src/sim/chemistry.ts` | Energy gained per unit of nutrient × uptake. |
 | Metabolism | `PHOTO_GAIN` | `0.14` | `src/sim/chemistry.ts` | Energy gained per unit of light × photo. |
-| Metabolism | `NUTRIENT_UPTAKE_CAP` | `0.16` | `src/sim/chemistry.ts` | Per-tick nutrient consumption capacity per unit of uptake. |
-| Metabolism | `LONGEVITY_UPKEEP` | `0.012` | `src/sim/fitness.ts` | Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for. |
-| Metabolism | `AGGRESSION_UPKEEP` | `0.3` | `src/sim/fitness.ts` | Energy per tick per unit of aggression (the hunting apparatus). Free aggression sweeps to fixation and eats the plate extinct. |
-| Fields | `AMBIENT_TEMPERATURE` | `0.5` | `src/sim/fields.ts` | Temperature a ventless plate relaxes towards; without it the field decays to 0 and the thermal term becomes a countdown. |
 | Exudate | `EXUDATE_YIELD` | `0.8` | `src/sim/chemistry.ts` | Energy a consumer gains per unit of exudate taken up; the rest dissipates. |
 | Exudate | `EXUDATE_UPTAKE_PER_UPTAKE` | `0.5` | `src/sim/chemistry.ts` | Per-tick uptake capacity per unit of uptake, scaled by signal / 7. |
 | Exudate | `EXUDATE_FITNESS` | `1` | `src/sim/chemistry.ts` | Weight of exudate in the comparable fitness score. |
@@ -449,10 +451,10 @@ Evidence: workbench.md, "Round: a habitable fresh plate".
 
 **Heritable lifespan, a standing climate, and a food web with prices.**
 
-- A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling. It rides on the threonine codons ACT/ACC/ACA/ACG (+0.06) and the cysteines TGT/TGC (+0.08), so a genome that predates it keeps its phenotype, and LONGEVITY_UPKEEP (0.012 per unit above 1) charges for the extra life in both ledgers.
-- The climate has a floor: the temperature field relaxes towards AMBIENT_TEMPERATURE (0.5) instead of decaying to 0. A one-way decay was a countdown — every organism's |temperature - tpref| cost grew without bound, so the plate froze into mass starvation by tick ~500 whatever it ate.
-- Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and NUTRIENT_UPTAKE_CAP only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.
-- Aggression is priced: AGGRESSION_UPKEEP (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.
+- A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling. It rides on the threonine codons ACT/ACC/ACA/ACG (+0.06) and the cysteines TGT/TGC (+0.08), so a genome that predates it keeps its phenotype, and params.longevityUpkeep (0.012 per unit above 1) charges for the extra life in both ledgers.
+- The climate has a floor: the temperature field relaxes towards params.ambientTemperature (0.5) instead of decaying to 0. A one-way decay was a countdown — every organism's |temperature - tpref| cost grew without bound, so the plate froze into mass starvation by tick ~500 whatever it ate.
+- Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and params.nutrientUptakeCap only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.
+- Aggression is priced: params.aggressionUpkeep (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.
 - Hunting follows need: a predator only attacks while it is below its own division threshold, so a fed predator is blocked by prey instead of hoarding meals.
 - The two specialist kits can feed themselves: Resistant is resist x5 / uptake x5 / motility x3 (uptake x3 left its income ceiling below its own maintenance, so a dropped Resistant starved in fifteen ticks) and the Mutualist gains motility x3. randomGenome() now derives its trait list from TRAIT_NAMES, so no trait can be missing from the random founders.
 - Snapshot schema v3 with a v2 -> v3 migration: a version-2 payload predates longevity, and restoring its stored phenotype verbatim left ph.longevity undefined, lifespan() NaN and the next reap() empty. World.restore and parseWorldBytes now migrate every reader, so file import, presets, in-session snapshots and the worker op all pass through one choke point.
@@ -478,7 +480,7 @@ A ventless plate stays habitable and a dropped organism founds a population inst
 - **Measured.** First birth at tick 22, six organisms at tick 150 (the founder still among them) and twenty-five at tick 260; mean nutrient 0.994 at tick 100. Before the climate and harvest repairs the same founder never divided at all: it peaked at 1.008 energy against a 1.542 threshold and died childless at tick 260.
 - **Tolerance.** The founder is alive at step 150, the population has grown past it, and mean nutrient at step 100 is at least 0.42.
 - **Checked by.** re-measured by `tests/calibration.test.ts` on every run.
-- **Source.** src/sim/world.ts seedEnvironment, src/sim/fields.ts AMBIENT_TEMPERATURE.
+- **Source.** src/sim/world.ts seedEnvironment, params.ambientTemperature.
 
 ### nutrient-equilibrium
 
@@ -598,7 +600,7 @@ Aggression is not free: a population seeded with hunters loses them, because the
 - **Measured.** Mean aggression falls to 0.020 / 0.020 / 0.023 on seeds 1 / 7 / 21, i.e. back to the phototroph baseline: the hunters cannot pay AGGRESSION_UPKEEP without prey. Free aggression instead swept the mature plate to mean 0.91 and extinction.
 - **Tolerance.** Every seed stays populated and drops below 0.05 mean aggression.
 - **Checked by.** re-measured by `tests/calibration.test.ts` on every run.
-- **Source.** src/sim/fitness.ts AGGRESSION_UPKEEP, src/sim/ecology.ts hungry.
+- **Source.** src/sim/fitness.ts aggressionUpkeep, params.aggressionUpkeep, src/sim/ecology.ts hungry.
 
 ### plate-persistence
 

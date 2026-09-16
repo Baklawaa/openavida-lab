@@ -11,6 +11,7 @@ import {
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,
+  exportTraitsCSV,
   flagsToQuery,
   parseWorldBytes,
   provenanceOf,
@@ -61,6 +62,17 @@ export function createExports(ctx: LabContext): void {
   });
   root.querySelector("#btn-csv")!.addEventListener("click", () => {
     download(`openavida-metrics-t${ctx.current().tick}.csv`, exportMetricsCSV(ctx.current().history, provenanceOf(ctx.current())), "text/csv");
+  });
+  root.querySelector("#btn-traits")!.addEventListener("click", () => {
+    const w = ctx.current();
+    const traits = Object.keys(w.history.at(-1)?.traitDist ?? {}).length;
+    if (traits === 0) {
+      ctx.status(tDynamic("app.traitsExport.empty"));
+      return;
+    }
+    const rows = w.history.reduce((n, m) => n + Object.keys(m.traitDist ?? {}).length, 0);
+    download(`openavida-traits-t${w.tick}.csv`, exportTraitsCSV(w.history, provenanceOf(w)), "text/csv");
+    ctx.status(tDynamic("app.traitsExport.done", { rows, traits }));
   });
   root.querySelector("#btn-phylo")!.addEventListener("click", () => {
     download(`openavida-phylo-t${ctx.current().tick}.csv`, exportPhylogenyCSV(ctx.current()), "text/csv");

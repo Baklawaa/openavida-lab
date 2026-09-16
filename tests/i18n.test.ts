@@ -124,6 +124,7 @@ describe("message catalogs", () => {
       { shape: /^trait\.[a-z]+\.abbr$/, why: "three-letter trait symbols" },
       { shape: /^kit\.[a-z]+\.short$/, why: "kit summaries name trait ids" },
       { shape: /^unit\.(aggression|concentration|fraction)$/, why: "same unit word" },
+      { shape: /^btn\.traits$/, why: "\"trait\" is the same word in French, next to the CSV of its number" },
       { shape: /^param\.diffusionRate\.label$/, why: "diffusion" },
       { shape: /^trait\.fecundity\.label$/, why: "reproduction" },
       { shape: /^explorer\.(filter\.fitness|table\.col\.fitness|detail\.(fitness|parent|position)|lineage\.(parent|col\.parent|signature|sort\.extinct)|saved\.(col\.fitness|simulation))$/, why: "fitness, parent, position, signature, simulation, extinction" },

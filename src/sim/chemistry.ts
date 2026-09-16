@@ -18,8 +18,6 @@
 export const UPTAKE_GAIN = 0.21;
 /** Energy gained per unit of light × photo. */
 export const PHOTO_GAIN = 0.14;
-/** Per-tick nutrient consumption capacity per unit of uptake. */
-export const NUTRIENT_UPTAKE_CAP = 0.16;
 /** Energy a consumer gains per unit of exudate taken up. */
 export const EXUDATE_YIELD = 0.8;
 /** Per-tick exudate uptake capacity per unit of uptake, scaled by signal/7. */

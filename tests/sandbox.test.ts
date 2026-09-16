@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DualWorld,
   TERRAIN,
+  TRAIT_NAMES,
   World,
   applyBottleneck,
   buildShareURL,
@@ -9,6 +10,7 @@ import {
   exportJSON,
   exportMetricsCSV,
   exportPhylogenyCSV,
+  exportTraitsCSV,
   founderHeterotroph,
   injectStrain,
   paintTerrain,
@@ -134,6 +136,37 @@ describe("snapshots, A/B, export, URL", () => {
     expect(pparsed.header).toContain("parentId");
     expect(pparsed.header).toContain("signature");
     expect(pparsed.rows.length).toBe(w.lineages.size);
+  });
+
+  it("exports the per-trait series in long format, every trait included", () => {
+    const w = new World({
+      width: 12,
+      height: 12,
+      startPopulation: 10,
+      seed: 8,
+      mutationRate: 1,
+      recordTraitDistribution: true,
+    });
+    for (const o of w.organisms) o.energy = 3;
+    for (let i = 0; i < 8; i++) w.step();
+
+    const traits = exportTraitsCSV(w.history);
+    const parsed = parseCSV(traits);
+    expect(parsed.header).toEqual(["tick", "trait", "mean", "sd", "q05", "q50", "q95"]);
+    const withDist = w.history.filter((m) => m.traitDist).length;
+    expect(withDist).toBeGreaterThan(0);
+    expect(parsed.rows.length).toBe(withDist * TRAIT_NAMES.length);
+    expect(new Set(parsed.rows.map((r) => r[1]))).toEqual(new Set(TRAIT_NAMES));
+    // A trait the wide metrics table never carried is present, with numbers.
+    const longevity = parsed.rows.find((r) => r[1] === "longevity")!;
+    expect(longevity.length).toBe(7);
+    expect(Number(longevity[2]), "mean longevity is basal or above").toBeGreaterThanOrEqual(1);
+    expect(Number(longevity[3]), "sd is a number").toBeGreaterThanOrEqual(0);
+
+    // Without the recorder the file is the header alone, not a broken table.
+    const quiet = new World({ width: 12, height: 12, startPopulation: 6, seed: 8, recordTraitDistribution: false });
+    for (let i = 0; i < 4; i++) quiet.step();
+    expect(exportTraitsCSV(quiet.history).split("\n").length).toBe(1);
   });
 
   it("seed+params URL/query round-trips to the same config", () => {

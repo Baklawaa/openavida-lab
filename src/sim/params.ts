@@ -81,6 +81,11 @@ const PARAM_SPEC_LIST = [
     description: "Fractional loss of the nutrient field per tick.",
   },
   {
+    key: "nutrientUptakeCap", unit: "concentration", group: "metabolism", kind: "number",
+    min: 0.01, max: 2, step: 0.01, default: 0.16,
+    description: "Nutrient a cell can be stripped of per tick, per unit of uptake. It rations the graze — a smaller cap makes a cell last longer — while the energy gained is uptake x nutrient x UPTAKE_GAIN either way.",
+  },
+  {
     key: "toxinDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.006,
     description: "Fractional loss of the toxin field per tick.",
@@ -89,6 +94,11 @@ const PARAM_SPEC_LIST = [
     key: "temperatureDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.002,
     description: "Relaxation of the temperature field towards the ambient (0.5) per tick.",
+  },
+  {
+    key: "ambientTemperature", unit: "relative", group: "metabolism", kind: "number",
+    min: 0, max: 1.5, step: 0.01, default: 0.5,
+    description: "Temperature the field relaxes towards, and where the initial plate starts. A ventless plate without it would decay to zero, and the thermal cost is |temperature - tpref| x 0.12 per tick.",
   },
   {
     key: "lightDecay", unit: "perTick", group: "metabolism", kind: "number",
@@ -191,6 +201,16 @@ const PARAM_SPEC_LIST = [
     description: "Energy charged per genome base at division, on top of the daughter's share.",
   },
   {
+    key: "longevityUpkeep", unit: "energy", group: "evolution", kind: "number",
+    min: 0, max: 0.5, step: 0.001, default: 0.012,
+    description: "Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for. 0 makes lifespan free and the trait walks to its cap.",
+  },
+  {
+    key: "aggressionUpkeep", unit: "energy", group: "evolution", kind: "number",
+    min: 0, max: 2, step: 0.01, default: 0.3,
+    description: "Energy per tick charged per unit of aggression: the hunting apparatus. 0 makes aggression free, and a free trait sweeps to fixation and eats the plate extinct.",
+  },
+  {
     key: "toxinPulseRate", unit: "perTick", group: "world", kind: "number",
     min: 0, max: 1, step: 0.0005, default: 0.015625,
     description: "Per-tick hazard of a random toxin pulse when disturbances are enabled (default 1/64).",
@@ -228,6 +248,25 @@ const PARAM_SPEC_LIST = [
 ] as const satisfies readonly ParamSpec[];
 
 export const PARAM_SPEC: readonly ParamSpec[] = PARAM_SPEC_LIST;
+
+/**
+ * The two life-history upkeeps the ledgers charge, read from the spec so the
+ * model and the panel can never disagree about the price of a trait.
+ */
+export interface UpkeepRates {
+  longevity: number;
+  aggression: number;
+}
+
+function specDefault2(key: keyof SimParams): number {
+  const spec = PARAM_SPEC.find((s) => s.key === key)!;
+  return spec.default as number;
+}
+
+export const DEFAULT_UPKEEP: UpkeepRates = Object.freeze({
+  longevity: specDefault2("longevityUpkeep"),
+  aggression: specDefault2("aggressionUpkeep"),
+});
 
 /**
  * Compile-time proof that every SimParams key has exactly one spec entry:

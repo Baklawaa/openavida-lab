@@ -1,4 +1,5 @@
 import { engineInfo, paramsDigest, type EngineInfo } from "./engine";
+import { TRAIT_NAMES } from "./mapping";
 import { migrateSnapshot } from "./migrate";
 import { PARAM_SPEC, QUERY_KEYS } from "./params";
 import { SNAPSHOT_BIN_MAGIC, decodeSnapshot } from "./snapshotBin";
@@ -133,6 +134,28 @@ export function exportMetricsCSV(history: MetricsSample[], provenance?: ExportPr
       m.meanOffspringPerAdult ?? "",
     ].join(","),
   );
+  const head = provenance ? [provenanceLine(provenance), header] : [header];
+  return [...head, ...rows].join("\n");
+}
+
+/**
+ * Long-format per-trait time series: one row per tick and trait, so every trait
+ * reaches a pipeline that only reads CSV. The wide metrics table carries none of
+ * them; this file is written only when the world recorded trait distributions,
+ * so an empty body (the header alone) means the recorder was off.
+ */
+export function exportTraitsCSV(history: readonly MetricsSample[], provenance?: ExportProvenance): string {
+  const header = "tick,trait,mean,sd,q05,q50,q95";
+  const rows: string[] = [];
+  for (const m of history) {
+    const dist = m.traitDist;
+    if (!dist) continue;
+    for (const trait of TRAIT_NAMES) {
+      const d = dist[trait];
+      if (!d) continue;
+      rows.push([m.tick, trait, d.mean, d.sd, d.q05, d.q50, d.q95].join(","));
+    }
+  }
   const head = provenance ? [provenanceLine(provenance), header] : [header];
   return [...head, ...rows].join("\n");
 }
