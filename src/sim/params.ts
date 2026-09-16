@@ -103,7 +103,7 @@ const PARAM_SPEC_LIST = [
   {
     key: "maxAge", unit: "steps", group: "metabolism", kind: "number",
     min: 1, max: 100000, step: 1, integer: true, default: 260,
-    description: "Hard age ceiling. With senescenceRate > 0 most deaths happen well before it.",
+    description: "Base age ceiling; each organism's own is round(maxAge x longevity). With senescenceRate > 0 most deaths happen well before it.",
   },
   {
     key: "predationThreshold", unit: "aggression", group: "metabolism", kind: "number",
@@ -163,7 +163,7 @@ const PARAM_SPEC_LIST = [
   {
     key: "senescenceRate", unit: "risk", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.005, default: 0.02,
-    description: "Scale of the age-dependent mortality hazard (1 - exp(-rate (age/maxAge)^2)). 0 = hard maxAge cutoff only.",
+    description: "Scale of the age-dependent mortality hazard (1 - exp(-rate (age/lifespan)^2), lifespan being the organism's own ceiling). 0 = hard cutoff only.",
   },
   {
     key: "exudateLeak", unit: "fraction", group: "chemistry", kind: "number",

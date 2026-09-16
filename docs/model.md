@@ -60,7 +60,8 @@ order, and the order is part of the model.
    organism displaces the occupant (death cause `competition`).
 10. **Reproduction.** One pass over the pre-movement population (see
     [§5](#5-energy-budget-and-reproduction)).
-11. **Reaping.** Organisms with no energy, or past `maxAge`, become death
+11. **Reaping.** Organisms with no energy, or past their own lifespan
+    ceiling (`round(maxAge × longevity)`), become death
     records with a cause; extinct lineages are stamped and their peak count
     kept.
 12. **Bookkeeping.** Trails, occupancy heat (200-step decay), the metrics
@@ -303,7 +304,7 @@ What caps each structure that grows with the run, read from the constants themse
 | `temperatureDecay` | metabolism | number | 0.002 (1/500) | 0-1 | 0.001 | perTick | Relaxation of the temperature field towards the ambient (0.5) per tick. |
 | `lightDecay` | metabolism | number | 0.03 | 0-1 | 0.001 | perTick | Fractional loss of the light field per tick before solar recharge. |
 | `reproduceEnergy` | metabolism | number | 1.55 | 0.05-100 | 0.05 | energy | Base energy a cell must hold to divide; scaled by the fecundity trait. |
-| `maxAge` | metabolism | number | 260 | 1-100000 | 1 | steps | Hard age ceiling. With senescenceRate > 0 most deaths happen well before it. |
+| `maxAge` | metabolism | number | 260 | 1-100000 | 1 | steps | Base age ceiling; each organism's own is round(maxAge x longevity). With senescenceRate > 0 most deaths happen well before it. |
 | `predationThreshold` | metabolism | number | 0.26 | 0-1 | 0.01 | aggression | Minimum aggression for an organism to be a predator at all. |
 | `maxMealsPerTick` | metabolism | number | 1 | 1-8 | 1 | prey | Maximum prey a predator can eat in one tick across all phases; density-independent attack limit. |
 | `kinThreshold` | ecology | number | 0.1 (1/10) | 0-1 | 0.01 | aggression | Minimum aggression gap required for a kill. 0 allows cannibalism of identical phenotypes. |
@@ -315,7 +316,7 @@ What caps each structure that grows with the run, read from the constants themse
 | `recombinationRadius` | evolution | number | 3 | 0-32 | 1 | cells | Chebyshev radius within which a recombination partner is drawn. |
 | `regulationEnabled` | evolution | flag | true | 0-1 | 1 | - | Amplify a gene by the codons upstream of its ATG (cis-regulatory layer). Off restores the purely additive decoder. |
 | `lightDiffusion` | metabolism | number | 0 | 0-1 | 0.01 | perTick | Diffusion of the light field. 0 keeps light where the solar recharge and shade put it. |
-| `senescenceRate` | metabolism | number | 0.02 (1/50) | 0-1 | 0.005 | risk | Scale of the age-dependent mortality hazard (1 - exp(-rate (age/maxAge)^2)). 0 = hard maxAge cutoff only. |
+| `senescenceRate` | metabolism | number | 0.02 (1/50) | 0-1 | 0.005 | risk | Scale of the age-dependent mortality hazard (1 - exp(-rate (age/lifespan)^2), lifespan being the organism's own ceiling). 0 = hard cutoff only. |
 | `exudateLeak` | chemistry | number | 0.15 | 0-1 | 0.01 | fraction | Share of the photosynthetic surplus a phototroph leaks into the exudate field. |
 | `exudateDecay` | chemistry | number | 0.03 | 0-1 | 0.001 | perTick | Fractional loss of the exudate field per tick. |
 | `exudateDiffusion` | chemistry | number | 0.5 (1/2) | 0-1 | 0.01 | perTick | Diffusion of the exudate field; how far a leak travels from its producer. |
