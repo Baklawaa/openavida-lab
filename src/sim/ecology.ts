@@ -7,6 +7,7 @@ import {
   photosyntheticSurplus,
 } from "./chemistry";
 import { maintenanceCost, metabolicDelta, reproduceThreshold, upkeepRates } from "./fitness";
+import type { UpkeepRates } from "./params";
 import type { Fields } from "./fields";
 import type { Organism, SimParams } from "./types";
 import type { Rng } from "./rng";
@@ -94,7 +95,14 @@ export interface MetabolismResult {
  * transfer, not a source — and a signal-positive / low-photo mutant is a
  * free-rider on its neighbours' overflow.
  */
-export function metabolize(org: Organism, fields: Fields, params: SimParams): MetabolismResult {
+export function metabolize(
+  org: Organism,
+  fields: Fields,
+  params: SimParams,
+  // Hoisted by the caller: deriving it here allocates one object per organism
+  // per tick, which measured as a 2x slowdown of the whole step.
+  rates: UpkeepRates = upkeepRates(params),
+): MetabolismResult {
   const env = fields.sample(org.x, org.y);
   // Harvest is the documented mass-action law, uptake x local concentration x
   // UPTAKE_GAIN, so the break-even concentration is maintenance / (uptake x
@@ -104,7 +112,7 @@ export function metabolize(org: Organism, fields: Fields, params: SimParams): Me
   // constant set the whole plate's energy budget.
   fields.consumeNutrient(org.x, org.y, org.ph.uptake * params.nutrientUptakeCap);
   const upkeep = params.genomeUpkeep * org.genome.length;
-  const delta = metabolicDelta(org.ph, env, maintenanceScale(org), upkeep, upkeepRates(params));
+  const delta = metabolicDelta(org.ph, env, maintenanceScale(org), upkeep, rates);
   org.energy += delta;
 
   let leaked = 0;
@@ -112,7 +120,7 @@ export function metabolize(org: Organism, fields: Fields, params: SimParams): Me
     const gross = org.ph.photo * env.light * PHOTO_GAIN;
     const surplus = photosyntheticSurplus(
       gross,
-      maintenanceCost(org.ph, maintenanceScale(org), upkeep, upkeepRates(params)),
+      maintenanceCost(org.ph, maintenanceScale(org), upkeep, rates),
     );
     if (surplus > 0) {
       // Never leak past the field clamp: what does not fit stays in the cell,

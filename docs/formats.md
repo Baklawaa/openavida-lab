@@ -18,7 +18,7 @@ when those move, this page moves with them.
 | Run manifest | `MANIFEST_VERSION = 1` (`src/sim/manifest.ts`) | `makeManifest`, `manifestFromWorld` | `validateManifest` | accepted, normalized, engine re-stamped | refused (error list) |
 | Recipe in `?recipe=` | `RECIPE_VERSION = 1` (`src/sim/recipe.ts`) | `recipeFromWorld`, `recipeToQuery` | `parseRecipe`, `recipeFromQuery` | ignored | ignored |
 | Browser stores | IndexedDB `openavida-lab` version 3 (`src/ui/presetStore.ts`) | `PresetStore` | `PresetStore` | upgrade adds stores in place; a stored snapshot of any version is migrated by `World.restore` | unknown fields ignored |
-| Engine identity | `2.3.0` / revision `5` / `f0d4b39e` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
+| Engine identity | `2.3.0` / revision `5` / `b6734bfc` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
 | Research exports | no version field (CSV, JSONL) | `src/sim/serialize.ts`, `tools/openavida.ts` | `parseCSV`, `tools/openavida_reader.py` | additive changes only, comment lines skipped; `metrics.csv` and `traits.csv` are separate files because traits are long, not wide | additive readers must skip unknown columns/keys |
 
 The one thing that is **not** backwards compatible is the engine revision
@@ -217,7 +217,7 @@ pinned by the canonical perf world (128 x 128, 260 founders, seed
 | 2.0.0 | 2 | `9df52ec5` | model correctness stage (`docs/model.md` §11) |
 | 2.1.0 | 3 | `185d6460` | evolvability stage |
 | 2.2.0 | 4 | `e953dcdc` | nutrient recycling round |
-| 2.3.0 | 5 | `f0d4b39e` | current; longevity, the climate floor, the mass-action harvest, priced aggression; `tests/engine.test.ts` fails on a silent behaviour change |
+| 2.3.0 | 5 | `b6734bfc` | current; longevity, the climate floor, the mass-action harvest, priced aggression, real trophic efficiency; `tests/engine.test.ts` fails on a silent behaviour change |
 
 `engine` and `paramsDigest` inside a snapshot are provenance, not
 compatibility keys: `migrateSnapshot` never reads them, and the migration

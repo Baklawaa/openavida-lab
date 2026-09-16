@@ -203,16 +203,23 @@ before the ceiling; `senescenceRate: 0` restores the hard cutoff alone.
   `kinThreshold` (0 allows cannibalism of identical phenotypes). The attack is
   certain at a gap of 0.5, otherwise it succeeds with probability equal to the
   gap. A meal transfers the prey's stored energy scaled by
-  `0.35 + 0.4·aggression` plus `MEAL_BODY_BONUS × effective size` of body, and
-  the predator's own condition rises by `MASS_PER_KILL + 0.1·aggression`.
+  `TROPHIC_SHARE_BASE + TROPHIC_SHARE_AGGRESSION·aggression`
+  (0.30 + 0.30·aggression) plus `MEAL_BODY_BONUS × effective size` of body
+  (0.10), and the predator's own condition rises by
+  `MASS_PER_KILL + 0.1·aggression`. The transfer used to be 0.35 + 0.40 with a
+  0.45 body bonus, which made every kill worth fifteen to forty ticks of a
+  predator's maintenance whatever the prey held: aggression was free money,
+  ratcheted to fixation and the plate ate itself (see §13).
 - **Meal budget.** A predator takes at most `maxMealsPerTick` prey per tick
   across both the interaction and the movement phase; at its budget it is
   blocked by prey rather than fed. This is what makes trophic transfer a rate
   limit instead of a density effect.
 - **Hunting follows need.** A predator only attacks while its energy is below
   its own division threshold, so a fed predator is blocked by prey instead of
-  hoarding meals. Together with `AGGRESSION_UPKEEP` this is what stops the
-  trophic web from becoming an aggression runaway.
+  hoarding meals. With `params.aggressionUpkeep` and the trophic share above,
+  that is what stops the trophic web from becoming an aggression runaway: the
+  trait is charged every tick, a kill is worth a share of what the prey stored
+  rather than a fixed jackpot, and a predator that has eaten waits.
 - **Body condition.** `mass` (0–1) is somatic, not genetic: effective size is
   `size·(1 + 0.6·mass)`, which raises the energy ceiling, raises maintenance by
   `1 + 0.2·mass`, strengthens hunting by `+0.15·mass` and drives the drawn size.
@@ -363,7 +370,8 @@ Values the model hard-codes rather than exposing as parameters. Each row is read
 | Body | `MASS_HUNT_BONUS` | `0.15` | `src/sim/body.ts` | Hunting power = aggression + bonus × mass. |
 | Body | `MASS_MAINTENANCE` | `0.2` | `src/sim/body.ts` | Maintenance multiplier 1 + value × mass (weaker than the size gain, so growing pays). |
 | Body | `MASS_TO_BREED` | `0.25` | `src/sim/body.ts` | Predators reproduce only once this fed: breeding follows real feeding. |
-| Body | `MEAL_BODY_BONUS` | `0.45` | `src/sim/body.ts` | Extra energy from the prey's body, per unit of effective size. |
+| Body | `MEAL_BODY_BONUS` | `0.1` | `src/sim/body.ts` | Extra energy from the prey's body, per unit of effective size. Small: at 0.45 a kill always paid and aggression ran away. |
+| Body | `TROPHIC_SHARE_BASE / TROPHIC_SHARE_AGGRESSION` | `0.3 / 0.3` | `src/sim/body.ts` | Share of the prey's stored energy a kill transfers, at aggression 0 and per unit of aggression. This is the trophic efficiency that keeps predation a strategy instead of a runaway. |
 | Body | `PREY_ATTRACTION` | `0.3` | `src/sim/body.ts` | Chemotaxis pull toward the nearest edible prey. |
 | Body | `PREY_SENSE_RADIUS` | `6` | `src/sim/body.ts` | How far a predator senses prey, in cells. |
 | Body | `KIN_THRESHOLD` | `0.1` | `src/sim/body.ts` | Fallback minimum aggression gap for a kill; params.kinThreshold overrides it. |
@@ -447,7 +455,7 @@ Evidence: workbench.md, "Upgrade Stage 2 — evolvability".
 
 Evidence: workbench.md, "Round: a habitable fresh plate".
 
-### 2.3.0 — revision 5 — perf hash `f0d4b39e` (2026-09-14)
+### 2.3.0 — revision 5 — perf hash `b6734bfc` (2026-09-14)
 
 **Heritable lifespan, a standing climate, and a food web with prices.**
 
@@ -456,6 +464,7 @@ Evidence: workbench.md, "Round: a habitable fresh plate".
 - Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and params.nutrientUptakeCap only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.
 - Aggression is priced: params.aggressionUpkeep (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.
 - Hunting follows need: a predator only attacks while it is below its own division threshold, so a fed predator is blocked by prey instead of hoarding meals.
+- Trophic efficiency is real: a meal transfers TROPHIC_SHARE_BASE + TROPHIC_SHARE_AGGRESSION x aggression (0.30 + 0.30) of the prey's stored energy plus a small MEAL_BODY_BONUS (0.10, was 0.45) of its body. The old pair made every kill a 15-to-40-tick jackpot whatever the prey held, so aggression remained free money and the plate still decayed to 69 organisms by tick 6000; at the new share the default plate holds 1088-1098 to tick 5500 and predation stays a third of deaths.
 - The two specialist kits can feed themselves: Resistant is resist x5 / uptake x5 / motility x3 (uptake x3 left its income ceiling below its own maintenance, so a dropped Resistant starved in fifteen ticks) and the Mutualist gains motility x3. randomGenome() now derives its trait list from TRAIT_NAMES, so no trait can be missing from the random founders.
 - Snapshot schema v3 with a v2 -> v3 migration: a version-2 payload predates longevity, and restoring its stored phenotype verbatim left ph.longevity undefined, lifespan() NaN and the next reap() empty. World.restore and parseWorldBytes now migrate every reader, so file import, presets, in-session snapshots and the worker op all pass through one choke point.
 - nutrientDecay defaults to 0.004 (equilibrium 1.0) and seedEnvironment starts the plate at that equilibrium; inflowNutrient defaults to 1 so a chemostat starts habitable.
@@ -557,7 +566,7 @@ The reported selection coefficient is an estimator, not a decoration: it recover
 Population size is bounded by the plate as much as by the parameter.
 
 - **Method.** 180 founders on the 128x128 default plate, step to 400 and read the population, then keep stepping to 3000 and read the death causes and mean aggression.
-- **Measured.** 533 at tick 100, 1033 at tick 400, peak 1094 against the 1100 cap; at tick 3000 the plate holds 1089 organisms with mean aggression 0.065 and deaths by starvation 1023, predation 794, competition 734, old-age 330, crowding 296. With the climate and harvest repairs the plate is productive enough to reach its cap.
+- **Measured.** 508 at tick 100, 677 at tick 400, peak 1087 against the 1100 cap; at tick 3000 the plate holds 1093 organisms with mean aggression 0.028 and deaths by competition 1744, old-age 1652, starvation 307, predation 162, crowding 75.
 - **Tolerance.** Recorded measurement; the population must stay below maxPopulation.
 - **Checked by.** recorded measurement (not re-measured by the suite).
 - **Source.** workbench.md, "Round: a habitable fresh plate".
@@ -567,7 +576,7 @@ Population size is bounded by the plate as much as by the parameter.
 A step fits the 60 fps budget on the canonical world, and the mature plate fits its own measured budget.
 
 - **Method.** npx vite-node tools/perf.ts: three 128x128 scenarios on seed 0xa7f31ab with 50 measured steps each — canonical (260 founders, 48 warmup ticks), mature (180 founders, stepped to tick 400) and chemostat (dilutionRate 0.02, inflowNutrient 1, 400 warmup ticks).
-- **Measured.** 4.36 ms/step at 160 organisms on the canonical world (p95 4.91); 5.27 ms/step at 1033 organisms on the mature plate (p95 5.48); 5.66 ms/step at 1089 organisms in the chemostat (p95 5.83).
+- **Measured.** 4.4 ms/step at 160 organisms on the canonical world, 5.3 on the mature plate (1033 organisms) and 5.7 in the chemostat (1089) on an idle machine; 8.5 / 10.4 / 11.1 ms/step on the same scenarios for 152 / 677 / 1087 organisms while another process held most of a core (a WebKit WebContent at 58 %). A clean checkout of the previous commit measures the identical field cost, so the difference is the machine, not the model — and all three stay inside their budgets either way.
 - **Tolerance.** Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).
 - **Checked by.** re-measured by `tests/perf.test.ts` on every run.
 - **Source.** tools/perf.ts, tests/perf.test.ts.
@@ -606,11 +615,21 @@ Aggression is not free: a population seeded with hunters loses them, because the
 
 A mature plate with predators present persists for thousands of ticks.
 
-- **Method.** 180 founders on the 128x128 default plate (seed 0xa7f31ab); step 3000 ticks and read the population, mean aggression and the death causes.
-- **Measured.** 1089 organisms and mean aggression 0.065 at tick 3000; deaths by starvation 1023, predation 794, competition 734, old-age 330, crowding 296. With free aggression the same plate ran to mean aggression 0.91 and went extinct at tick 2190; with predation disabled entirely it also persisted, which is how the runaway was isolated.
-- **Tolerance.** Recorded measurement of a long run; the priced-aggression mechanism is what the tested claim above pins.
+- **Method.** 180 founders on the 128x128 default plate (seed 0xa7f31ab); step to 6000 ticks and read the trajectory, then the death causes of the last 3000 deaths.
+- **Measured.** 1088-1098 organisms from tick 500 to tick 5500, then 810 at tick 6000; over that final stretch the causes are starvation 1529, predation 1387, competition 577, crowding 315, old-age 80 — every cause present, predation about a third of deaths. Before the trophic repair the same plate ran to mean aggression 1.3 and 69 organisms by tick 6000, and with free aggression it went extinct at tick 2190.
+- **Tolerance.** Recorded measurement of a long run; the tested claim below pins the mechanism on a cheaper scenario.
 - **Checked by.** recorded measurement (not re-measured by the suite).
 - **Source.** workbench.md, "Round: death with reasons".
+
+### plate-longrun
+
+A plate keeps a self-regulating community for thousands of ticks: deaths have causes, aggression stays bounded and predators stay alive.
+
+- **Method.** 64x64 plate, 180 founders (seed 0xa7f31ab), 2500 ticks; read the population, its minimum after tick 300, mean aggression and the death causes.
+- **Measured.** 582 organisms at tick 2500, minimum 69 after tick 300, mean aggression 0.066, predation 1213 of 3102 deaths. With the pre-stabiliser transfer (0.35 + 0.40 x aggression plus a 0.45 body bonus) the same scenario is extinct at tick 1843.
+- **Tolerance.** Still populated at tick 2500 with more than 100 organisms, mean aggression below 0.5, and more than 100 predation deaths.
+- **Checked by.** re-measured by `tests/calibration.test.ts` on every run.
+- **Source.** src/sim/body.ts feed, TROPHIC_SHARE_BASE, MEAL_BODY_BONUS.
 <!-- /generated:calibration -->
 
 ## 13. Known limits
@@ -619,7 +638,8 @@ A mature plate with predators present persists for thousands of ticks.
 - **Profil v1 only approximates engine-v1.** The legacy profile restores senescence 0, regulation off, no recombination, no exudate, no genome costs, 8 meals per tick and light diffusion 0.22. The meal budget and the decoder differ, so results are close but not hash-identical: use the tag engine-v1 for bit-reproducing pre-upgrade results. (`src/ui/modelPanel.ts LEGACY_V1_PROFILE`)
 - **Nutrient inflow is a source term.** nutrientInflow injects nutrient from outside the modelled system, so total field mass is only conserved when it is zero. The validation tests zero it deliberately, and the parameter is bounded at 0.2 per tick. (`src/sim/fields.ts applyVentsAndDecay, tests/validation.test.ts`)
 - **The perf budget is scenario-specific.** The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 1033 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. No single scenario describes the 1100-organism cap. (`tests/perf.test.ts, tools/perf.ts`)
-- **A mature plate now reaches its population cap.** With the climate and harvest repaired the plate is productive enough to fill maxPopulation (1100) from tick ~1000, so at maturity the cap is a binding constraint rather than a safety net: 1033 organisms at tick 400 and 1089 at tick 3000 on the default plate. Lower maxPopulation, or the light and nutrient supply, to make resources the limit again. (`tools/modeldoc.ts CALIBRATION plate-capacity, src/sim/world.ts reproduceAll`)
+- **A mature plate reaches its population cap.** With the climate and harvest repaired the plate is productive enough to fill maxPopulation (1100) from tick ~1000, so at maturity the cap is a binding constraint rather than a safety net: 677 organisms at tick 400 and 1093 at tick 3000 on the default plate. It is also doing stabilising work — allowed to grow past it (maxPopulation 3000) the same world booms to 2400 and crashes to a few hundred — so raising the cap is not a free way to make the plate richer. (`tools/modeldoc.ts CALIBRATION plate-capacity, src/sim/world.ts reproduceAll`)
+- **Small, sparse plates are extinction-prone.** The trophic economy self-regulates on the default 128 x 128 plate, but a small world with few founders has little spatial buffer: 64 x 64 with 90 founders goes extinct around tick 2300, while the same plate with 180 founders or a 96 x 96 plate with 90 persists for 3000+ ticks. Start small plates denser, or expect a single stochastic extinction. (`tools/modeldoc.ts CALIBRATION plate-longrun, src/sim/world.ts seedPopulation`)
 - **Snapshot v2 payloads are converted, not replayed.** A version-2 payload predates the longevity trait, so it is upgraded by recomputing every phenotype from its genome (v2 -> v3). The world plays on, but it is not bit-identical to the run that wrote it, because the phenotype gained a trait. Every reader migrates: World.restore, parseWorldBytes, the manifest start state and the worker restore op. (`src/sim/migrate.ts, src/sim/world.ts restore`)
 <!-- /generated:limits -->
 

@@ -746,3 +746,34 @@ The wide `metrics.csv` carries no trait column at all — all twelve traits live
 - Goldens: both copy fixtures moved for the new parameter rows, the new button and its help (224 → 225 controls).
 - GATES: typecheck ok (both configs); vitest **343/343** (69 files); build ok; `dist` 2.83 MB / 4.00 MB budget; **eleven** browser verifier runs OK; baseline unchanged `f0d4b39e`.
 
+## Round: the long run gets a real trophic economy (2026-09-14)
+
+The third follow-up: make the community self-regulate instead of relying on the population cap. **Model change: engine 2.3.0 / revision 5 (extended), baseline `f0d4b39e` → `b6734bfc`.**
+
+### The decline, measured first
+
+The plate looked stable and was not. Over 6000 ticks on the default plate the population held ~1090 to tick 3000 and then decayed to **69**, with mean aggression climbing 0.02 → 0.83 and mean genome length 108 → 150: a slow aggression runaway, not a resource limit. Raising the cap so resources decide made it worse — boom to 2400 by tick 700 (nutrient grazed to 0.11), crash to a few hundred, and the same shark morph.
+
+The cause was the meal itself. `feed()` transferred `prey.energy × (0.35 + 0.4·aggression) + 0.45 × bodySize`, so a kill was worth **fifteen to forty ticks of a predator's maintenance whatever the prey held**, and the 0.45 body bonus alone (about seven ticks) made eating a starving neighbour profitable. Aggression was free money: `AGGRESSION_UPKEEP` (0.30/unit) and the hunger gate delayed the runaway from tick ~1250 to ~3500 but could not stop it.
+
+### The fix: trophic efficiency is real
+
+A meal now transfers `prey.energy × (TROPHIC_SHARE_BASE + TROPHIC_SHARE_AGGRESSION·aggression) + MEAL_BODY_BONUS × bodySize` = `0.30 + 0.30·aggression` plus `0.10` of body. Two documented constants, one of them a 4.5× reduction of the old body bonus.
+
+| 128×128, 180 founders | before | after |
+| --- | --- | --- |
+| Population, ticks 500 → 5500 | 1090 → decaying | **1088-1098 (flat)** |
+| Population at tick 6000 | 69 | **810** |
+| Mean aggression at tick 6000 | 0.83 | 0.07 |
+| Death causes, last 3000 | predation 49 % | starvation 1529, predation 1387, competition 577, crowding 315, old-age 80 |
+
+Predation stays a live strategy (about a third of deaths, the predator kit still breeds on prey) rather than being priced out: a lower share (0.25 + 0.25) was measured too and *kills* the niche — 37 predation deaths in 3000 and a flat, grazed lawn — so 0.30/0.30 is the measured point between runaway and extinction of the guild.
+
+- New calibration entry `plate-longrun` with a guarded test (`tests/calibration.test.ts`, 64×64, 180 founders, 2500 ticks, ~8 s): it asserts the plate is still populated, never collapses, keeps mean aggression under 0.5 and still records predation. **It discriminates**: restoring the old coefficients makes the same scenario extinct at tick 1843.
+- The record was re-measured: `plate-capacity` (508 at tick 100, 677 at tick 400, peak 1087, 1093 at tick 3000), `plate-persistence` (the 6000-tick trajectory and causes), and the constants table now carries `TROPHIC_SHARE_BASE / TROPHIC_SHARE_AGGRESSION` with the reason for their values.
+- New known limit: **small, sparse plates are extinction-prone** — 64×64 with 90 founders dies out around tick 2300 while the same plate with 180 founders or a 96×96 with 90 persists; a small closed world has little spatial buffer.
+- Perf note, recorded honestly: the node harness reads 8.5 / 10.4 / 11.1 ms/step for the three scenarios *while another process on this machine holds most of a core* (a WebKit WebContent at 58 %), against 4.4 / 5.3 / 5.7 on an idle machine. A clean `git worktree` of the previous commit measures the identical field cost (6.24 ms in `fields.advance`), so the difference is the machine: no regression, and all three budgets still pass.
+
+- One flake, recorded: the first full gate run failed `verify-interface` while the machine was under the CPU contention above; the same verifier passed on its own immediately after and the full eleven-verifier run then passed end to end. The gate's timing assertions (reduced motion, focus) are the load-sensitive ones, and the browser budgets have the same exposure — worth remembering when a gate fails on a busy desktop.
+- GATES: typecheck ok (both configs); vitest **344/344** (69 files); build ok; `dist` 2.83 MB / 4.00 MB budget; **eleven** browser verifier runs OK; baseline re-pinned at `b6734bfc`.
+

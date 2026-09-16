@@ -151,7 +151,9 @@ describe("predators feed, grow and hunt", () => {
 
   it("predators hunt, grow, and only breed once fed; a lean predator never reproduces", () => {
     const w = new World({ width: 32, height: 32, seed: 9, mutationRate: 0 });
-    w.fields.nutrient.fill(0.6);
+    // Prey above break-even (0.63): a meal is a share of what the prey stored,
+    // so a predator only grows where the prey are actually fat.
+    w.fields.nutrient.fill(1.5);
     w.injectStrain(founderHeterotroph(), 60);
     w.injectStrain(founderPredator(), 6);
     let fedPredators = 0;

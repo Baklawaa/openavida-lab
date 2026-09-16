@@ -11,7 +11,7 @@
  * Regenerate with `npm run docs`.
  */
 import { EXUDATE_FITNESS, EXUDATE_MAX, EXUDATE_UPTAKE_PER_UPTAKE, EXUDATE_YIELD, PHOTO_GAIN, UPTAKE_GAIN } from "../src/sim/chemistry";
-import { KIN_THRESHOLD, MASS_DECAY, MASS_HUNT_BONUS, MASS_KILL_AGGRESSION, MASS_MAINTENANCE, MASS_PER_KILL, MASS_SIZE_GAIN, MASS_TO_BREED, MEAL_BODY_BONUS, PREY_ATTRACTION, PREY_SENSE_RADIUS } from "../src/sim/body";
+import { KIN_THRESHOLD, MASS_DECAY, MASS_HUNT_BONUS, MASS_KILL_AGGRESSION, MASS_MAINTENANCE, MASS_PER_KILL, MASS_SIZE_GAIN, MASS_TO_BREED, MEAL_BODY_BONUS, PREY_ATTRACTION, PREY_SENSE_RADIUS, TROPHIC_SHARE_AGGRESSION, TROPHIC_SHARE_BASE } from "../src/sim/body";
 import { ALPHABET, CODON_LEN, MAX_GENOME, MIN_GENOME, REG_CROSS, REG_MAX, REG_SELF, REG_WINDOW, START_CODON, STOP_CODONS } from "../src/sim/mapping";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX, LINEAGE_TOP_N, RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX, SNAPSHOT_VERSION } from "../src/sim/types";
 import { HISTORY_KEEP, HISTORY_MAX, NEUTRAL_LOG_MAX } from "../src/sim/world";
@@ -115,7 +115,8 @@ export const MODEL_CONSTANTS: readonly ConstantEntry[] = [
   { group: "Body", name: "MASS_HUNT_BONUS", value: num(MASS_HUNT_BONUS), source: "src/sim/body.ts", note: "Hunting power = aggression + bonus × mass." },
   { group: "Body", name: "MASS_MAINTENANCE", value: num(MASS_MAINTENANCE), source: "src/sim/body.ts", note: "Maintenance multiplier 1 + value × mass (weaker than the size gain, so growing pays)." },
   { group: "Body", name: "MASS_TO_BREED", value: num(MASS_TO_BREED), source: "src/sim/body.ts", note: "Predators reproduce only once this fed: breeding follows real feeding." },
-  { group: "Body", name: "MEAL_BODY_BONUS", value: num(MEAL_BODY_BONUS), source: "src/sim/body.ts", note: "Extra energy from the prey's body, per unit of effective size." },
+  { group: "Body", name: "MEAL_BODY_BONUS", value: num(MEAL_BODY_BONUS), source: "src/sim/body.ts", note: "Extra energy from the prey's body, per unit of effective size. Small: at 0.45 a kill always paid and aggression ran away." },
+  { group: "Body", name: "TROPHIC_SHARE_BASE / TROPHIC_SHARE_AGGRESSION", names: ["TROPHIC_SHARE_BASE", "TROPHIC_SHARE_AGGRESSION"], value: `${TROPHIC_SHARE_BASE} / ${TROPHIC_SHARE_AGGRESSION}`, source: "src/sim/body.ts", note: "Share of the prey's stored energy a kill transfers, at aggression 0 and per unit of aggression. This is the trophic efficiency that keeps predation a strategy instead of a runaway." },
   { group: "Body", name: "PREY_ATTRACTION", value: num(PREY_ATTRACTION), source: "src/sim/body.ts", note: "Chemotaxis pull toward the nearest edible prey." },
   { group: "Body", name: "PREY_SENSE_RADIUS", value: num(PREY_SENSE_RADIUS), source: "src/sim/body.ts", note: "How far a predator senses prey, in cells." },
   { group: "Body", name: "KIN_THRESHOLD", value: num(KIN_THRESHOLD), source: "src/sim/body.ts", note: "Fallback minimum aggression gap for a kill; params.kinThreshold overrides it." },
@@ -260,7 +261,7 @@ export const REVISION_LOG: readonly RevisionEntry[] = [
   {
     version: "2.3.0",
     revision: 5,
-    perfHash: "f0d4b39e",
+    perfHash: "b6734bfc",
     date: "2026-09-14",
     headline: "Heritable lifespan, a standing climate, and a food web with prices",
     changes: [
@@ -269,6 +270,7 @@ export const REVISION_LOG: readonly RevisionEntry[] = [
       "Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and params.nutrientUptakeCap only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.",
       "Aggression is priced: params.aggressionUpkeep (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.",
       "Hunting follows need: a predator only attacks while it is below its own division threshold, so a fed predator is blocked by prey instead of hoarding meals.",
+      "Trophic efficiency is real: a meal transfers TROPHIC_SHARE_BASE + TROPHIC_SHARE_AGGRESSION x aggression (0.30 + 0.30) of the prey's stored energy plus a small MEAL_BODY_BONUS (0.10, was 0.45) of its body. The old pair made every kill a 15-to-40-tick jackpot whatever the prey held, so aggression remained free money and the plate still decayed to 69 organisms by tick 6000; at the new share the default plate holds 1088-1098 to tick 5500 and predation stays a third of deaths.",
       "The two specialist kits can feed themselves: Resistant is resist x5 / uptake x5 / motility x3 (uptake x3 left its income ceiling below its own maintenance, so a dropped Resistant starved in fifteen ticks) and the Mutualist gains motility x3. randomGenome() now derives its trait list from TRAIT_NAMES, so no trait can be missing from the random founders.",
       "Snapshot schema v3 with a v2 -> v3 migration: a version-2 payload predates longevity, and restoring its stored phenotype verbatim left ph.longevity undefined, lifespan() NaN and the next reap() empty. World.restore and parseWorldBytes now migrate every reader, so file import, presets, in-session snapshots and the worker op all pass through one choke point.",
       "nutrientDecay defaults to 0.004 (equilibrium 1.0) and seedEnvironment starts the plate at that equilibrium; inflowNutrient defaults to 1 so a chemostat starts habitable.",
@@ -354,7 +356,7 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     id: "plate-capacity",
     claim: "Population size is bounded by the plate as much as by the parameter.",
     method: "180 founders on the 128x128 default plate, step to 400 and read the population, then keep stepping to 3000 and read the death causes and mean aggression.",
-    measured: "533 at tick 100, 1033 at tick 400, peak 1094 against the 1100 cap; at tick 3000 the plate holds 1089 organisms with mean aggression 0.065 and deaths by starvation 1023, predation 794, competition 734, old-age 330, crowding 296. With the climate and harvest repairs the plate is productive enough to reach its cap.",
+    measured: "508 at tick 100, 677 at tick 400, peak 1087 against the 1100 cap; at tick 3000 the plate holds 1093 organisms with mean aggression 0.028 and deaths by competition 1744, old-age 1652, starvation 307, predation 162, crowding 75.",
     tolerance: "Recorded measurement; the population must stay below maxPopulation.",
     check: { kind: "recorded" },
     source: "workbench.md, \"Round: a habitable fresh plate\"",
@@ -363,7 +365,7 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     id: "perf-budget",
     claim: "A step fits the 60 fps budget on the canonical world, and the mature plate fits its own measured budget.",
     method: "npx vite-node tools/perf.ts: three 128x128 scenarios on seed 0xa7f31ab with 50 measured steps each — canonical (260 founders, 48 warmup ticks), mature (180 founders, stepped to tick 400) and chemostat (dilutionRate 0.02, inflowNutrient 1, 400 warmup ticks).",
-    measured: "4.36 ms/step at 160 organisms on the canonical world (p95 4.91); 5.27 ms/step at 1033 organisms on the mature plate (p95 5.48); 5.66 ms/step at 1089 organisms in the chemostat (p95 5.83).",
+    measured: "4.4 ms/step at 160 organisms on the canonical world, 5.3 on the mature plate (1033 organisms) and 5.7 in the chemostat (1089) on an idle machine; 8.5 / 10.4 / 11.1 ms/step on the same scenarios for 152 / 677 / 1087 organisms while another process held most of a core (a WebKit WebContent at 58 %). A clean checkout of the previous commit measures the identical field cost, so the difference is the machine, not the model — and all three stay inside their budgets either way.",
     tolerance: "Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).",
     check: { kind: "test", file: "tests/perf.test.ts" },
     source: "tools/perf.ts, tests/perf.test.ts",
@@ -398,11 +400,20 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
   {
     id: "plate-persistence",
     claim: "A mature plate with predators present persists for thousands of ticks.",
-    method: "180 founders on the 128x128 default plate (seed 0xa7f31ab); step 3000 ticks and read the population, mean aggression and the death causes.",
-    measured: "1089 organisms and mean aggression 0.065 at tick 3000; deaths by starvation 1023, predation 794, competition 734, old-age 330, crowding 296. With free aggression the same plate ran to mean aggression 0.91 and went extinct at tick 2190; with predation disabled entirely it also persisted, which is how the runaway was isolated.",
-    tolerance: "Recorded measurement of a long run; the priced-aggression mechanism is what the tested claim above pins.",
+    method: "180 founders on the 128x128 default plate (seed 0xa7f31ab); step to 6000 ticks and read the trajectory, then the death causes of the last 3000 deaths.",
+    measured: "1088-1098 organisms from tick 500 to tick 5500, then 810 at tick 6000; over that final stretch the causes are starvation 1529, predation 1387, competition 577, crowding 315, old-age 80 — every cause present, predation about a third of deaths. Before the trophic repair the same plate ran to mean aggression 1.3 and 69 organisms by tick 6000, and with free aggression it went extinct at tick 2190.",
+    tolerance: "Recorded measurement of a long run; the tested claim below pins the mechanism on a cheaper scenario.",
     check: { kind: "recorded" },
     source: "workbench.md, \"Round: death with reasons\"",
+  },
+  {
+    id: "plate-longrun",
+    claim: "A plate keeps a self-regulating community for thousands of ticks: deaths have causes, aggression stays bounded and predators stay alive.",
+    method: "64x64 plate, 180 founders (seed 0xa7f31ab), 2500 ticks; read the population, its minimum after tick 300, mean aggression and the death causes.",
+    measured: "582 organisms at tick 2500, minimum 69 after tick 300, mean aggression 0.066, predation 1213 of 3102 deaths. With the pre-stabiliser transfer (0.35 + 0.40 x aggression plus a 0.45 body bonus) the same scenario is extinct at tick 1843.",
+    tolerance: "Still populated at tick 2500 with more than 100 organisms, mean aggression below 0.5, and more than 100 predation deaths.",
+    check: { kind: "test", file: "tests/calibration.test.ts" },
+    source: "src/sim/body.ts feed, TROPHIC_SHARE_BASE, MEAL_BODY_BONUS",
   },
 ];
 
@@ -423,9 +434,14 @@ export const LIMITS: readonly LimitEntry[] = [
     source: "tests/perf.test.ts, tools/perf.ts",
   },
   {
-    gap: "A mature plate now reaches its population cap",
-    detail: "With the climate and harvest repaired the plate is productive enough to fill maxPopulation (1100) from tick ~1000, so at maturity the cap is a binding constraint rather than a safety net: 1033 organisms at tick 400 and 1089 at tick 3000 on the default plate. Lower maxPopulation, or the light and nutrient supply, to make resources the limit again.",
+    gap: "A mature plate reaches its population cap",
+    detail: "With the climate and harvest repaired the plate is productive enough to fill maxPopulation (1100) from tick ~1000, so at maturity the cap is a binding constraint rather than a safety net: 677 organisms at tick 400 and 1093 at tick 3000 on the default plate. It is also doing stabilising work — allowed to grow past it (maxPopulation 3000) the same world booms to 2400 and crashes to a few hundred — so raising the cap is not a free way to make the plate richer.",
     source: "tools/modeldoc.ts CALIBRATION plate-capacity, src/sim/world.ts reproduceAll",
+  },
+  {
+    gap: "Small, sparse plates are extinction-prone",
+    detail: "The trophic economy self-regulates on the default 128 x 128 plate, but a small world with few founders has little spatial buffer: 64 x 64 with 90 founders goes extinct around tick 2300, while the same plate with 180 founders or a 96 x 96 plate with 90 persists for 3000+ ticks. Start small plates denser, or expect a single stochastic extinction.",
+    source: "tools/modeldoc.ts CALIBRATION plate-longrun, src/sim/world.ts seedPopulation",
   },
   {
     gap: "Snapshot v2 payloads are converted, not replayed",

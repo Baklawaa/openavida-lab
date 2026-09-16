@@ -157,6 +157,27 @@ describe("calibration claims", () => {
     }
   });
 
+  it("keeps a plate alive for thousands of ticks with predators present", { timeout: 60000 }, () => {
+    // calibration:plate-longrun
+    // 64x64, 180 founders, 2500 ticks. This is the cheap guard for the trophic
+    // economy: with the pre-stabiliser transfer (0.35 + 0.40 x aggression plus a
+    // 0.45 body bonus) the same scenario is extinct at tick 1843, because every
+    // kill paid a fixed jackpot and aggression swept to fixation.
+    const w = new World({ width: 64, height: 64, startPopulation: 180, seed: 0xa7f31ab });
+    let minAfter300 = Infinity;
+    while (w.tick < 2500 && w.organisms.length > 0) {
+      w.step();
+      if (w.tick > 300) minAfter300 = Math.min(minAfter300, w.organisms.length);
+    }
+    const causes = new Map<string, number>();
+    for (const d of w.deaths) causes.set(d.cause, (causes.get(d.cause) ?? 0) + 1);
+    expect(w.tick, "the plate runs the whole horizon").toBe(2500);
+    expect(w.organisms.length, "and is still populated").toBeGreaterThan(100);
+    expect(minAfter300, "without collapsing on the way").toBeGreaterThan(25);
+    expect(meanAggression(w), "aggression stays bounded").toBeLessThan(0.5);
+    expect(causes.get("predation") ?? 0, "and predation stays a live strategy").toBeGreaterThan(100);
+  });
+
   it("recycles the leak: a higher exudateLeak no longer strangles a phototroph monoculture", () => {
     // calibration:exudate-leak-tuned
     const tuned = monoculture(0.15);

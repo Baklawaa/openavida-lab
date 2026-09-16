@@ -30,8 +30,25 @@ export const MASS_TO_BREED = 0.25;
  * from eating identical kin; params.kinThreshold = 0 enables cannibalism.
  */
 export const KIN_THRESHOLD = 0.1;
-/** Extra energy from a prey's body, per unit of its effective size. */
-export const MEAL_BODY_BONUS = 0.45;
+/**
+ * Extra energy from a prey's body, per unit of its effective size. Small on
+ * purpose: it used to be 0.45, which is seven ticks of a stock predator's
+ * maintenance *per kill regardless of what the prey had stored*, so a kill
+ * always paid and aggression ratcheted to fixation — measured, the mature
+ * plate ran to mean aggression 1.3 and collapsed from ~1090 to 69 organisms by
+ * tick 6000. At 0.10 a lean prey is a poor meal.
+ */
+export const MEAL_BODY_BONUS = 0.1;
+
+/**
+ * Share of the prey's stored energy a kill transfers: base + per unit of the
+ * predator's aggression. The pair used to be 0.35 + 0.40, which together with
+ * the old body bonus made a meal worth 15-40 ticks of maintenance and turned
+ * the plate into a shark monoculture. 0.30 + 0.30 keeps predation a living
+ * strategy (about 37 % of deaths on the default plate) without the runaway.
+ */
+export const TROPHIC_SHARE_BASE = 0.3;
+export const TROPHIC_SHARE_AGGRESSION = 0.3;
 
 type Body = Pick<Organism, "ph"> & { mass?: number };
 
@@ -67,7 +84,9 @@ export function preyGap(
 
 /** Predator eats prey: energy transferred, mass gained. Returns the meal energy. */
 export function feed(pred: Organism, prey: Organism): number {
-  const meal = prey.energy * (0.35 + 0.4 * pred.ph.aggression) + MEAL_BODY_BONUS * bodySize(prey);
+  const meal =
+    prey.energy * (TROPHIC_SHARE_BASE + TROPHIC_SHARE_AGGRESSION * pred.ph.aggression) +
+    MEAL_BODY_BONUS * bodySize(prey);
   pred.energy += meal;
   pred.kills = (pred.kills ?? 0) + 1;
   pred.mass = Math.min(1, (pred.mass ?? 0) + MASS_PER_KILL + MASS_KILL_AGGRESSION * pred.ph.aggression);

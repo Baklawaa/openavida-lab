@@ -30,6 +30,7 @@ import {
   recombine,
 } from "./genome";
 import { MAX_GENOME, copyPhenotype } from "./mapping";
+import { DEFAULT_UPKEEP, type UpkeepRates } from "./params";
 import { classifyEnergyDeath, deathFromOrganism } from "./deaths";
 import { canBreed, decayMass, energyCap, lifespan, maintenanceScale } from "./body";
 import { applyPolicyMoves, type BrainRuntime } from "./brains";
@@ -500,7 +501,7 @@ export class World {
       this.params,
     );
     const upkeep = this.params.genomeUpkeep * org.genome.length;
-    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org), upkeep, upkeepRates(this.params));
+    org.fitness = fitness(org.ph, env, neighbors, maintenanceScale(org), upkeep, this.stepRates);
   }
 
   rebuildOccupancy(): void {
@@ -522,11 +523,15 @@ export class World {
     this.applySchedule();
     const orgs = this.organisms;
     let exudateEvents = 0;
+    // One allocation per step instead of two per organism per step: the upkeep
+    // rates are shared by the metabolism, the overflow rule and the fitness
+    // refresh below.
+    this.stepRates = upkeepRates(this.params);
     for (let i = 0; i < orgs.length; i++) {
       const o = orgs[i]!;
       o.age++;
       decayMass(o);
-      const met = metabolize(o, this.fields, this.params);
+      const met = metabolize(o, this.fields, this.params, this.stepRates);
       if (met.leaked > 0) {
         exudateEvents++;
         this.pushEvent("exudate", o, { amount: met.leaked });
@@ -705,6 +710,9 @@ export class World {
       this.pushEvent("meal", pred, { preyId: prey.id, amount });
     },
   };
+
+  /** Upkeep rates of the active parameters, refreshed once per step. */
+  private stepRates: UpkeepRates = DEFAULT_UPKEEP;
 
   private applySenescence(o: Organism): void {
     const rate = this.params.senescenceRate;
