@@ -45,14 +45,26 @@ describe("longevity trait", () => {
   it("keeps a long-lived organism past the population age ceiling", () => {
     // senescenceRate 0 leaves the hard cutoff alone, so the only thing that can
     // save it is its own ceiling.
-    const w = new World({ width: 16, height: 16, seed: 7, startPopulation: 0, senescenceRate: 0, maxAge: 40 });
-    w.fields.nutrient.fill(0.6);
+    // A rich plate and no breeding, on purpose: the test is about the age
+    // ceiling. Under the mass-action harvest law a grazer on a lean cell starves
+    // long before any ceiling matters, and a fed one founds a population whose
+    // descendants outcompete the founder before the ceiling does.
+    const w = new World({
+      width: 16, height: 16, seed: 7, startPopulation: 0, senescenceRate: 0,
+      maxAge: 40, nutrientInflow: 0.05, reproduceEnergy: 100,
+    });
+    w.fields.nutrient.fill(4);
     w.fields.light.fill(0.8);
     const long = placeOrganismAt(w, 8, 8, LONG)!;
     const id = long.id;
     for (let i = 0; i < 41; i++) w.step();
     expect(w.organisms.some((o) => o.id === id), "lives past the parameter ceiling").toBe(true);
     expect(lifespan(long, 40)).toBeGreaterThan(40);
+    // And it dies at its own ceiling, not at the parameter's and not later.
+    for (let i = 0; i < 8; i++) w.step();
+    expect(w.organisms.some((o) => o.id === id), "dies at its own ceiling").toBe(false);
+    expect(w.deaths.at(-1)?.age).toBe(lifespan(long, 40));
+    expect(w.deaths.at(-1)?.cause).toBe("old-age");
   });
 
   // calibration:longevity-trade-off

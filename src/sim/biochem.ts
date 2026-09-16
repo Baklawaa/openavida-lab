@@ -4,7 +4,7 @@
  * / fitness so inspect is a readout of sim state, not a decorative overlay.
  */
 import { TRAIT_COLOR, TRAIT_NAMES, type Phenotype, type TraitName } from "./mapping";
-import { metabolicDelta } from "./fitness";
+import { maintenanceCost, metabolicDelta } from "./fitness";
 import { EXUDATE_YIELD, PHOTO_GAIN, UPTAKE_GAIN } from "./chemistry";
 import type { DecodedGenome } from "./genome";
 import type { EnvSample, Organism } from "./types";
@@ -174,7 +174,7 @@ export const PATHWAYS: readonly PathwaySpec[] = [
     enzymeId: "structin",
     reactants: ["atp"],
     products: ["biomass"],
-    description: "0.04 + 0.028 × size",
+    description: "maintenanceCost: 0.04 + 0.028 × size + the life-history upkeeps",
   },
   {
     id: "motility",
@@ -316,7 +316,9 @@ export function pathwayFluxes(
   const photo = ph.photo * env.light * PHOTO_GAIN;
   const detox = env.toxin * (1 - ph.resist) * 0.3;
   const therm = Math.abs(env.temperature - ph.tpref) * 0.12;
-  const maintain = 0.04 + 0.028 * ph.size;
+  // Read from the ledger itself: a hand-copied formula drifts the moment a
+  // term is added (longevity and aggression upkeeps both landed after this).
+  const maintain = maintenanceCost(ph);
   // Potential overflow out of the organism plus the uptake a receptor enables.
   const exudation =
     ph.photo * env.light * PHOTO_GAIN +

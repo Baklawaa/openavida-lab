@@ -23,12 +23,16 @@ describe("research event stream", () => {
 
   it("records births, deaths, meals and exudation when enabled", () => {
     const w = new World({ width: 20, height: 20, seed: 7, startPopulation: 0, recordEvents: true });
-    w.fields.nutrient.fill(0.6);
+    w.fields.nutrient.fill(1.5);
     w.fields.light.fill(0.8);
     w.injectStrain(founderHeterotroph(), 16);
-    w.injectStrain(founderPredator(), 4);
     // Phototrophs are the exudate producers, so a mixed plate is required.
     w.injectStrain(founderPhototroph(), 8);
+    // Let the prey establish first: predation follows need, so a predator pays
+    // its aggression upkeep while it searches, and four freshly injected
+    // hunters can die before they meet anything on a bare plate.
+    for (let i = 0; i < 25; i++) w.step();
+    w.injectStrain(founderPredator(), 8);
     let predationInSteps = 0;
     for (let i = 0; i < 60; i++) {
       w.step();

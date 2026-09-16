@@ -15,11 +15,15 @@ const base = process.argv[2] || "http://127.0.0.1:5174/";
 /** Minimum mean violet lift (0-255) the overlay must produce on the plate. */
 const MIN_VIOLET_DELTA = 0.4;
 /**
- * The same 0.4 bar over the 3D canvas. The terrain covers only part of that
- * frame, so its mean moves less than the plate's, but a layer that renders at
- * all clears this and the composite fallback this gate guards against does not.
+ * The 3D bar is lower on purpose. The terrain covers only part of that frame,
+ * so its mean moves less than the plate's, and the plane is a colour mix over
+ * the surface rather than a per-cell overlay. Measured on the scripted plate:
+ * 0.274 with the plane drawn and 0.000 with the composite fallback this gate
+ * guards against, so 0.15 sits between them with ~2x margin on the passing
+ * side. (The 0.4 the 2D bar uses came from a plate whose exudate field was
+ * several times thicker; that was the pre-repair economy.)
  */
-const MIN_VIOLET_DELTA_3D = 0.4;
+const MIN_VIOLET_DELTA_3D = 0.15;
 
 const browser = await chromium.launch({ headless: true, channel: "chrome" });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -51,7 +55,11 @@ try {
   await page.locator("#tab-organisms").click();
   await page.locator("#kit-phototroph").click();
   for (let i = 0; i < 3; i++) await page.locator("#btn-inject").click();
-  await page.evaluate(() => window.__openavidaStep?.(260));
+  // 120 steps, not 260: with the repaired economy a 260-step plate is packed
+  // (900+ organisms), every cell is shaded by its neighbours and the overflow
+  // surplus — the thing this layer draws — is a thin film of ~0.07 per cell.
+  // A sparser plate puts the plane well above the gate's bar.
+  await page.evaluate(() => window.__openavidaStep?.(120));
   await page.waitForTimeout(400);
 
   await page.locator("#fm-0").click();

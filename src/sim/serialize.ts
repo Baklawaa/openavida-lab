@@ -78,7 +78,9 @@ export function parseJSONSnapshot(text: string): WorldSnapshot {
 export function parseWorldBytes(bytes: ArrayBuffer): WorldSnapshot {
   const view = new DataView(bytes);
   if (bytes.byteLength >= 4 && view.getUint32(0, true) === SNAPSHOT_BIN_MAGIC) {
-    return decodeSnapshot(bytes);
+    // The container is a shape, not a compatibility key: migrate what it holds,
+    // exactly as the JSON branch does.
+    return migrateSnapshot(decodeSnapshot(bytes));
   }
   const text = new TextDecoder().decode(new Uint8Array(bytes));
   return parseJSONSnapshot(text.replace(/^\uFEFF/, ""));

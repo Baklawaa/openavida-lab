@@ -81,7 +81,7 @@ describe("ecology", () => {
   it("predation kills a weaker adjacent prey (aggression gap ≥ 0.5 is certain)", () => {
     const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 3 });
     w.terrain.fill(TERRAIN.empty);
-    const pred = w.birth(2, 2, founderPredator(), null, false, 2);
+    const pred = w.birth(2, 2, founderPredator(), null, false, 1);
     const prey = w.birth(3, 2, founderPhototroph(), null, false, 2);
     expect(pred).toBeTruthy();
     expect(prey).toBeTruthy();

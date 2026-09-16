@@ -255,7 +255,7 @@ export interface MutationRates {
 export type MutationKind = "point" | "indel" | "duplication" | "recombination";
 
 /** Current snapshot schema version. The upgrade path lives in src/sim/migrate.ts. */
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 
 /** Per-organism research event stream; see World.eventLog. */
 export type ResearchEventKind = "birth" | "death" | "meal" | "exudate" | "recombination" | "neutral";

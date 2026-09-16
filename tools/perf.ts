@@ -11,7 +11,7 @@
  * - mature: 180 founders stepped to tick 400, where the plate self-regulates
  *   at 670-780 organisms (calibration plate-capacity).
  * - chemostat: the mature plate with dilutionRate 0.02 and inflowNutrient
- *   0.12, 400 warmup ticks.
+ *   1.0 (the batch equilibrium), 400 warmup ticks.
  * - snapshot/frame: encodeSnapshot and frameFromWorld on the canonical world
  *   right after its measured steps, reporting the bytes the timeline and the
  *   worker path pay.
@@ -78,7 +78,7 @@ const STEP_SCENARIOS: readonly StepScenarioSpec[] = [
     name: "chemostat",
     startPopulation: 180,
     warmupTicks: WARMUP_MATURE,
-    params: { dilutionRate: 0.02, inflowNutrient: 0.12 },
+    params: { dilutionRate: 0.02, inflowNutrient: 1 },
   },
 ];
 

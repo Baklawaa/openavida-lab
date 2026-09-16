@@ -52,7 +52,9 @@ describe("predators feed, grow and hunt", () => {
 
   it("mass decays slowly without prey and never below zero", () => {
     const w = arena();
-    w.fields.nutrient.fill(2);
+    // The predator pays AGGRESSION_UPKEEP as well as maintenance, so an empty
+    // plate has to be rich for it to survive long enough to watch the decay.
+    w.fields.nutrient.fill(4);
     const pred = w.birth(5, 5, founderPredator(), null, false, 3)!;
     pred.mass = 0.5;
     decayMass(pred);
@@ -108,7 +110,9 @@ describe("predators feed, grow and hunt", () => {
     // calibration:meal-budget
     const ring = () => {
       const w = arena();
-      const pred = w.birth(8, 8, founderPredator(), null, false, 3)!;
+      // Energy 1 is below the predator's division threshold: hunting follows
+      // need, so a fed predator would take no meal at all.
+      const pred = w.birth(8, 8, founderPredator(), null, false, 1)!;
       pred.ph.aggression = 1;
       const preyIds: number[] = [];
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {

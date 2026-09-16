@@ -20,7 +20,10 @@ import {
 
 function toxinWorld(): World {
   const w = new World({ width: 32, height: 32, seed: 21, mutationRate: 1 });
-  w.fields.nutrient.fill(0.3);
+  // 1.0, the ventless equilibrium: under the mass-action harvest law a grazer
+  // earns uptake x nutrient x 0.21, so 0.3 left the founders below break-even
+  // and the trial world died at tick 17 instead of running its budget.
+  w.fields.nutrient.fill(1);
   // Food behind a toxin band on the right half.
   for (let y = 0; y < 32; y++) for (let x = 16; x < 32; x++) {
     w.fields.toxin[y * 32 + x] = 0.5;
@@ -103,7 +106,9 @@ describe("goal metrics", () => {
     w2.injectStrain(founderHeterotroph(), 6, 4, 4);
     const other = w2.injectStrain(founderResistant(), 3, 12, 12);
     expect(other).toBe(3);
-    for (const o of w2.organisms) if (o.strainId === 2) o.energy = 0;
+    // Zero energy is not death here: an organism at 0 still harvests during the
+    // tick and can recover, so put the strain beyond any single tick's income.
+    for (const o of w2.organisms) if (o.strainId === 2) o.energy = -1;
     w2.step();
     const gone = runTrial(takeSnapshot(w2), { metric: { kind: "strain-share", strainId: 2 }, op: ">=", target: 0.5, sustain: 1 }, { seed: 1, maxTicks: 200, sampleEvery: 5 });
     expect(gone.unreachable).toBe(true);
@@ -210,7 +215,9 @@ describe("goal metrics", () => {
     w2.fields.nutrient.fill(1);
     w2.injectStrain(founderHeterotroph(), 6, 4, 4);
     expect(w2.injectStrain(founderResistant(), 3, 12, 12)).toBe(3);
-    for (const o of w2.organisms) if (o.strainId === 2) o.energy = 0;
+    // Zero energy is not death here: an organism at 0 still harvests during the
+    // tick and can recover, so put the strain beyond any single tick's income.
+    for (const o of w2.organisms) if (o.strainId === 2) o.energy = -1;
     w2.step();
     const gPop: Goal = { metric: { kind: "population" }, op: ">=", target: 1, sustain: 4 };
     const gGone: Goal = { metric: { kind: "strain-share", strainId: 2 }, op: ">=", target: 0.5, sustain: 1 };

@@ -57,7 +57,7 @@ export const PARAMS_FR = {
   "param.nutrientInflow.desc": "Régénération uniforme de nutriments par pas (recyclage des détritus). Fixe l’équilibre d’une plaque sans source : entrée / nutrientDecay.",
   "param.nutrientDecay.desc": "Perte fractionnaire du champ de nutriments par pas.",
   "param.toxinDecay.desc": "Perte fractionnaire du champ de toxines par pas.",
-  "param.temperatureDecay.desc": "Retour du champ de température vers 0 à chaque pas.",
+  "param.temperatureDecay.desc": "Retour du champ de température vers l’ambiante (0,5) à chaque pas.",
   "param.lightDecay.desc": "Perte fractionnaire du champ de lumière par pas, avant la recharge solaire.",
   "param.reproduceEnergy.desc": "Énergie de base qu’une cellule doit détenir pour se diviser ; modulée par le trait de reproduction.",
   "param.maxAge.desc": "Plafond d’âge strict. Avec senescenceRate > 0, la plupart des morts surviennent bien avant.",
@@ -84,7 +84,7 @@ export const PARAMS_FR = {
   "param.recordTraitDistribution.desc": "Stocke moyenne, écart-type et quantiles de chaque trait à chaque échantillon d’historique (analyse sans re-simulation).",
   "param.recordEvents.desc": "Enregistre chaque naissance, mort, repas, exsudation, recombinaison et substitution neutre pour l’export scientifique (anneau borné).",
   "param.dilutionRate.desc": "Évacuation en chémostat : fraction d’organismes retirés par pas, nutriment ramené vers inflowNutrient. 0 = monde fermé.",
-  "param.inflowNutrient.desc": "Concentration de nutriment que l’entrée restaure quand dilutionRate > 0.",
+  "param.inflowNutrient.desc": "Concentration de nutriment que l’entrée restaure quand dilutionRate > 0. 1 est l’équilibre d’une plaque sans source : un chémostat démarre habitable.",
 
   /* units ----------------------------------------------------------------- */
   "unit.organisms": "organismes",

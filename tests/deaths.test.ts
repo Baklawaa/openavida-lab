@@ -54,7 +54,7 @@ describe("death causes", () => {
 
   it("predation is recorded on the prey", () => {
     const w = new World({ width: 8, height: 8, startPopulation: 0, seed: 3 });
-    const pred = w.birth(2, 2, founderPredator(), null, false, 2);
+    const pred = w.birth(2, 2, founderPredator(), null, false, 1);
     const prey = w.birth(3, 2, founderPhototroph(), null, false, 2);
     expect(pred && prey).toBeTruthy();
     pred!.ph.aggression = 1;

@@ -7,7 +7,7 @@ import {
   PHOTO_GAIN,
   photosyntheticSurplus,
 } from "./chemistry";
-import { maintenanceCost, metabolicDelta } from "./fitness";
+import { maintenanceCost, metabolicDelta, reproduceThreshold } from "./fitness";
 import type { Fields } from "./fields";
 import type { Organism, SimParams } from "./types";
 import type { Rng } from "./rng";
@@ -97,10 +97,15 @@ export interface MetabolismResult {
  */
 export function metabolize(org: Organism, fields: Fields, params: SimParams): MetabolismResult {
   const env = fields.sample(org.x, org.y);
-  const take = fields.consumeNutrient(org.x, org.y, org.ph.uptake * NUTRIENT_UPTAKE_CAP);
-  const envPaid = { ...env, nutrient: take > 0 ? take / NUTRIENT_UPTAKE_CAP : env.nutrient };
+  // Harvest is the documented mass-action law, uptake x local concentration x
+  // UPTAKE_GAIN, so the break-even concentration is maintenance / (uptake x
+  // UPTAKE_GAIN) and income is linear in the uptake trait. NUTRIENT_UPTAKE_CAP
+  // only limits the *rate* at which a cell can be stripped; it must not scale
+  // the yield, which is what made income quadratic in uptake and let one
+  // constant set the whole plate's energy budget.
+  fields.consumeNutrient(org.x, org.y, org.ph.uptake * NUTRIENT_UPTAKE_CAP);
   const upkeep = params.genomeUpkeep * org.genome.length;
-  const delta = metabolicDelta(org.ph, envPaid, maintenanceScale(org), upkeep);
+  const delta = metabolicDelta(org.ph, env, maintenanceScale(org), upkeep);
   org.energy += delta;
 
   let leaked = 0;
@@ -145,6 +150,17 @@ export interface InteractResult {
 }
 
 /**
+ * Hunting follows need: a predator only attacks while it is below its own
+ * division threshold. Without that gate a fed predator keeps killing — one meal
+ * per tick, every tick — and the plate becomes an aggression runaway that eats
+ * every prey and then itself (measured before the gate: extinction at tick
+ * 1246 with mean aggression 0.98).
+ */
+function hungry(pred: Organism, reproduceEnergy: number): boolean {
+  return pred.energy < reproduceThreshold(pred.ph, reproduceEnergy);
+}
+
+/**
  * Adjacent predation. Predation is certain when the aggression gap ≥ 0.5;
  * otherwise it rolls against the gap. An organism may take at most
  * `params.maxMealsPerTick` prey per tick, so trophic transfer is bounded by
@@ -167,6 +183,7 @@ export function interactNeighbors(
   for (let i = 0; i < n; i++) {
     const pred = organisms[i]!;
     if (pred.energy <= 0) continue;
+    if (!hungry(pred, params.reproduceEnergy)) continue;
     for (let d = 0; d < 8; d++) {
       if (meals[i]! >= cap) break;
       const ni = neighborIndex(pred.x, pred.y, d, w, h);
@@ -292,13 +309,14 @@ export function moveOrganisms(
   w: number,
   h: number,
   rng: Rng,
-  params?: Pick<SimParams, "predationThreshold" | "maxMealsPerTick" | "kinThreshold">,
+  params?: Pick<SimParams, "predationThreshold" | "maxMealsPerTick" | "kinThreshold" | "reproduceEnergy">,
   meals: Int32Array | null = null,
   sink?: InteractionSink | null,
 ): MoveResult {
   const threshold = params?.predationThreshold ?? 0.26;
   const kin = params?.kinThreshold ?? KIN_THRESHOLD;
   const cap = Math.max(1, params?.maxMealsPerTick ?? 1);
+  const reproBase = params?.reproduceEnergy ?? 1.55;
   /** A predator that already reached its meal budget cannot start another kill. */
   const hasBudget = (i: number): boolean => meals === null || meals[i]! < cap;
   let moved = 0;
@@ -329,8 +347,9 @@ export function moveOrganisms(
     const other = organisms[occ]!;
     if (preyGap(org, other, threshold, kin) !== null) {
       // Moving onto prey is a hunt: the predator eats and takes the cell.
-      // A predator at its meal budget is simply blocked by the prey.
-      if (!hasBudget(i)) continue;
+      // A predator at its meal budget, or one that has no need to eat yet, is
+      // simply blocked by the prey.
+      if (!hasBudget(i) || !hungry(org, reproBase)) continue;
       const meal = feed(org, other);
       sink?.meal?.(org, other, meal);
       if (meals) meals[i] = meals[i]! + 1;
@@ -344,8 +363,8 @@ export function moveOrganisms(
     }
     if (preyGap(other, org, threshold, kin) !== null) {
       // Walking into a predator: the mover is eaten where it stands, unless
-      // the predator has already eaten its fill this tick.
-      if (!hasBudget(occ)) continue;
+      // the predator has already eaten its fill this tick or is not hungry.
+      if (!hasBudget(occ) || !hungry(other, reproBase)) continue;
       const meal = feed(other, org);
       sink?.meal?.(other, org, meal);
       if (meals) meals[occ] = meals[occ]! + 1;

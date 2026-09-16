@@ -13,12 +13,12 @@ when those move, this page moves with them.
 
 | Shape | Version | Writer | Reader | Older payload | Newer payload |
 | --- | --- | --- | --- | --- | --- |
-| World snapshot (JSON) | `SNAPSHOT_VERSION = 2` (`src/sim/types.ts`) | `World.snapshot()` (`src/sim/world.ts`) | `migrateSnapshot` (`src/sim/migrate.ts`) | v1 migrated to v2, phenotypes recomputed | refused |
+| World snapshot (JSON) | `SNAPSHOT_VERSION = 3` (`src/sim/types.ts`) | `World.snapshot()` (`src/sim/world.ts`) | `migrateSnapshot` (`src/sim/migrate.ts`) | v1 → v2 → v3, phenotypes recomputed from the genomes | refused |
 | OAV2 binary container | `SNAPSHOT_BIN_VERSION = 1`, magic `0x4f415632` (`src/sim/snapshotBin.ts`) | `encodeSnapshot` | `decodeSnapshot`, via `parseWorldBytes` (`src/sim/serialize.ts`) | accepted; missing planes are zero-filled | refused |
 | Run manifest | `MANIFEST_VERSION = 1` (`src/sim/manifest.ts`) | `makeManifest`, `manifestFromWorld` | `validateManifest` | accepted, normalized, engine re-stamped | refused (error list) |
 | Recipe in `?recipe=` | `RECIPE_VERSION = 1` (`src/sim/recipe.ts`) | `recipeFromWorld`, `recipeToQuery` | `parseRecipe`, `recipeFromQuery` | ignored | ignored |
-| Browser stores | IndexedDB `openavida-lab` version 3 (`src/ui/presetStore.ts`) | `PresetStore` | `PresetStore` | upgrade adds stores in place; stored snapshots are current-version | unknown fields ignored |
-| Engine identity | `2.3.0` / revision `5` / `0a4f5d18` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
+| Browser stores | IndexedDB `openavida-lab` version 3 (`src/ui/presetStore.ts`) | `PresetStore` | `PresetStore` | upgrade adds stores in place; a stored snapshot of any version is migrated by `World.restore` | unknown fields ignored |
+| Engine identity | `2.3.0` / revision `5` / `f0d4b39e` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
 | Research exports | no version field (CSV, JSONL) | `src/sim/serialize.ts`, `tools/openavida.ts` | `parseCSV`, `tools/openavida_reader.py` | additive changes only, comment lines skipped | additive readers must skip unknown columns/keys |
 
 The one thing that is **not** backwards compatible is the engine revision
@@ -33,7 +33,7 @@ terrain, organisms with their decoded phenotypes, lineages, extinctions,
 history and the optional analysis collections (death log, strains, innovations,
 events, schedule).
 
-- **Version.** `SNAPSHOT_VERSION = 2` in `src/sim/types.ts`, stamped on every
+- **Version.** `SNAPSHOT_VERSION = 3` in `src/sim/types.ts`, stamped on every
   `WorldSnapshot` as the literal `version` field.
 - **Writer.** `World.snapshot()` (`src/sim/world.ts`) writes the current
   version plus provenance (`engine`, `paramsDigest`), copies the field grids
@@ -70,11 +70,15 @@ events, schedule).
   `schedule` — and `Fields.fromArrays` zero-fills an absent `exudate` plane. So
   a version-2 snapshot from before a collection existed still restores; it just
   restores with that collection empty.
-- **Caveat.** Only a v1 payload is rewritten by the migration. A version-2
-  snapshot carries no engine check: it restores as-is and continues under the
-  current model, so a world saved under engine 2.0.0 does not replay the same
-  trajectory when continued under 2.3.0. Bit-reproducing an old run means
-  running the old engine (see section 6), not restoring its snapshot.
+- **Caveat.** A payload is rewritten only when its schema version is older.
+  v2 payloads predate the longevity trait, so their phenotypes are recomputed
+  from the genomes (v2 → v3) and the world plays on — but that is a conversion,
+  not a replay: phenotypes are current-model, and a world saved under engine
+  2.0.0 does not reproduce the same trajectory when continued. Bit-reproducing
+  an old run means running the old engine (see section 6), not restoring its
+  snapshot. Before v3 existed, a v2 payload restored verbatim left
+  `ph.longevity` undefined and the next reap deleted every organism, which is
+  what `tests/migrate.test.ts` now pins.
 
 ## 2. OAV2 binary container
 
@@ -111,12 +115,11 @@ The compact form of the same snapshot, used by the `.oav` export
   throws from `JSON.parse`/`DataView`. `parseWorldBytes` lets all of them
   propagate rather than silently re-reading the bytes as text, and the import
   control reports the failure.
-- **Caveat.** `decodeSnapshot` does not call `migrateSnapshot`: the binary
-  reader hands the header straight to `World.restore`, which is defensive about
-  absent planes but does not recompute v1 phenotypes. Every encoder in the tree
-  stamps the current `SNAPSHOT_VERSION` into the header, so this is only
-  reachable for a hand-built payload; a v1 world should be imported as JSON,
-  where `parseJSONSnapshot` migrates it.
+- **Caveat.** The container carries a schema version and `parseWorldBytes`
+  migrates whatever it decodes, so an .oav from an older engine is converted
+  like a JSON file. `decodeSnapshot` itself is a pure reader and does not
+  migrate; `World.restore` migrates too, which is the choke point every caller
+  shares.
 
 ## 3. Run manifest
 
@@ -191,10 +194,11 @@ an in-memory fallback for private windows where IndexedDB is unavailable.
   not validation, so unknown extra fields on a record are ignored by an older
   build.
 - **Older / newer payload.** A preset is written from the live world's
-  `snapshot()`, so the snapshot inside is current-version by construction and
-  needs no migration on load; `World.restore` is defensive about an absent
-  exudate plane and optional collections but does not recompute phenotypes, so
-  a foreign or hand-edited snapshot belongs in the file import path (where
+  `snapshot()`, so the snapshot inside is current-version by construction, and
+  a preset written by an older engine is migrated on load because every restore
+  goes through `World.restore`; `World.restore` is also defensive about an
+  absent exudate plane and optional collections, so a foreign or hand-edited
+  snapshot is safe there as well as in the file import path (where
   `parseJSONSnapshot` migrates) rather than injected into a store. A record
   written by a newer build with an unknown field is read structurally and the
   unknown field ignored. Without IndexedDB the same API serves the session
@@ -213,7 +217,7 @@ pinned by the canonical perf world (128 x 128, 260 founders, seed
 | 2.0.0 | 2 | `9df52ec5` | model correctness stage (`docs/model.md` §11) |
 | 2.1.0 | 3 | `185d6460` | evolvability stage |
 | 2.2.0 | 4 | `e953dcdc` | nutrient recycling round |
-| 2.3.0 | 5 | `0a4f5d18` | current; `tests/engine.test.ts` fails on a silent behaviour change |
+| 2.3.0 | 5 | `f0d4b39e` | current; longevity, the climate floor, the mass-action harvest, priced aggression; `tests/engine.test.ts` fails on a silent behaviour change |
 
 `engine` and `paramsDigest` inside a snapshot are provenance, not
 compatibility keys: `migrateSnapshot` never reads them, and the migration

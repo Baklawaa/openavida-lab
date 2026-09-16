@@ -77,7 +77,7 @@ const PARAM_SPEC_LIST = [
   },
   {
     key: "nutrientDecay", unit: "perTick", group: "metabolism", kind: "number",
-    min: 0, max: 1, step: 0.001, default: 0.007,
+    min: 0, max: 1, step: 0.001, default: 0.004,
     description: "Fractional loss of the nutrient field per tick.",
   },
   {
@@ -88,7 +88,7 @@ const PARAM_SPEC_LIST = [
   {
     key: "temperatureDecay", unit: "perTick", group: "metabolism", kind: "number",
     min: 0, max: 1, step: 0.001, default: 0.002,
-    description: "Relaxation of the temperature field towards 0 per tick.",
+    description: "Relaxation of the temperature field towards the ambient (0.5) per tick.",
   },
   {
     key: "lightDecay", unit: "perTick", group: "metabolism", kind: "number",
@@ -222,8 +222,8 @@ const PARAM_SPEC_LIST = [
   },
   {
     key: "inflowNutrient", unit: "concentration", group: "world", kind: "number",
-    min: 0, max: 4, step: 0.01, default: 0.12,
-    description: "Nutrient concentration the inflow restores when dilutionRate > 0.",
+    min: 0, max: 4, step: 0.01, default: 1,
+    description: "Nutrient concentration the inflow restores when dilutionRate > 0. 1 is the ventless batch equilibrium, so a chemostat starts habitable.",
   },
 ] as const satisfies readonly ParamSpec[];
 

@@ -15,6 +15,7 @@ import { KIN_THRESHOLD, MASS_DECAY, MASS_HUNT_BONUS, MASS_KILL_AGGRESSION, MASS_
 import { ALPHABET, CODON_LEN, MAX_GENOME, MIN_GENOME, REG_CROSS, REG_MAX, REG_SELF, REG_WINDOW, START_CODON, STOP_CODONS } from "../src/sim/mapping";
 import { DEATH_LOG_KEEP, DEATH_LOG_MAX, LINEAGE_TOP_N, RESEARCH_LOG_KEEP, RESEARCH_LOG_MAX, SNAPSHOT_VERSION } from "../src/sim/types";
 import { HISTORY_KEEP, HISTORY_MAX, NEUTRAL_LOG_MAX } from "../src/sim/world";
+import { AMBIENT_TEMPERATURE } from "../src/sim/fields";
 import { EVENT_LOG_MAX, EVENT_WINDOW } from "../src/sim/events";
 import { HEAT_STEPS, TRAIL_LENGTH } from "../src/sim/heat";
 import { DEFAULT_TIMELINE_BUDGET, DEFAULT_TIMELINE_EVERY } from "../src/sim/timeline";
@@ -23,7 +24,7 @@ import { TOURNAMENT_DRAW, TOURNAMENT_INJECT } from "../src/sim/tournament";
 import { RECIPE_QUERY_MAX, RECIPE_VERSION } from "../src/sim/recipe";
 import { MANIFEST_VERSION } from "../src/sim/manifest";
 import { HASH_ALGO, ENGINE_VERSION, MODEL_REVISION, engineInfo } from "../src/sim/engine";
-import { LONGEVITY_UPKEEP } from "../src/sim/fitness";
+import { AGGRESSION_UPKEEP, LONGEVITY_UPKEEP } from "../src/sim/fitness";
 import { PARAM_SPEC } from "../src/sim/params";
 import { DEFAULT_OVERLAY_ALPHA, EXUDATE_OVERLAY_ALPHA, OVERLAY_GAMMA } from "../src/render/overlay";
 import { HISTORY_CURVES, HISTORY_RESULTS_CAP } from "../src/ui/experimentHistory";
@@ -106,6 +107,8 @@ export const MODEL_CONSTANTS: readonly ConstantEntry[] = [
   { group: "Metabolism", name: "PHOTO_GAIN", value: num(PHOTO_GAIN), source: "src/sim/chemistry.ts", note: "Energy gained per unit of light × photo." },
   { group: "Metabolism", name: "NUTRIENT_UPTAKE_CAP", value: num(NUTRIENT_UPTAKE_CAP), source: "src/sim/chemistry.ts", note: "Per-tick nutrient consumption capacity per unit of uptake." },
   { group: "Metabolism", name: "LONGEVITY_UPKEEP", value: num(LONGEVITY_UPKEEP), source: "src/sim/fitness.ts", note: "Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for." },
+  { group: "Metabolism", name: "AGGRESSION_UPKEEP", value: num(AGGRESSION_UPKEEP), source: "src/sim/fitness.ts", note: "Energy per tick per unit of aggression (the hunting apparatus). Free aggression sweeps to fixation and eats the plate extinct." },
+  { group: "Fields", name: "AMBIENT_TEMPERATURE", value: num(AMBIENT_TEMPERATURE), source: "src/sim/fields.ts", note: "Temperature a ventless plate relaxes towards; without it the field decays to 0 and the thermal term becomes a countdown." },
   { group: "Exudate", name: "EXUDATE_YIELD", value: num(EXUDATE_YIELD), source: "src/sim/chemistry.ts", note: "Energy a consumer gains per unit of exudate taken up; the rest dissipates." },
   { group: "Exudate", name: "EXUDATE_UPTAKE_PER_UPTAKE", value: num(EXUDATE_UPTAKE_PER_UPTAKE), source: "src/sim/chemistry.ts", note: "Per-tick uptake capacity per unit of uptake, scaled by signal / 7." },
   { group: "Exudate", name: "EXUDATE_FITNESS", value: num(EXUDATE_FITNESS), source: "src/sim/chemistry.ts", note: "Weight of exudate in the comparable fitness score." },
@@ -262,35 +265,39 @@ export const REVISION_LOG: readonly RevisionEntry[] = [
   {
     version: "2.3.0",
     revision: 5,
-    perfHash: "0a4f5d18",
-    date: "2026-09-13",
-    headline: "Heritable lifespan: the longevity trait",
+    perfHash: "f0d4b39e",
+    date: "2026-09-14",
+    headline: "Heritable lifespan, a standing climate, and a food web with prices",
     changes: [
-      "A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling.",
-      "It rides as a secondary contribution on the threonine codons ACT/ACC/ACA/ACG (+0.06 each) and the cysteines TGT/TGC (+0.08), so every genome that predates it keeps its phenotype and its lifespan.",
-      "The extra life is paid for: maintenanceCost adds LONGEVITY_UPKEEP (0.012) per unit of longevity above 1, so selection trades lifespan against the energy budget instead of pinning the trait at its cap.",
-      "Telomerase joins the enzyme readout for the trait, and the research card tracks longevity alongside the other eleven.",
+      "A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling. It rides on the threonine codons ACT/ACC/ACA/ACG (+0.06) and the cysteines TGT/TGC (+0.08), so a genome that predates it keeps its phenotype, and LONGEVITY_UPKEEP (0.012 per unit above 1) charges for the extra life in both ledgers.",
+      "The climate has a floor: the temperature field relaxes towards AMBIENT_TEMPERATURE (0.5) instead of decaying to 0. A one-way decay was a countdown — every organism's |temperature - tpref| cost grew without bound, so the plate froze into mass starvation by tick ~500 whatever it ate.",
+      "Harvest is the documented mass-action law again: energy is uptake x nutrient x UPTAKE_GAIN, and NUTRIENT_UPTAKE_CAP only limits how fast a cell can be stripped. Reconstructing the harvest from the cap instead made income quadratic in uptake (a knife-edge at uptake ~ 0.67) and let one constant set the whole plate's energy budget.",
+      "Aggression is priced: AGGRESSION_UPKEEP (0.30 per unit) is charged in both ledgers. Free aggression swept to fixation, every organism became a predator and the plate ate itself extinct at tick ~1250; the priced plate holds ~1090 organisms for 3000 ticks with all five death causes present.",
+      "Hunting follows need: a predator only attacks while it is below its own division threshold, so a fed predator is blocked by prey instead of hoarding meals.",
+      "The two specialist kits can feed themselves: Resistant is resist x5 / uptake x5 / motility x3 (uptake x3 left its income ceiling below its own maintenance, so a dropped Resistant starved in fifteen ticks) and the Mutualist gains motility x3. randomGenome() now derives its trait list from TRAIT_NAMES, so no trait can be missing from the random founders.",
+      "Snapshot schema v3 with a v2 -> v3 migration: a version-2 payload predates longevity, and restoring its stored phenotype verbatim left ph.longevity undefined, lifespan() NaN and the next reap() empty. World.restore and parseWorldBytes now migrate every reader, so file import, presets, in-session snapshots and the worker op all pass through one choke point.",
+      "nutrientDecay defaults to 0.004 (equilibrium 1.0) and seedEnvironment starts the plate at that equilibrium; inflowNutrient defaults to 1 so a chemostat starts habitable.",
     ],
-    evidence: "workbench.md, \"Round: a gene for age\"",
+    evidence: "workbench.md, \"Round: a gene for age\" and \"Round: death with reasons\"",
   },
 ];
 
 export const CALIBRATION: readonly CalibrationEntry[] = [
   {
     id: "plate-habitability",
-    claim: "A ventless plate stays habitable: a dropped organism founds a population instead of starving in seconds.",
-    method: "World(48x48, published defaults, randomTerrain false) with one heterotroph kit genome placed at the centre; step until it dies, then read the plate's mean nutrient.",
-    measured: "One heterotroph lives exactly 260 steps on a 48x48 plate (about 20 before the change); on a mature 128x128 plate the nutrient self-regulates between 0.13 and 0.41 as the population grazes it.",
-    tolerance: "The founder is still alive at step 150; mean nutrient at step 100 at least 0.42.",
+    claim: "A ventless plate stays habitable and a dropped organism founds a population instead of starving in seconds.",
+    method: "World(48x48, published defaults, randomTerrain false) with one heterotroph kit genome placed at the centre; step 260 ticks and record the first birth, the population and the plate's mean nutrient.",
+    measured: "First birth at tick 22, six organisms at tick 150 (the founder still among them) and twenty-five at tick 260; mean nutrient 0.994 at tick 100. Before the climate and harvest repairs the same founder never divided at all: it peaked at 1.008 energy against a 1.542 threshold and died childless at tick 260.",
+    tolerance: "The founder is alive at step 150, the population has grown past it, and mean nutrient at step 100 is at least 0.42.",
     check: { kind: "test", file: "tests/calibration.test.ts" },
-    source: "workbench.md, \"Round: a habitable fresh plate\"",
+    source: "src/sim/world.ts seedEnvironment, src/sim/fields.ts AMBIENT_TEMPERATURE",
   },
   {
     id: "nutrient-equilibrium",
     claim: "Nutrient inflow sets a floor under a ventless plate: the equilibrium is inflow / nutrientDecay.",
-    method: "32x32 world with nutrientInflow 0.004, nutrientDecay 0.007, no organisms and no vents; step 400 and read the mean nutrient.",
-    measured: "0.558 by tick 400, asymptotically 0.571 (0.004 / 0.007); the break-even of a stock heterotroph is maintenance / (uptake x UPTAKE_GAIN) = 0.07 / 0.147, about 0.42.",
-    tolerance: "Between 0.55 and 0.62 at tick 400, and the equilibrium stays above the 0.42 break-even.",
+    method: "32x32 world with the published defaults (nutrientInflow 0.004, nutrientDecay 0.004), no organisms and no vents; step 400 and read the mean nutrient.",
+    measured: "1.000 by tick 400 (0.004 / 0.004), and the plate starts there because seedEnvironment fills the equilibrium. The break-even of a stock heterotroph is (maintenance + thermal) / (uptake x UPTAKE_GAIN) = (0.0676 + 0.0277) / 0.1512, about 0.63.",
+    tolerance: "Within 0.05 of inflow / nutrientDecay at tick 400, and the equilibrium stays above the 0.63 break-even.",
     check: { kind: "test", file: "tests/calibration.test.ts" },
     source: "src/sim/fields.ts, src/sim/world.ts seedEnvironment",
   },
@@ -298,17 +305,17 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     id: "exudate-surplus-rule",
     claim: "Cross-feeding is overflow metabolism: only a phototroph whose gross gain exceeds its maintenance leaks, and exudateLeak 0 disables the trophic link exactly.",
     method: "32x32 plate, 12 phototrophs injected; step 60 and read lastExudate and the exudate field total; repeat with exudateLeak 0.",
-    measured: "Twelve phototrophs on a 32x32 plate: 11 leak in the peak tick and the field total reaches 1.72 by step 60. With exudateLeak 0 the field total stays at exactly 0 for the whole run.",
+    measured: "Twelve phototrophs on a 32x32 plate: 21 leak in the peak tick and the field total reaches 1.99 by step 60. With exudateLeak 0 the field total stays at exactly 0 for the whole run.",
     tolerance: "At least one producer event with the default; field total identically 0 at leak 0.",
     check: { kind: "test", file: "tests/calibration.test.ts" },
     source: "src/sim/chemistry.ts, src/sim/ecology.ts metabolize",
   },
   {
     id: "exudate-leak-tuned",
-    claim: "exudateLeak 0.15 is the tuned default: a larger leak strangles a phototroph monoculture.",
-    method: "24 injected phototrophs, mutationRate 1, 90 steps: survivors / innovations / lineages with living descendants, on the v1 engine, at leak 0.4 and at leak 0.15.",
-    measured: "Survivors / innovations: 11 / 2 at leak 0.15 against 7 / 0 at leak 0.4. The historical bisect (a different scenario) read 21 / 12 / 9 on the v1 engine, 10 / 2 / 0 at leak 0.4 and 17 / 6 / 5 at leak 0.15, and a receptor outlived an identical blind neighbour 30 steps to 25.",
-    tolerance: "Leak 0.15 leaves strictly more survivors and innovations at 90 steps than leak 0.4 on the same seed.",
+    claim: "The leak is a transfer, not a tax: a larger exudateLeak no longer strangles a phototroph monoculture.",
+    method: "24 injected phototrophs, mutationRate 1, 90 steps: survivors and innovations at leak 0.15 and at leak 0.4, plus the 0-leak rule above.",
+    measured: "26 survivors / 12 innovations at leak 0.15 against 33 / 14 at leak 0.4. The historical bisect read the other way (11 / 2 against 7 / 0) while the plate was cooling to zero and the nutrient yield was capped below subsistence; with both repaired the surplus is recovered by receptors instead of lost.",
+    tolerance: "Both monocultures survive 90 steps and the higher leak is not worse by more than a quarter.",
     check: { kind: "test", file: "tests/calibration.test.ts" },
     source: "workbench.md, \"Upgrade Stage 1 — model correctness\", calibration evidence",
   },
@@ -350,9 +357,9 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
   },
   {
     id: "plate-capacity",
-    claim: "Population size is bounded by the plate rather than by the parameter.",
-    method: "180 founders on the 128x128 default plate, step to 400 and read the population and Shannon index.",
-    measured: "Reaches 263 at tick 100, peaks at 924 (below the 1100 cap) and holds 670-780 organisms with Shannon 5.9 at tick 400.",
+    claim: "Population size is bounded by the plate as much as by the parameter.",
+    method: "180 founders on the 128x128 default plate, step to 400 and read the population, then keep stepping to 3000 and read the death causes and mean aggression.",
+    measured: "533 at tick 100, 1033 at tick 400, peak 1094 against the 1100 cap; at tick 3000 the plate holds 1089 organisms with mean aggression 0.065 and deaths by starvation 1023, predation 794, competition 734, old-age 330, crowding 296. With the climate and harvest repairs the plate is productive enough to reach its cap.",
     tolerance: "Recorded measurement; the population must stay below maxPopulation.",
     check: { kind: "recorded" },
     source: "workbench.md, \"Round: a habitable fresh plate\"",
@@ -360,8 +367,8 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
   {
     id: "perf-budget",
     claim: "A step fits the 60 fps budget on the canonical world, and the mature plate fits its own measured budget.",
-    method: "npx vite-node tools/perf.ts: three 128x128 scenarios on seed 0xa7f31ab with 50 measured steps each — canonical (260 founders, 48 warmup ticks), mature (180 founders, stepped to tick 400) and chemostat (dilutionRate 0.02, inflowNutrient 0.12, 400 warmup ticks).",
-    measured: "3.80 ms/step at 74 organisms on the canonical world (p95 3.99); 5.01 ms/step at 672 organisms on the mature plate (p95 5.30); 4.97 ms/step at 705 organisms in the chemostat (p95 5.39).",
+    method: "npx vite-node tools/perf.ts: three 128x128 scenarios on seed 0xa7f31ab with 50 measured steps each — canonical (260 founders, 48 warmup ticks), mature (180 founders, stepped to tick 400) and chemostat (dilutionRate 0.02, inflowNutrient 1, 400 warmup ticks).",
+    measured: "4.36 ms/step at 160 organisms on the canonical world (p95 4.91); 5.27 ms/step at 1033 organisms on the mature plate (p95 5.48); 5.66 ms/step at 1089 organisms in the chemostat (p95 5.83).",
     tolerance: "Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).",
     check: { kind: "test", file: "tests/perf.test.ts" },
     source: "tools/perf.ts, tests/perf.test.ts",
@@ -374,6 +381,33 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     tolerance: "The measured deltas must follow the codon extras exactly; the carrier outlives maxAge with the hazard disabled.",
     check: { kind: "test", file: "tests/longevity.test.ts" },
     source: "src/sim/mapping.ts CODON_EXTRAS, src/sim/body.ts lifespan, src/sim/fitness.ts maintenanceCost",
+  },
+  {
+    id: "founder-viability",
+    claim: "Every non-carnivorous starter kit founds a population from a single founder on a bare default plate.",
+    method: "One founder of the phototroph, heterotroph, resistant and mutualist kits on a fresh 48x48 plate (seed 0xa7f31ab, no injected food); step 600 ticks and record the first birth and the largest population.",
+    measured: "First birth at tick 34 / 38 / 63 / 50 with a largest population of 115 / 68 / 11 / 62. Before the repairs all four were dead ends: the heterotroph never divided, the phototroph divided once at tick 251, and the Resistant and Mutualist kits starved in fifteen ticks.",
+    tolerance: "Every listed kit divides within 200 ticks and passes a population of 5; the predator kit is excluded because it needs prey.",
+    check: { kind: "test", file: "tests/calibration.test.ts" },
+    source: "src/sim/kits.ts, src/sim/genome.ts founder*",
+  },
+  {
+    id: "aggression-priced",
+    claim: "Aggression is not free: a population seeded with hunters loses them, because the hunting apparatus is charged every tick.",
+    method: "32x32 plate, no injection: 40 phototrophs and 20 predators placed by hand (mean aggression 0.193), stepped 300 ticks on three seeds; read the mean aggression of the survivors.",
+    measured: "Mean aggression falls to 0.020 / 0.020 / 0.023 on seeds 1 / 7 / 21, i.e. back to the phototroph baseline: the hunters cannot pay AGGRESSION_UPKEEP without prey. Free aggression instead swept the mature plate to mean 0.91 and extinction.",
+    tolerance: "Every seed stays populated and drops below 0.05 mean aggression.",
+    check: { kind: "test", file: "tests/calibration.test.ts" },
+    source: "src/sim/fitness.ts AGGRESSION_UPKEEP, src/sim/ecology.ts hungry",
+  },
+  {
+    id: "plate-persistence",
+    claim: "A mature plate with predators present persists for thousands of ticks.",
+    method: "180 founders on the 128x128 default plate (seed 0xa7f31ab); step 3000 ticks and read the population, mean aggression and the death causes.",
+    measured: "1089 organisms and mean aggression 0.065 at tick 3000; deaths by starvation 1023, predation 794, competition 734, old-age 330, crowding 296. With free aggression the same plate ran to mean aggression 0.91 and went extinct at tick 2190; with predation disabled entirely it also persisted, which is how the runaway was isolated.",
+    tolerance: "Recorded measurement of a long run; the priced-aggression mechanism is what the tested claim above pins.",
+    check: { kind: "recorded" },
+    source: "workbench.md, \"Round: death with reasons\"",
   },
 ];
 
@@ -390,8 +424,18 @@ export const LIMITS: readonly LimitEntry[] = [
   },
   {
     gap: "The perf budget is scenario-specific",
-    detail: "The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 670-780 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. No single scenario describes the 1100-organism cap.",
+    detail: "The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 1033 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. No single scenario describes the 1100-organism cap.",
     source: "tests/perf.test.ts, tools/perf.ts",
+  },
+  {
+    gap: "A mature plate now reaches its population cap",
+    detail: "With the climate and harvest repaired the plate is productive enough to fill maxPopulation (1100) from tick ~1000, so at maturity the cap is a binding constraint rather than a safety net: 1033 organisms at tick 400 and 1089 at tick 3000 on the default plate. Lower maxPopulation, or the light and nutrient supply, to make resources the limit again.",
+    source: "tools/modeldoc.ts CALIBRATION plate-capacity, src/sim/world.ts reproduceAll",
+  },
+  {
+    gap: "Snapshot v2 payloads are converted, not replayed",
+    detail: "A version-2 payload predates the longevity trait, so it is upgraded by recomputing every phenotype from its genome (v2 -> v3). The world plays on, but it is not bit-identical to the run that wrote it, because the phenotype gained a trait. Every reader migrates: World.restore, parseWorldBytes, the manifest start state and the worker restore op.",
+    source: "src/sim/migrate.ts, src/sim/world.ts restore",
   },
 ];
 

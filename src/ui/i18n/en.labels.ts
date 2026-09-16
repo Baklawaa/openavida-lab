@@ -98,13 +98,13 @@ export const LABELS_EN = {
   "kit.heterotroph.short": "uptake ×6 · motility ×3 · fecundity ×2",
   "kit.heterotroph.description": "Takes up local nutrient. Without a nutrient supply the population collapses.",
   "kit.resistant.label": "Resistant",
-  "kit.resistant.short": "resist ×5 · uptake ×3 · tpref ×2",
+  "kit.resistant.short": "resist ×5 · uptake ×5 · motility ×3",
   "kit.resistant.description": "Ignores a share of the toxin damage. A useful control against toxin sources.",
   "kit.predator.label": "Predator",
   "kit.predator.short": "aggression ×5 · motility ×3 · uptake ×2",
   "kit.predator.description": "Draws energy from weaker neighbours. Needs an established population.",
   "kit.mutualist.label": "Mutualist",
-  "kit.mutualist.short": "signal ×2 · uptake ×3 · photo ×2",
+  "kit.mutualist.short": "signal ×2 · uptake ×3 · photo ×2 · motility ×3",
   "kit.mutualist.description": "Photosynthesises and carries a receptor (signal ≥ 1): it consumes the exudate released by productive neighbouring phototrophs.",
 
   /* model parameter groups -------------------------------------------------- */

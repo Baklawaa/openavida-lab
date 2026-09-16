@@ -8,6 +8,12 @@
  * are applied faithfully. Optional legacy fields keep their documented
  * defaults; nothing is silently carried as an unknown key.
  *
+ * v2 → v3 (longevity). Phenotypes are recomputed from the genomes again, for
+ * organisms and for strain founders. A v2 payload predates the longevity trait,
+ * so its stored phenotype has no such key: restoring it verbatim left
+ * `ph.longevity` undefined, `lifespan()` returned NaN and the next reap()
+ * deleted every organism in the world.
+ *
  * tests/migrate.test.ts replays tests/fixtures/snapshot-v1.json, captured from
  * the engine-v1 tag, and asserts the migrated world is deterministic.
  */
@@ -64,6 +70,23 @@ function v1ToV2(s: Raw): Raw {
   };
 }
 
+/** Recompute the stored phenotypes from the genomes, for organisms and strains. */
+function recomputePhenotypes(s: Raw): Raw {
+  const organisms = asArray(s.organisms).map((entry) => {
+    const org = entry as Raw;
+    return { ...org, ph: phenotypeFor(org.genome, org.ph) } satisfies Raw;
+  }) as unknown as Organism[];
+  const strains = asArray(s.strains).map((entry) => {
+    const strain = entry as Raw;
+    return { ...strain, founderPhenotype: phenotypeFor(strain.genome, strain.founderPhenotype) };
+  });
+  return { ...s, organisms, strains };
+}
+
+function v2ToV3(s: Raw): Raw {
+  return { ...recomputePhenotypes(s), version: 3 };
+}
+
 /** Current-version payloads pass through untouched; older ones are upgraded step by step. */
 export function migrateSnapshot(raw: unknown): WorldSnapshot {
   const version = snapshotVersion(raw);
@@ -73,5 +96,6 @@ export function migrateSnapshot(raw: unknown): WorldSnapshot {
   }
   let snap = raw as Raw;
   if (version < 2) snap = v1ToV2(snap);
+  if (version < 3) snap = v2ToV3(snap);
   return snap as unknown as WorldSnapshot;
 }

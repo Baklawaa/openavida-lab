@@ -57,7 +57,7 @@ export const PARAMS_EN = {
   "param.nutrientInflow.desc": "Uniform nutrient regeneration per tick (detritus recycling). Sets the equilibrium of a ventless plate: inflow / nutrientDecay.",
   "param.nutrientDecay.desc": "Fractional loss of the nutrient field per tick.",
   "param.toxinDecay.desc": "Fractional loss of the toxin field per tick.",
-  "param.temperatureDecay.desc": "Relaxation of the temperature field towards 0 per tick.",
+  "param.temperatureDecay.desc": "Relaxation of the temperature field towards the ambient (0.5) per tick.",
   "param.lightDecay.desc": "Fractional loss of the light field per tick before solar recharge.",
   "param.reproduceEnergy.desc": "Base energy a cell must hold to divide; scaled by the fecundity trait.",
   "param.maxAge.desc": "Hard age ceiling. With senescenceRate > 0 most deaths happen well before it.",
@@ -84,7 +84,7 @@ export const PARAMS_EN = {
   "param.recordTraitDistribution.desc": "Store mean, sd and quantiles of every trait on each history sample (analysis without re-simulation).",
   "param.recordEvents.desc": "Record every birth, death, meal, exudation, recombination and neutral substitution for research export (bounded ring).",
   "param.dilutionRate.desc": "Chemostat washout: fraction of organisms removed per tick and nutrient relaxed towards inflowNutrient. 0 = closed batch world.",
-  "param.inflowNutrient.desc": "Nutrient concentration the inflow restores when dilutionRate > 0.",
+  "param.inflowNutrient.desc": "Nutrient concentration the inflow restores when dilutionRate > 0. 1 is the ventless batch equilibrium, so a chemostat starts habitable.",
 
   /* units ----------------------------------------------------------------- */
   "unit.organisms": "organisms",

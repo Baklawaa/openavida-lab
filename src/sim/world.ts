@@ -15,7 +15,7 @@ import {
   sampleNeighborEffects,
   shadeOccupied,
 } from "./ecology";
-import { Fields } from "./fields";
+import { AMBIENT_TEMPERATURE, Fields, nutrientEquilibrium } from "./fields";
 import { fitness, reproduceThreshold } from "./fitness";
 import {
   decodeGenome,
@@ -193,17 +193,18 @@ export class World {
 
   seedEnvironment(): void {
     const { w, h, fields } = this;
+    const start = nutrientEquilibrium(this.params);
     for (let y = 0; y < h; y++) {
       const sun = 0.35 + 0.55 * (1 - y / Math.max(1, h - 1));
       for (let x = 0; x < w; x++) {
         const i = y * w + x;
         fields.solar[i] = sun;
         fields.light[i] = sun;
-        fields.temperature[i] = 0.5;
-        // A habitable starting plate: with nutrientInflow recycling, 0.35 puts
-        // the equilibrium above the break-even of a stock heterotroph
-        // (maintenance / (uptake × 0.21) ≈ 0.42) once a few cells are grazed.
-        fields.nutrient[i] = 0.35;
+        fields.temperature[i] = AMBIENT_TEMPERATURE;
+        // A habitable starting plate: start at the ventless equilibrium itself
+        // (nutrientInflow / nutrientDecay), so a dropped organism grazes a full
+        // cell instead of waiting for the plate to fill up around it.
+        fields.nutrient[i] = start;
         fields.toxin[i] = 0;
       }
     }
@@ -261,7 +262,7 @@ export class World {
     this.randomTerrain = false;
     this.terrain.fill(TERRAIN.empty);
     this.fields.toxin.fill(0);
-    this.fields.nutrient.fill(0.35);
+    this.fields.nutrient.fill(nutrientEquilibrium(this.params));
   }
 
   seedPopulation(): void {
@@ -1054,6 +1055,11 @@ export class World {
   }
 
   restore(snap: WorldSnapshot): void {
+    // Every reader funnels through here — file import, preset, in-session
+    // snapshot, worker op — so migration happens once, centrally. A v2 payload
+    // from an older engine has no ph.longevity: restored verbatim it made
+    // lifespan() NaN and the next reap() emptied the world.
+    snap = migrateSnapshot(snap);
     this.rng.setState(snap.rngState);
     this.tick = snap.tick;
     this.fields.fromArrays(snap);

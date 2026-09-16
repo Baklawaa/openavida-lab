@@ -1,6 +1,19 @@
 import { clamp } from "./mapping";
 import { TERRAIN, type EnvSample, type SimParams } from "./types";
 
+/**
+ * The temperature a ventless plate relaxes towards. A field that only decays
+ * would make the thermal term a countdown instead of a climate: every organism
+ * would pay |ambient - tpref| more each tick until nothing could feed itself.
+ */
+export const AMBIENT_TEMPERATURE = 0.5;
+
+/** Nutrient a ventless plate settles at: inflow / decay, clamped to the field range. */
+export function nutrientEquilibrium(params: SimParams): number {
+  if (params.nutrientDecay <= 0) return Math.min(4, params.nutrientInflow);
+  return clamp(params.nutrientInflow / params.nutrientDecay, 0, 4);
+}
+
 export const FIELD_NAMES = ["nutrient", "toxin", "temperature", "light", "exudate"] as const;
 export type FieldName = (typeof FIELD_NAMES)[number];
 
@@ -160,7 +173,14 @@ export class Fields {
         4,
       );
       this.toxin[i] = clamp(this.toxin[i]! * (1 - params.toxinDecay), 0, 4);
-      this.temperature[i] = clamp(this.temperature[i]! * (1 - params.temperatureDecay), 0, 1.5);
+      // Relax towards the ambient, so vents and heat waves are excursions
+      // around a standing climate rather than a slide towards zero.
+      this.temperature[i] = clamp(
+        AMBIENT_TEMPERATURE +
+          (this.temperature[i]! - AMBIENT_TEMPERATURE) * (1 - params.temperatureDecay),
+        0,
+        1.5,
+      );
       this.exudate[i] = clamp(this.exudate[i]! * (1 - params.exudateDecay), 0, 4);
       const shade = t === TERRAIN.shade ? 0.35 : 1;
       this.light[i] = clamp(

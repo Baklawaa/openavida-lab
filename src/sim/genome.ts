@@ -293,7 +293,13 @@ export function founderHeterotroph(): string {
 }
 
 export function founderResistant(): string {
-  return assembleGenome([geneCassette("resist", 5), geneCassette("uptake", 3), geneCassette("tpref", 2)]);
+  // uptake x5 and fecundity x2, not uptake x3 / tpref x2. At uptake x3 the
+  // kit's saturated nutrient income (uptake^2 x UPTAKE_GAIN, about 0.044) was
+  // below its own maintenance (0.067), so a dropped Resistant starved within
+  // fifteen ticks whatever the plate held; the tpref cassettes then pushed its
+  // preferred temperature away from the ambient and cost it another 0.028 per
+  // tick. The resist-for-uptake trade-off stays, but the kit can now feed.
+  return assembleGenome([geneCassette("resist", 5), geneCassette("uptake", 5), geneCassette("motility", 3)]);
 }
 
 export function founderPredator(): string {
@@ -305,26 +311,21 @@ export function founderPredator(): string {
 }
 
 export function founderMutualist(channelCodons = 2): string {
+  // motility x3 for the same reason as the Resistant kit: a supply-limited
+  // plate is harvested by roaming, and a stationary kit sits at break-even.
   return assembleGenome([
     geneCassette("signal", channelCodons),
     geneCassette("uptake", 3),
     geneCassette("photo", 2),
+    geneCassette("motility", 3),
   ]);
 }
 
 export function randomGenome(rng: Rng, cassettes = 4): string {
-  const traits: TraitName[] = [
-    "uptake",
-    "photo",
-    "resist",
-    "tpref",
-    "motility",
-    "aggression",
-    "signal",
-    "fecundity",
-    "size",
-    "hue",
-  ];
+  // Derived from TRAIT_NAMES, so a trait added to the table cannot be silently
+  // missing from the random founders (mutator and longevity were both absent
+  // from the hand-written list this replaces).
+  const traits: readonly TraitName[] = TRAIT_NAMES;
   const parts: string[] = [];
   const n = 2 + rng.int(cassettes);
   for (let i = 0; i < n; i++) {

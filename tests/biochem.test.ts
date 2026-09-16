@@ -10,6 +10,7 @@ import {
   metabolicDelta,
   pathwayFluxes,
 } from "../src/sim/index";
+import { maintenanceCost } from "../src/sim/fitness";
 
 describe("genome → enzyme → pathway inspect", () => {
   it("every displayed molecule and pathway is a named sim quantity", () => {
@@ -41,11 +42,13 @@ describe("genome → enzyme → pathway inspect", () => {
     const detox = fluxes.find((p) => p.id === "detox")!.flux;
     const therm = fluxes.find((p) => p.id === "thermostasis")!.flux;
     const maint = fluxes.find((p) => p.id === "maintenance")!.flux;
+    const upkeep = maintenanceCost(decoded.phenotype);
     expect(carbon).toBeCloseTo(decoded.phenotype.uptake * env.nutrient * 0.21, 10);
     expect(photo).toBeCloseTo(decoded.phenotype.photo * env.light * 0.14, 10);
     expect(detox).toBeCloseTo(env.toxin * (1 - decoded.phenotype.resist) * 0.3, 10);
     expect(therm).toBeCloseTo(Math.abs(env.temperature - decoded.phenotype.tpref) * 0.12, 10);
-    expect(maint).toBeCloseTo(0.04 + 0.028 * decoded.phenotype.size, 10);
+    expect(maint).toBeCloseTo(upkeep, 10);
+    expect(maint).toBeGreaterThan(0.04 + 0.028 * decoded.phenotype.size);
     expect(carbon + photo - detox - therm - maint).toBeCloseTo(metabolicDelta(decoded.phenotype, env), 10);
     const org = { energy: 1.1, ph: decoded.phenotype };
     const inspect = inspectBiochem(decoded, env, org);

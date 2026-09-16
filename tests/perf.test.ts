@@ -53,7 +53,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     name: "chemostat",
     startPopulation: 180,
     warmupTicks: 400,
-    params: { dilutionRate: 0.02, inflowNutrient: 0.12 },
+    params: { dilutionRate: 0.02, inflowNutrient: 1 },
   },
 ];
 
