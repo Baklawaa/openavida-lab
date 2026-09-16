@@ -31,7 +31,7 @@ import {
 } from "./genome";
 import { MAX_GENOME, copyPhenotype } from "./mapping";
 import { classifyEnergyDeath, deathFromOrganism } from "./deaths";
-import { canBreed, decayMass, energyCap, maintenanceScale } from "./body";
+import { canBreed, decayMass, energyCap, lifespan, maintenanceScale } from "./body";
 import { applyPolicyMoves, type BrainRuntime } from "./brains";
 import { parentChildEdges, sampleMetrics } from "./metrics";
 import type { DeathRecord } from "./types";
@@ -708,7 +708,9 @@ export class World {
   private applySenescence(o: Organism): void {
     const rate = this.params.senescenceRate;
     if (rate <= 0 || o.pendingDeath) return;
-    const frac = Math.min(1, o.age / Math.max(1, this.params.maxAge));
+    // The hazard follows the organism's own ceiling, not the parameter: a
+    // longevity gene delays ageing instead of merely postponing the cutoff.
+    const frac = Math.min(1, o.age / lifespan(o, this.params.maxAge));
     const p = 1 - Math.exp(-rate * frac * frac);
     if (this.rng.chance(p)) o.pendingDeath = "old-age";
   }
@@ -805,9 +807,12 @@ export class World {
 
   private reap(): void {
     const kept: Organism[] = [];
-    const maxAge = this.params.maxAge;
     const counts = new Map<number, number>();
     for (const o of this.organisms) {
+      // Each organism is measured against its own ceiling (params.maxAge times
+      // its longevity trait), so a long-lived lineage is not cut off at the
+      // population-wide age.
+      const maxAge = lifespan(o, this.params.maxAge);
       if (o.energy > 0 && o.age < maxAge) {
         kept.push(o);
         counts.set(o.lineageId, (counts.get(o.lineageId) ?? 0) + 1);

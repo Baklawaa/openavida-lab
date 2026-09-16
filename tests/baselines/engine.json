@@ -1,8 +1,8 @@
 {
-  "version": "2.2.0",
-  "revision": 4,
+  "version": "2.3.0",
+  "revision": 5,
   "hashAlgo": "fnv1a-32",
   "seed": "0xa7f31ab",
   "steps": 48,
-  "perfHash": "e953dcdc"
+  "perfHash": "0a4f5d18"
 }

@@ -13,7 +13,7 @@ import {
 } from "../sim/index";
 import { tDynamic } from "./i18n/runtime";
 
-const TRACKED_TRAITS: readonly TraitName[] = ["uptake", "photo", "resist", "size", "mutator"];
+const TRACKED_TRAITS: readonly TraitName[] = ["uptake", "photo", "resist", "size", "mutator", "longevity"];
 
 export interface StrainSelection {
   strainId: number;

@@ -15,7 +15,7 @@ panel — is documented in [research.md](research.md) and in `workbench.md`.
 ## 1. Engine identity and provenance
 
 <!-- generated:identity -->
-- Engine version **2.2.0**, model revision **4**, state hash `fnv1a-32`.
+- Engine version **2.3.0**, model revision **5**, state hash `fnv1a-32`.
 - The canonical perf world is a 128 x 128 plate with 260 founders and seed 0xa7f31ab; the pinned hash after 48 steps lives in `tests/baselines/engine.json`.
 - Results published under an earlier revision reproduce from the annotated tag `engine-v1` (pre-upgrade) or from the engine version named in the manifest. `tests/fixtures/snapshot-v1.json` is the migration fixture captured from that revision.
 - `npm run baseline` regenerates the pinned hash deliberately; `npm test` fails if the behaviour hash changes without it.
@@ -103,8 +103,10 @@ A genome is an ACGT string of `MIN_GENOME`–`MAX_GENOME` bases
   are possible.
 - **Codon table.** Each sense codon carries one primary trait and a delta; some
   codons carry secondary contributions (`extras`). Every proline codon and TGG
-  also raise `mutator`, which is how an eleventh trait fits a table built
-  around ten.
+  also raise `mutator`, and the four threonine codons (ACT/ACC/ACA/ACG) plus
+  the two cysteines (TGT/TGC) also raise `longevity`: two traits beyond the ten
+  the table was built around, both carried by secondary contributions so the
+  primary trait of every codon is unchanged.
 - **Expression.** A gene's contribution is the sum of its codons' deltas,
   multiplied by the cis-regulation factor described below. The phenotype is
   `squash(BASAL + Σ contributions)` per trait, where `squash` is a clamp, a
@@ -117,7 +119,7 @@ A genome is an ACGT string of `MIN_GENOME`–`MAX_GENOME` bases
   `regulationEnabled: false` restores the purely additive decoder exactly.
 - **Base traits** (`BASAL`) are what a genome with no ORFs expresses: uptake
   0.18, photo 0.02, resist 0.05, tpref 0.5, motility 0.16, aggression 0.02,
-  signal 0, hue 0.55, fecundity 0.55, size 0.9, mutator 1.
+  signal 0, hue 0.55, fecundity 0.55, size 0.9, mutator 1, longevity 1.
 - `hue` is display-only: it never enters fitness, which is what makes the
   neutral substitution log a real neutral marker.
 
@@ -136,7 +138,16 @@ with the coefficients in `src/sim/chemistry.ts`.
 | Toxin damage | `toxin · (1 − resist) · 1.15` | `toxin · (1 − resist) · 0.3` |
 | Thermal mismatch | `|temperature − tpref| · 0.85` | `|temperature − tpref| · 0.12` |
 | Maintenance | `0.04 + 0.05 · size · bodyScale + genomeUpkeep` | `0.04 + 0.028 · size · bodyScale + genomeUpkeep` |
+| Longevity upkeep | `LONGEVITY_UPKEEP · max(0, longevity − 1)` | same term |
 | Predation | neighbour effect `Σ gap · 0.35` | through meals |
+
+**Lifespan.** `longevity` scales the age ceiling: the organism dies at
+`max(1, round(maxAge × longevity))` ticks, squashed into [0.5, 2], and both the
+senescence hazard and the reap cutoff read that personal ceiling. A carrier is
+therefore old later than its neighbours, not immortal. The upkeep row above is
+the price — 0.012 energy per tick for every point above the basal 1, which at
+the 2.0 cap is about a sixth of a stock heterotroph's maintenance — so selection
+trades life against the energy budget instead of walking the trait to its limit.
 
 Nutrient is the only field that is consumed: a cell takes
 `min(field, uptake · NUTRIENT_UPTAKE_CAP)` and pays for exactly what it takes.
@@ -155,10 +166,10 @@ random free neighbour cell, or the birth is skipped.
 
 **Death.** Nine causes are recorded: `starvation` (energy exhausted),
 `toxin` (classified when toxin damage exceeds the harvest that tick), `crowding`,
-`old-age` (the senescence hazard or the `maxAge` ceiling), `predation`,
+`old-age` (the senescence hazard or the organism's own lifespan ceiling), `predation`,
 `competition` (displaced by a fitter mover), `crash`, `wipe` (brush) and
 `washout` (chemostat). The senescence hazard is
-`1 − exp(−senescenceRate·(age/maxAge)²)` per tick, so most deaths happen well
+`1 − exp(−senescenceRate·(age/lifespan)²)` per tick, so most deaths happen well
 before the ceiling; `senescenceRate: 0` restores the hard cutoff alone.
 
 ## 6. Ecology
@@ -308,6 +319,7 @@ Values the model hard-codes rather than exposing as parameters. Each row is read
 | Metabolism | `UPTAKE_GAIN` | `0.21` | `src/sim/chemistry.ts` | Energy gained per unit of nutrient × uptake. |
 | Metabolism | `PHOTO_GAIN` | `0.14` | `src/sim/chemistry.ts` | Energy gained per unit of light × photo. |
 | Metabolism | `NUTRIENT_UPTAKE_CAP` | `0.16` | `src/sim/chemistry.ts` | Per-tick nutrient consumption capacity per unit of uptake. |
+| Metabolism | `LONGEVITY_UPKEEP` | `0.012` | `src/sim/fitness.ts` | Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for. |
 | Exudate | `EXUDATE_YIELD` | `0.8` | `src/sim/chemistry.ts` | Energy a consumer gains per unit of exudate taken up; the rest dissipates. |
 | Exudate | `EXUDATE_UPTAKE_PER_UPTAKE` | `0.5` | `src/sim/chemistry.ts` | Per-tick uptake capacity per unit of uptake, scaled by signal / 7. |
 | Exudate | `EXUDATE_FITNESS` | `1` | `src/sim/chemistry.ts` | Weight of exudate in the comparable fitness score. |
@@ -402,6 +414,17 @@ Evidence: workbench.md, "Upgrade Stage 2 — evolvability".
 - The two model-validation tests that isolate the diffusion kernel now zero the inflow, because it is a source.
 
 Evidence: workbench.md, "Round: a habitable fresh plate".
+
+### 2.3.0 — revision 5 — perf hash `0a4f5d18` (2026-09-13)
+
+**Heritable lifespan: the longevity trait.**
+
+- A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling.
+- It rides as a secondary contribution on the threonine codons ACT/ACC/ACA/ACG (+0.06 each) and the cysteines TGT/TGC (+0.08), so every genome that predates it keeps its phenotype and its lifespan.
+- The extra life is paid for: maintenanceCost adds LONGEVITY_UPKEEP (0.012) per unit of longevity above 1, so selection trades lifespan against the energy budget instead of pinning the trait at its cap.
+- Telomerase joins the enzyme readout for the trait, and the research card tracks longevity alongside the other eleven.
+
+Evidence: workbench.md, "Round: a gene for age".
 <!-- /generated:revisions -->
 
 Stages 3 to 5 of the research upgrade (statistics, the headless runner, the
@@ -512,6 +535,16 @@ A step fits the 60 fps budget on the canonical world, and the mature plate fits 
 - **Tolerance.** Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).
 - **Checked by.** re-measured by `tests/perf.test.ts` on every run.
 - **Source.** tools/perf.ts, tests/perf.test.ts.
+
+### longevity-trade-off
+
+Lifespan is heritable, and the extra life is charged as upkeep, so the trait faces a trade-off instead of pinning itself at the cap.
+
+- **Method.** Decode two genomes that differ in exactly two ACT codons (threonine, +0.06 longevity each); compare the phenotype, lifespan and maintenanceCost, then hold a carrier on a fed plate with senescenceRate 0 and maxAge 40.
+- **Measured.** 1.0000 to 1.1200 longevity: an age ceiling of 40 becomes 45 and 260 becomes 291, while maintenance rises from 0.065200 to 0.066640 energy per tick (LONGEVITY_UPKEEP x 0.12). The carrier is still alive at step 41 on a plate whose parameter ceiling is 40.
+- **Tolerance.** The measured deltas must follow the codon extras exactly; the carrier outlives maxAge with the hazard disabled.
+- **Checked by.** re-measured by `tests/longevity.test.ts` on every run.
+- **Source.** src/sim/mapping.ts CODON_EXTRAS, src/sim/body.ts lifespan, src/sim/fitness.ts maintenanceCost.
 <!-- /generated:calibration -->
 
 ## 13. Known limits

@@ -72,11 +72,13 @@ describe("memory bounds", () => {
     expect(tiny.history.includes(oldest), "the oldest history rows were dropped").toBe(false);
   });
 
-  it("keeps the mean serialised history row under 1500 bytes with trait distributions", () => {
+  it("keeps the mean serialised history row under 1600 bytes with trait distributions", () => {
     // The trait distribution is rounded to 3 decimals on purpose
     // (selection.ts traitDistribution) because it lands in every row; once the
     // founder-strain transient is amortised it is nearly the whole row, so its
-    // cost must stay put here.
+    // cost must stay put here. The twelfth trait (longevity) added about 37
+    // bytes, which is why the budget reads 1600 rather than 1500: the extra 100
+    // is headroom for one more trait, not for a new field on every trait.
     const w = longRunWorld(true);
     for (let i = 0; i < 1500; i++) w.step();
     const rows = w.history;
@@ -85,8 +87,8 @@ describe("memory bounds", () => {
     const mean = bytes / rows.length;
     expect(
       mean,
-      `mean history row was ${mean.toFixed(1)} bytes over ${rows.length} rows (budget 1500)`,
-    ).toBeLessThan(1500);
+      `mean history row was ${mean.toFixed(1)} bytes over ${rows.length} rows (budget 1600)`,
+    ).toBeLessThan(1600);
   });
 
   it("never lets the death log pass DEATH_LOG_MAX", () => {

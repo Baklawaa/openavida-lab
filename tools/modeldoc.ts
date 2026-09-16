@@ -23,6 +23,7 @@ import { TOURNAMENT_DRAW, TOURNAMENT_INJECT } from "../src/sim/tournament";
 import { RECIPE_QUERY_MAX, RECIPE_VERSION } from "../src/sim/recipe";
 import { MANIFEST_VERSION } from "../src/sim/manifest";
 import { HASH_ALGO, ENGINE_VERSION, MODEL_REVISION, engineInfo } from "../src/sim/engine";
+import { LONGEVITY_UPKEEP } from "../src/sim/fitness";
 import { PARAM_SPEC } from "../src/sim/params";
 import { DEFAULT_OVERLAY_ALPHA, EXUDATE_OVERLAY_ALPHA, OVERLAY_GAMMA } from "../src/render/overlay";
 import { HISTORY_CURVES, HISTORY_RESULTS_CAP } from "../src/ui/experimentHistory";
@@ -104,6 +105,7 @@ export const MODEL_CONSTANTS: readonly ConstantEntry[] = [
   { group: "Metabolism", name: "UPTAKE_GAIN", value: num(UPTAKE_GAIN), source: "src/sim/chemistry.ts", note: "Energy gained per unit of nutrient × uptake." },
   { group: "Metabolism", name: "PHOTO_GAIN", value: num(PHOTO_GAIN), source: "src/sim/chemistry.ts", note: "Energy gained per unit of light × photo." },
   { group: "Metabolism", name: "NUTRIENT_UPTAKE_CAP", value: num(NUTRIENT_UPTAKE_CAP), source: "src/sim/chemistry.ts", note: "Per-tick nutrient consumption capacity per unit of uptake." },
+  { group: "Metabolism", name: "LONGEVITY_UPKEEP", value: num(LONGEVITY_UPKEEP), source: "src/sim/fitness.ts", note: "Energy per tick charged for each unit of longevity above the basal 1, so a longer life is paid for." },
   { group: "Exudate", name: "EXUDATE_YIELD", value: num(EXUDATE_YIELD), source: "src/sim/chemistry.ts", note: "Energy a consumer gains per unit of exudate taken up; the rest dissipates." },
   { group: "Exudate", name: "EXUDATE_UPTAKE_PER_UPTAKE", value: num(EXUDATE_UPTAKE_PER_UPTAKE), source: "src/sim/chemistry.ts", note: "Per-tick uptake capacity per unit of uptake, scaled by signal / 7." },
   { group: "Exudate", name: "EXUDATE_FITNESS", value: num(EXUDATE_FITNESS), source: "src/sim/chemistry.ts", note: "Weight of exudate in the comparable fitness score." },
@@ -257,6 +259,20 @@ export const REVISION_LOG: readonly RevisionEntry[] = [
     ],
     evidence: "workbench.md, \"Round: a habitable fresh plate\"",
   },
+  {
+    version: "2.3.0",
+    revision: 5,
+    perfHash: "0a4f5d18",
+    date: "2026-09-13",
+    headline: "Heritable lifespan: the longevity trait",
+    changes: [
+      "A twelfth trait, longevity, multiplies the age ceiling: lifespan = max(1, round(maxAge x longevity)), squashed into [0.5, 2]. The senescence hazard and the reap cutoff both use the organism's own ceiling.",
+      "It rides as a secondary contribution on the threonine codons ACT/ACC/ACA/ACG (+0.06 each) and the cysteines TGT/TGC (+0.08), so every genome that predates it keeps its phenotype and its lifespan.",
+      "The extra life is paid for: maintenanceCost adds LONGEVITY_UPKEEP (0.012) per unit of longevity above 1, so selection trades lifespan against the energy budget instead of pinning the trait at its cap.",
+      "Telomerase joins the enzyme readout for the trait, and the research card tracks longevity alongside the other eleven.",
+    ],
+    evidence: "workbench.md, \"Round: a gene for age\"",
+  },
 ];
 
 export const CALIBRATION: readonly CalibrationEntry[] = [
@@ -349,6 +365,15 @@ export const CALIBRATION: readonly CalibrationEntry[] = [
     tolerance: "Canonical below 16.67 ms/step (the 60 fps target); mature below 12.9 ms/step and chemostat below 12.4 ms/step (2.5x the slowest recorded run).",
     check: { kind: "test", file: "tests/perf.test.ts" },
     source: "tools/perf.ts, tests/perf.test.ts",
+  },
+  {
+    id: "longevity-trade-off",
+    claim: "Lifespan is heritable, and the extra life is charged as upkeep, so the trait faces a trade-off instead of pinning itself at the cap.",
+    method: "Decode two genomes that differ in exactly two ACT codons (threonine, +0.06 longevity each); compare the phenotype, lifespan and maintenanceCost, then hold a carrier on a fed plate with senescenceRate 0 and maxAge 40.",
+    measured: "1.0000 to 1.1200 longevity: an age ceiling of 40 becomes 45 and 260 becomes 291, while maintenance rises from 0.065200 to 0.066640 energy per tick (LONGEVITY_UPKEEP x 0.12). The carrier is still alive at step 41 on a plate whose parameter ceiling is 40.",
+    tolerance: "The measured deltas must follow the codon extras exactly; the carrier outlives maxAge with the hazard disabled.",
+    check: { kind: "test", file: "tests/longevity.test.ts" },
+    source: "src/sim/mapping.ts CODON_EXTRAS, src/sim/body.ts lifespan, src/sim/fitness.ts maintenanceCost",
   },
 ];
 

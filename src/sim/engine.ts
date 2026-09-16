@@ -12,8 +12,8 @@
  * migration fixture captured from that revision.
  */
 
-export const ENGINE_VERSION = "2.2.0";
-export const MODEL_REVISION = 4;
+export const ENGINE_VERSION = "2.3.0";
+export const MODEL_REVISION = 5;
 export const HASH_ALGO = "fnv1a-32";
 
 export interface EngineInfo {

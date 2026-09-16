@@ -15,7 +15,7 @@ describe("genome → enzyme → pathway inspect", () => {
   it("every displayed molecule and pathway is a named sim quantity", () => {
     expect(MOLECULES.length).toBeGreaterThanOrEqual(6);
     expect(PATHWAYS.length).toBeGreaterThanOrEqual(5);
-    expect(ENZYMES.length).toBe(11);
+    expect(ENZYMES.length).toBe(12);
     for (const m of MOLECULES) {
       expect(m.color.startsWith("#")).toBe(true);
       expect(m.description.length).toBeGreaterThan(8);

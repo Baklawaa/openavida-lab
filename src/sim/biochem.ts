@@ -112,6 +112,7 @@ export const ENZYMES: readonly EnzymeSpec[] = [
   { id: "replicase", name: "Replicase", trait: "fecundity", color: TRAIT_COLOR.fecundity, description: "Lowers energy threshold to divide" },
   { id: "mutase", name: "Mutase", trait: "mutator", color: TRAIT_COLOR.mutator, description: "Scales the mutation rate of this organism's births" },
   { id: "structin", name: "Structural protein", trait: "size", color: TRAIT_COLOR.size, description: "Body size; raises maintenance" },
+  { id: "telomerase", name: "Telomerase", trait: "longevity", color: TRAIT_COLOR.longevity, description: "Extends the age ceiling; upkeep rises with it" },
 ] as const;
 
 export type PathwayId =
@@ -257,6 +258,7 @@ const TRAIT_ENZYME: Record<TraitName, string> = {
   fecundity: "replicase",
   size: "structin",
   mutator: "mutase",
+  longevity: "telomerase",
 };
 
 export function enzymesFromDecoded(decoded: DecodedGenome): EnzymeLevel[] {

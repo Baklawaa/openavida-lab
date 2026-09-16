@@ -27,6 +27,7 @@ export const HELP_FR = {
   "help.kit-resistant": "Résiste mieux aux dommages causés par les toxines.",
   "help.kit-predator": "Chasse les organismes voisins plus faibles et récupère leur énergie.",
   "help.kit-mutualist": "Photosynthétise et porte un récepteur d’exsudat : il récupère une part du surplus relâché par les phototrophes voisins.",
+  "help.gene-add-longevity": "Ajoute un gène de longévité : il repousse l’âge maximal de cet organisme, au prix d’un entretien énergétique plus élevé.",
   "help.gene-add-mutator": "Ajoute une cassette de mutabilité : elle multiplie le taux de mutation des naissances de cet organisme.",
   "help.dna-builder": "Chaque carte est un gène lu dans la séquence. La force est son nombre de codons ; réordonnez, renforcez ou retirez les gènes sans perdre vos autres modifications.",
   "help.dna-strip-section": "La séquence base par base. Les rails colorés délimitent les gènes (ATG → TAA/TAG/TGA). Sélectionnez des bases pour les remplacer, les supprimer ou les dupliquer.",

@@ -646,3 +646,47 @@ Final wave, two subagents on disjoint files. **No model change: the perf hash st
 - Two robustness fixes I made while verifying: the reduced-motion assertion no longer measures a fixed wall-clock window (it waits for the clock, then bounds the rate), because it flaked once under the load of a build plus eleven verifiers in sequence; and the gates now print the dist measurement on every run.
 - GATES: typecheck ok (both configs); vitest **330/330** (68 files); build ok; `dist` 2.77 MB / 4.00 MB budget; **eleven** browser verifier runs OK; baseline unchanged `e953dcdc`.
 
+## Round: a gene for age — the longevity trait (2026-09-14)
+
+The question was why fit organisms die without reproducing, and whether age could become a gene. I measured the first before touching the model, then built the second. **Model change: engine 2.3.0 / revision 5, baseline `e953dcdc` → `0a4f5d18`.**
+
+### The measurement: childless death is not old age
+A mature plate (128×128, seed `0xa7f31ab`, 180 founders, stepped to tick 400) holds 797 organisms and 3638 deaths in the log:
+
+| Cause | Deaths | Never reproduced | Mean births |
+| --- | --- | --- | --- |
+| starvation | 1794 | 59.9 % | 0.78 |
+| competition | 1068 | 52.0 % | 1.06 |
+| predation | 466 | 57.3 % | 0.90 |
+| crowding | 175 | 58.3 % | 0.84 |
+| old-age | 135 | **16.3 %** | 2.66 |
+
+- The childless are not the unfit: mean comparable fitness **−0.2890** against **−0.2983** for those that did reproduce. They die young — mean age 26.8 against 69.1 — so most never get the chance to divide.
+- Old-age deaths are 3.7 % of the log, arrive at mean age 165 (the senescence hazard bites long before the 260 ceiling), and 84 % of those organisms had already reproduced (mean 2.66 births). "Perfect genome, dies of old age childless" is the corner case: **22 deaths out of 3638**.
+- **The decisive experiment**: one founder alone on a fresh 48×48 plate, same genome and seed, only the ceiling changed — which is exactly what the new trait scales.
+
+| Founder | maxAge | Peak energy | Threshold | Pop max | Died |
+| --- | --- | --- | --- | --- | --- |
+| heterotroph | 260 | 1.008 @ tick 77 | 1.542 | 1 | tick 260, old-age |
+| heterotroph | 700 | 1.008 @ tick 77 | 1.542 | 1 | tick 280, old-age |
+| heterotroph | 2000 | 1.008 @ tick 77 | 1.542 | 1 | tick 267, starvation |
+| phototroph | 260 | 1.668 @ tick 250 | 1.676 | 2 (first birth 251) | tick 594, old-age |
+| phototroph | 2000 | 1.665 @ tick 247 | 1.676 | 2 (first birth 248) | tick 597, starvation |
+
+  A heterotroph peaks at 1.008 against a 1.542 threshold and never divides, whatever the ceiling: more lifespan changes how long it waits, not whether it breeds. The phototroph crosses its threshold at tick ~250 and manages exactly one division — the daughter does not found a population. Childlessness is a fecundity/energy problem (the lever is `reproduceEnergy` or the fecundity trait, not age); the age gene was added on its own merits and does not pretend to fix it.
+
+### The trait
+- `longevity` is the twelfth trait, basal 1, squashed into [0.5, 2]. An organism's ceiling is `max(1, round(maxAge × longevity))`, and **both** the senescence hazard and the reap cutoff use that personal ceiling, so a carrier ages later instead of living forever.
+- It rides on secondary codon contributions only — the four threonines ACT/ACC/ACA/ACG (+0.06) and the two cysteines TGT/TGC (+0.08) — so no codon changed its primary trait and every genome that predates the trait keeps its phenotype. Only the **resistant** kit already carries it (1.120 → ceiling 291 instead of 260); the other five founders stay at 1.000 → 260.
+- The extra life is paid for: `LONGEVITY_UPKEEP = 0.012` per unit above the basal 1, charged in **both** ledgers (energy and comparable score) through the shared `longevityUpkeep`, so a long-lived organism cannot win cell contests on a cost it never pays. At the 2.0 cap that is 0.012/tick, about a sixth of a stock heterotroph's maintenance.
+- No snapshot schema change: phenotypes are recomputed from the genome on restore, so an old payload simply gains the trait. Telomerase joins the enzyme readout, and the trait appears in the DNA editor, the Analyse trait row, the research card, the goal metrics, the explorer and the species strips — all of them driven by `TRAIT_NAMES`.
+
+### Evidence
+- **It evolves and it does not run away.** On the mature plate the mean longevity reads 1.0075 (tick 100, 13 carriers) → 1.0116 → 1.0270 → **1.0609 at tick 400, 471 of 797 organisms above basal**, and the recorded trait distribution agrees. The upkeep is what keeps it off the 2.0 cap.
+- Calibration entry `longevity-trade-off`, checked by `tests/longevity.test.ts`: two ACT codons read 1.1200, the ceiling goes 40 → 45 and 260 → 291, maintenance 0.065200 → 0.066640, and with `senescenceRate 0` a carrier outlives `maxAge` 40.
+- The perf hash moved by itself: the canonical world seeds `founderResistant()`, which carries the codons, so the upkeep term changes its energy from tick 0. One part of the change is *not* visible there — the comparable-score term needs a cell contest that a 0.00144 difference does not flip within 48 steps — so the revision bump is the record of it, not the hash.
+- Goldens: both copy fixtures moved by exactly four strings (the DNA editor's gene list, the Analyse trait row, the goal metric options and the `gene-add-longevity` help), 223 → 224 controls; FR 69 826 characters, EN 63 037.
+- Two test expectations moved with the model, deliberately: `ENZYMES.length` 11 → 12 (telomerase) and the mean history row budget 1500 → 1600 bytes, because a twelfth trait distribution costs about 37 bytes per row — the extra 100 is headroom for one more trait, not for a new field on every trait.
+
+- GATES: typecheck ok (both configs); vitest **336/336** (69 files); build ok; `dist` 2.78 MB / 4.00 MB budget; **eleven** browser verifier runs OK; baseline re-pinned at `0a4f5d18` (revision 5).
+

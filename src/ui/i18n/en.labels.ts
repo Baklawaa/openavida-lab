@@ -14,6 +14,7 @@ export const LABELS_EN = {
   "trait.fecundity.label": "Reproduction",
   "trait.size.label": "Size",
   "trait.mutator.label": "Mutability",
+  "trait.longevity.label": "Longevity",
   "trait.uptake.hint": "Absorbs the nutrient available in the environment.",
   "trait.photo.hint": "Turns local light into energy.",
   "trait.resist.hint": "Reduces the damage caused by toxins.",
@@ -25,6 +26,7 @@ export const LABELS_EN = {
   "trait.fecundity.hint": "Changes the ability to reproduce.",
   "trait.size.hint": "Changes the size and the energy cost of upkeep.",
   "trait.mutator.hint": "Multiplies the mutation rate of this organism's births (0.25 to 4).",
+  "trait.longevity.hint": "Extends the organism's maximum lifespan; its energy upkeep rises with it.",
   "trait.uptake.abbr": "Upt",
   "trait.photo.abbr": "Pho",
   "trait.resist.abbr": "Res",
@@ -36,6 +38,7 @@ export const LABELS_EN = {
   "trait.fecundity.abbr": "Rep",
   "trait.size.abbr": "Siz",
   "trait.mutator.abbr": "Mut",
+  "trait.longevity.abbr": "Lon",
 
   /* death causes ------------------------------------------------------------ */
   "death.starvation.label": "Not enough food or light",

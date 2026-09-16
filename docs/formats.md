@@ -18,12 +18,12 @@ when those move, this page moves with them.
 | Run manifest | `MANIFEST_VERSION = 1` (`src/sim/manifest.ts`) | `makeManifest`, `manifestFromWorld` | `validateManifest` | accepted, normalized, engine re-stamped | refused (error list) |
 | Recipe in `?recipe=` | `RECIPE_VERSION = 1` (`src/sim/recipe.ts`) | `recipeFromWorld`, `recipeToQuery` | `parseRecipe`, `recipeFromQuery` | ignored | ignored |
 | Browser stores | IndexedDB `openavida-lab` version 3 (`src/ui/presetStore.ts`) | `PresetStore` | `PresetStore` | upgrade adds stores in place; stored snapshots are current-version | unknown fields ignored |
-| Engine identity | `2.2.0` / revision `4` / `e953dcdc` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
+| Engine identity | `2.3.0` / revision `5` / `0a4f5d18` (`src/sim/engine.ts`) | `engineInfo()` | provenance fields, `tests/baselines/engine.json` | lineage below; no migration between revisions | not applicable |
 | Research exports | no version field (CSV, JSONL) | `src/sim/serialize.ts`, `tools/openavida.ts` | `parseCSV`, `tools/openavida_reader.py` | additive changes only, comment lines skipped | additive readers must skip unknown columns/keys |
 
 The one thing that is **not** backwards compatible is the engine revision
 itself: no migration makes a result recorded under revision 1 reproduce under
-revision 4. Everything else has an upgrade path, an explicit refusal or a
+revision 5. Everything else has an upgrade path, an explicit refusal or a
 documented ignore.
 
 ## 1. World snapshot (JSON)
@@ -73,7 +73,7 @@ events, schedule).
 - **Caveat.** Only a v1 payload is rewritten by the migration. A version-2
   snapshot carries no engine check: it restores as-is and continues under the
   current model, so a world saved under engine 2.0.0 does not replay the same
-  trajectory when continued under 2.2.0. Bit-reproducing an old run means
+  trajectory when continued under 2.3.0. Bit-reproducing an old run means
   running the old engine (see section 6), not restoring its snapshot.
 
 ## 2. OAV2 binary container
@@ -212,7 +212,8 @@ pinned by the canonical perf world (128 x 128, 260 founders, seed
 | 1.0.0 | 1 | `c2c03a81` | annotated tag `engine-v1`; fixture `tests/fixtures/snapshot-v1.json` |
 | 2.0.0 | 2 | `9df52ec5` | model correctness stage (`docs/model.md` §11) |
 | 2.1.0 | 3 | `185d6460` | evolvability stage |
-| 2.2.0 | 4 | `e953dcdc` | current; `tests/engine.test.ts` fails on a silent behaviour change |
+| 2.2.0 | 4 | `e953dcdc` | nutrient recycling round |
+| 2.3.0 | 5 | `0a4f5d18` | current; `tests/engine.test.ts` fails on a silent behaviour change |
 
 `engine` and `paramsDigest` inside a snapshot are provenance, not
 compatibility keys: `migrateSnapshot` never reads them, and the migration

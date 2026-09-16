@@ -88,3 +88,11 @@ export function canBreed(o: Body, predationThreshold: number): boolean {
 export function energyCap(o: Body): number {
   return 3.2 + 1.2 * bodySize(o);
 }
+
+/**
+ * Age ceiling of one organism: the parameter times its longevity trait, so a
+ * long-lived genome stretches both the hard cutoff and the senescence hazard.
+ */
+export function lifespan(o: Body, maxAge: number): number {
+  return Math.max(1, Math.round(maxAge * o.ph.longevity));
+}

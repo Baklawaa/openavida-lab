@@ -23,6 +23,7 @@ export const HELP_EN = {
   "help.kit-resistant": "Resists toxin damage better than the others.",
   "help.kit-predator": "Hunts weaker neighbouring organisms and takes their energy.",
   "help.kit-mutualist": "Photosynthesises and carries an exudate receptor: it collects part of the surplus released by neighbouring phototrophs.",
+  "help.gene-add-longevity": "Adds a longevity gene: it pushes back this organism's age ceiling at the cost of higher energy upkeep.",
   "help.gene-add-mutator": "Adds a mutability cassette: it multiplies the mutation rate of this organism's births.",
   "help.dna-builder": "Each card is a gene read from the sequence. Strength is its codon count; reorder, reinforce or remove genes without losing your other edits.",
   "help.dna-strip-section": "The sequence base by base. The coloured rails delimit the genes (ATG → TAA/TAG/TGA). Select bases to replace, delete or duplicate them.",

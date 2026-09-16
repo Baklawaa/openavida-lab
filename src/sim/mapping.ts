@@ -37,6 +37,7 @@ export const TRAIT_NAMES = [
   "fecundity",
   "size",
   "mutator",
+  "longevity",
 ] as const;
 export type TraitName = (typeof TRAIT_NAMES)[number];
 
@@ -116,6 +117,12 @@ export const TRAIT_SPEC: Record<TraitName, TraitSpec> = {
     squash: "clamp",
     description: "Multiplier on this organism's mutation rate (secondary codon effect)",
   },
+  longevity: {
+    min: 0.5,
+    max: 2,
+    squash: "clamp",
+    description: "Multiplier on the age ceiling; upkeep rises with it (secondary codon effect)",
+  },
 };
 
 export const TRAIT_COLOR: Record<TraitName, string> = {
@@ -130,6 +137,7 @@ export const TRAIT_COLOR: Record<TraitName, string> = {
   fecundity: "#b08cff",
   size: "#8aa0b5",
   mutator: "#ffd1a1",
+  longevity: "#7fd4a8",
 };
 
 export const BASE_COLOR: Record<Base, string> = {
@@ -151,6 +159,8 @@ export interface Phenotype {
   fecundity: number;
   size: number;
   mutator: number;
+  /** Age-ceiling multiplier; 1 is the published maxAge. */
+  longevity: number;
 }
 
 /**
@@ -178,6 +188,8 @@ export const BASAL: Phenotype = {
   fecundity: 0.55,
   size: 0.9,
   mutator: 1,
+  // 1 = the published age ceiling. Only codons can push it either way.
+  longevity: 1,
 };
 
 export interface CodonRule {
@@ -195,13 +207,25 @@ export interface CodonRule {
   extras: ReadonlyArray<{ trait: TraitName; delta: number }>;
 }
 
-/** Secondary contributions, by codon. Proline codons and TGG also raise mutator. */
+/**
+ * Secondary contributions, by codon. Proline codons and TGG also raise mutator;
+ * the stress-response codons — the two threonine groups that set a thermal
+ * preference and the two cysteines that resist toxins — also buy lifespan, so
+ * longevity is evolvable from sequence without stealing a primary trait from
+ * the codon table the genomes were written against.
+ */
 const CODON_EXTRAS: Record<string, ReadonlyArray<{ trait: TraitName; delta: number }>> = {
   CCT: [{ trait: "mutator", delta: 0.1 }],
   CCC: [{ trait: "mutator", delta: 0.1 }],
   CCA: [{ trait: "mutator", delta: 0.1 }],
   CCG: [{ trait: "mutator", delta: 0.1 }],
   TGG: [{ trait: "mutator", delta: 0.15 }],
+  ACT: [{ trait: "longevity", delta: 0.06 }],
+  ACC: [{ trait: "longevity", delta: 0.06 }],
+  ACA: [{ trait: "longevity", delta: 0.06 }],
+  ACG: [{ trait: "longevity", delta: 0.06 }],
+  TGT: [{ trait: "longevity", delta: 0.08 }],
+  TGC: [{ trait: "longevity", delta: 0.08 }],
 };
 
 interface AaGroup {
@@ -314,6 +338,7 @@ export function copyPhenotype(p: Phenotype): Phenotype {
     fecundity: p.fecundity,
     size: p.size,
     mutator: p.mutator,
+    longevity: p.longevity,
   };
 }
 

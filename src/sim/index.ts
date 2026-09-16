@@ -242,6 +242,7 @@ export {
   maintenanceScale,
   decayMass,
   energyCap,
+  lifespan,
   feed,
   huntingPower,
   preyGap,

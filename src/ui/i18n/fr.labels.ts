@@ -19,6 +19,7 @@ export const LABELS_FR = {
   "trait.fecundity.label": "Reproduction",
   "trait.size.label": "Taille",
   "trait.mutator.label": "Mutabilité",
+  "trait.longevity.label": "Longévité",
   "trait.uptake.hint": "Absorbe les nutriments disponibles dans le milieu.",
   "trait.photo.hint": "Transforme la lumière locale en énergie.",
   "trait.resist.hint": "Réduit les dommages causés par les toxines.",
@@ -30,6 +31,7 @@ export const LABELS_FR = {
   "trait.fecundity.hint": "Modifie la capacité à se reproduire.",
   "trait.size.hint": "Modifie la taille et le coût énergétique d’entretien.",
   "trait.mutator.hint": "Multiplie le taux de mutation des naissances de cet organisme (0,25 à 4).",
+  "trait.longevity.hint": "Allonge la durée de vie maximale de l’organisme ; son entretien énergétique augmente d’autant.",
   "trait.uptake.abbr": "Nut",
   "trait.photo.abbr": "Pho",
   "trait.resist.abbr": "Rés",
@@ -41,6 +43,7 @@ export const LABELS_FR = {
   "trait.fecundity.abbr": "Rep",
   "trait.size.abbr": "Tai",
   "trait.mutator.abbr": "Mut",
+  "trait.longevity.abbr": "Lon",
 
   /* death causes ------------------------------------------------------------ */
   "death.starvation.label": "Manque de nourriture ou de lumière",
