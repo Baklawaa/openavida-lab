@@ -43,9 +43,27 @@ async function run(mode) {
   });
   const url = `${base}${base.includes("?") ? "&" : "?"}seed=4711${mode === "worker" ? "&worker=1" : ""}`;
   // The runner needs an order of magnitude more time per step than a laptop,
-  // and the synchronous mutate below blocks the page for tens of seconds, so
-  // Playwright's 30 s default is not enough for the interactions that follow.
+  // and it rasterises WebGL in software, so the page's main thread is busy
+  // enough that Playwright's actionability checks time out even at 120 s.
+  // These controls only need a click or a change event, so drive them through
+  // the DOM and keep asserting the application's own response.
   page.setDefaultTimeout(120000);
+  const click = (selector) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!(el instanceof HTMLElement)) throw new Error(`missing ${sel}`);
+      el.click();
+    }, selector);
+  const pick = (selector, value) =>
+    page.evaluate(
+      ({ sel, v }) => {
+        const el = document.querySelector(sel);
+        if (!(el instanceof HTMLSelectElement)) throw new Error(`missing ${sel}`);
+        el.value = v;
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      },
+      { sel: selector, v: value },
+    );
   const params = async (side) => page.evaluate((s) => window.__openavidaParams(s), side);
   const status = () => page.locator("#status-line").textContent();
   const setParam = (key, value) =>
@@ -56,7 +74,7 @@ async function run(mode) {
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForFunction(() => window.__openavida, null, { timeout: 30000 });
-  await page.locator("#btn-pause").click();
+  await click("#btn-pause");
   await page.waitForTimeout(120);
   assert.equal(await page.evaluate(() => window.__openavida.host), mode, `${mode}: host`);
   // The clock runs from boot until the pause above, and that window is
@@ -73,7 +91,7 @@ async function run(mode) {
   await page.waitForFunction(() => (window.__openavida?.tick ?? -1) <= 1, null, { timeout: 60000 });
 
   // --- Milieu -> Modèle -----------------------------------------------------
-  await page.locator("#tab-environment").click();
+  await click("#tab-environment");
   await page.waitForSelector("#model-form [data-param]");
   const domKeys = await page.evaluate(() =>
     [...document.querySelectorAll("#model-form [data-param]")].map((el) => el.dataset.param),
@@ -95,10 +113,10 @@ async function run(mode) {
   assert.ok(title.length > 10, `${mode}: controls advertise the spec description`);
 
   // Targeting: only world A receives the edit.
-  await page.locator("#model-target").selectOption("A");
+  await pick("#model-target", "A");
   await setParam("nutrientInflow", 0.02);
   await setParam("exudateLeak", 0.3);
-  await page.locator("#model-apply").click();
+  await click("#model-apply");
   await page.waitForTimeout(250);
   const a = await params("A");
   const b = await params("B");
@@ -108,18 +126,18 @@ async function run(mode) {
   assert.match(await status(), /monde A/, `${mode}: the status line names the target`);
 
   // Nothing edited: nothing sent.
-  await page.locator("#model-apply").click();
+  await click("#model-apply");
   await page.waitForTimeout(150);
   assert.match(await status(), /Aucun paramètre modifié/, `${mode}: an empty apply is reported`);
 
   // Values are clamped by the specification, not written through.
   await setParam("maxMealsPerTick", 99);
-  await page.locator("#model-apply").click();
+  await click("#model-apply");
   await page.waitForTimeout(250);
   assert.equal((await params("A")).maxMealsPerTick, 8, `${mode}: an out-of-range value is clamped`);
 
   // The legacy profile approximates the pre-upgrade engine.
-  await page.locator("#model-legacy").click();
+  await click("#model-legacy");
   await page.waitForTimeout(250);
   const legacy = await params("A");
   assert.equal(legacy.senescenceRate, 0, `${mode}: legacy senescence`);
@@ -128,19 +146,19 @@ async function run(mode) {
   assert.equal(legacy.lightDiffusion, 0.22, `${mode}: legacy light diffusion`);
 
   // Defaults restore the published values.
-  await page.locator("#model-reset").click();
+  await click("#model-reset");
   await page.waitForTimeout(250);
   const defaults = await params("A");
   assert.equal(defaults.nutrientInflow, 0.004, `${mode}: defaults restored`);
   assert.equal(defaults.maxMealsPerTick, 1, `${mode}: defaults restored the meal budget`);
 
   // --- Analyse -> Recherche -------------------------------------------------
-  await page.locator("#tab-organisms").click();
-  await page.locator("#kit-phototroph strong").click();
-  await page.locator("#btn-inject").click();
+  await click("#tab-organisms");
+  await click("#kit-phototroph strong");
+  await click("#btn-inject");
   await page.waitForFunction(() => (window.__openavida?.population ?? 0) >= 24, null, { timeout: 15000 });
   await page.evaluate(() => window.__openavidaMutate(120));
-  await page.locator("#tab-inspect").click();
+  await click("#tab-inspect");
   await page.waitForTimeout(700);
   const card = (await page.locator("#research-body").textContent()) ?? "";
   for (const heading of ["SÉLECTION", "DÉRIVE NEUTRE", "FITNESS RÉALISÉE", "DISTRIBUTION DES TRAITS"]) {
@@ -153,8 +171,8 @@ async function run(mode) {
   assert.equal(shownCount, neutral, `${mode}: the card reports the live neutral log (${shownCount} vs ${neutral})`);
 
   // --- Expérience -> Données: the research event log reaches the probe ------
-  await page.locator("#tab-experiment").click();
-  await page.locator("#opt-events").click();
+  await click("#tab-experiment");
+  await click("#opt-events");
   await page.waitForTimeout(150);
   assert.equal(await page.locator("#opt-events input").isChecked(), true, `${mode}: the event toggle is on`);
   await page.evaluate(() => window.__openavidaStep(40));
