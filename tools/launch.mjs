@@ -193,7 +193,10 @@ async function probe(page, label) {
 const browser = await chromium.launch({
   channel: "chrome",
   headless: true,
-  args: process.platform === "darwin" ? ["--use-gl=angle", "--use-angle=metal"] : ["--use-gl=angle"],
+  // Nothing on Linux: Chrome there has no GPU and picks its own software
+  // fallback, which is exactly what the other ten gates rely on. Forcing any
+  // --use-gl backend made the page fail to boot on the runner.
+  args: process.platform === "darwin" ? ["--use-gl=angle", "--use-angle=metal"] : [],
 });
 
 const results = [];

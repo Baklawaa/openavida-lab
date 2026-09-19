@@ -42,6 +42,10 @@ async function run(mode) {
     if (m.type() === "error" && !/favicon/i.test(m.text())) errors.push(m.text());
   });
   const url = `${base}${base.includes("?") ? "&" : "?"}seed=4711${mode === "worker" ? "&worker=1" : ""}`;
+  // The runner needs an order of magnitude more time per step than a laptop,
+  // and the synchronous mutate below blocks the page for tens of seconds, so
+  // Playwright's 30 s default is not enough for the interactions that follow.
+  page.setDefaultTimeout(120000);
   const params = async (side) => page.evaluate((s) => window.__openavidaParams(s), side);
   const status = () => page.locator("#status-line").textContent();
   const setParam = (key, value) =>
