@@ -30,9 +30,12 @@ async function probe(page, label) {
     }
   });
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForSelector("#gl", { state: "attached", timeout: 20000 });
+  // 60 s, not 20: a GitHub-hosted runner boots the bundle and the worker an
+  // order of magnitude slower than a laptop, and this probe only has to know
+  // that the page came up. A fast machine returns immediately either way.
+  await page.waitForSelector("#gl", { state: "attached", timeout: 60000 });
   await page.waitForFunction(() => window.__openavida && window.__openavida.population >= 0, null, {
-    timeout: 20000,
+    timeout: 60000,
   });
   if (/view3d=1/.test(url) || (await page.evaluate(() => window.__openavida?.surface === "3d"))) {
     await page.waitForSelector("#gl3d.on", { timeout: 20000 });

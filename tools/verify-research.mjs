@@ -55,6 +55,14 @@ async function run(mode) {
   await page.locator("#btn-pause").click();
   await page.waitForTimeout(120);
   assert.equal(await page.evaluate(() => window.__openavida.host), mode, `${mode}: host`);
+  // The clock runs from boot until the pause above, and that window is
+  // wall-clock dependent: on a slow CI runner the inline and worker hosts had
+  // already diverged by the first count (4504 against 6471 research events), so
+  // the comparison failed for a reason that has nothing to do with the model.
+  // Restart both worlds from the seed in the URL, then measure.
+  await page.locator("#tab-experiment").click();
+  await page.locator("#btn-reseed").click();
+  await page.waitForFunction(() => (window.__openavida?.tick ?? -1) <= 1, null, { timeout: 20000 });
 
   // --- Milieu -> Modèle -----------------------------------------------------
   await page.locator("#tab-environment").click();
@@ -124,7 +132,7 @@ async function run(mode) {
   await page.locator("#btn-inject").click();
   await page.waitForFunction(() => (window.__openavida?.population ?? 0) >= 24, null, { timeout: 15000 });
   await page.evaluate(() => window.__openavidaMutate(120));
-  await page.locator("#tab-analysis").click();
+  await page.locator("#tab-inspect").click();
   await page.waitForTimeout(700);
   const card = (await page.locator("#research-body").textContent()) ?? "";
   for (const heading of ["SÉLECTION", "DÉRIVE NEUTRE", "FITNESS RÉALISÉE", "DISTRIBUTION DES TRAITS"]) {
