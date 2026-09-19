@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "OpenAvida Lab — browser artificial-evolution laboratory",
+  "license": "MIT",
   "scripts": {
     "dev": "vite --port 5174 --strictPort --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",

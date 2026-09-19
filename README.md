@@ -158,3 +158,7 @@ A bare URL is still the phase-1 2D lab. Enable in the sandbox or via query:
 | LLM brains | `?llm=1` | Optional cost-capped adapter; falls back to baseline |
 
 Inspect always shows named molecules, enzymes, and pathway fluxes derived from the genome and fields (not decorative). The model itself is documented in [docs/model.md](docs/model.md); the evidence log is `workbench.md`.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Marin Lachenaud.
