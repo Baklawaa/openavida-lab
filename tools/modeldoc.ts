@@ -430,7 +430,7 @@ export const LIMITS: readonly LimitEntry[] = [
   },
   {
     gap: "The perf budget is scenario-specific",
-    detail: "The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 1033 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. No single scenario describes the 1100-organism cap.",
+    detail: "The canonical 128 x 128 world (260 founders, seed 0xa7f31ab) is the pinned-hash world: its budget is the 16.67 ms/step 60 fps target. The mature plate (180 founders stepped to tick 400, 677 organisms) and the chemostat carry their own 2.5x-headroom budgets in tests/perf.test.ts, measured by npx vite-node tools/perf.ts. Those two are calibrated on a laptop and a shared CI runner is ~2.5x slower per step, so the workflow sets OPENAVIDA_PERF_BUDGET_SCALE=3 rather than loosening the local gate; the effective budget and scale are printed with every result. No single scenario describes the 1100-organism cap.",
     source: "tests/perf.test.ts, tools/perf.ts",
   },
   {
