@@ -60,9 +60,13 @@ async function run(mode) {
   // already diverged by the first count (4504 against 6471 research events), so
   // the comparison failed for a reason that has nothing to do with the model.
   // Restart both worlds from the seed in the URL, then measure.
-  await page.locator("#tab-experiment").click();
-  await page.locator("#btn-reseed").click();
-  await page.waitForFunction(() => (window.__openavida?.tick ?? -1) <= 1, null, { timeout: 20000 });
+  // Clicked through the DOM on purpose: Playwright's actionability wait costs
+  // 30 s per control on a loaded runner, and this is a hidden panel's button.
+  await page.evaluate(() => {
+    const btn = document.querySelector("#btn-reseed");
+    if (btn instanceof HTMLElement) btn.click();
+  });
+  await page.waitForFunction(() => (window.__openavida?.tick ?? -1) <= 1, null, { timeout: 60000 });
 
   // --- Milieu -> Modèle -----------------------------------------------------
   await page.locator("#tab-environment").click();

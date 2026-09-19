@@ -187,10 +187,13 @@ async function probe(page, label) {
   return { label, errors, before, after, pixel, org, editor, hover, pop0, placed };
 }
 
+// Metal is macOS-only: forcing it on a Linux runner fails WebGL init, the app
+// never publishes its probe and every wait here times out (that is exactly how
+// the first two CI runs failed). Pick the backend the platform can actually do.
 const browser = await chromium.launch({
   channel: "chrome",
   headless: true,
-  args: ["--use-gl=angle", "--use-angle=metal"],
+  args: process.platform === "darwin" ? ["--use-gl=angle", "--use-angle=metal"] : ["--use-gl=angle"],
 });
 
 const results = [];
