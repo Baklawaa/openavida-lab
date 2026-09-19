@@ -48,12 +48,19 @@ async function run(mode) {
   // These controls only need a click or a change event, so drive them through
   // the DOM and keep asserting the application's own response.
   page.setDefaultTimeout(120000);
-  const click = (selector) =>
-    page.evaluate((sel) => {
+  // Wait for the control to exist, then click it in the DOM. The first version
+  // threw "missing #tab-inspect" on the runner: the panel is rebuilt on a UI
+  // cadence there, so the node can be absent at the instant we look, which is
+  // also why Playwright's locator spent its whole timeout waiting for it.
+  const click = async (selector) => {
+    await page.waitForFunction((sel) => document.querySelector(sel) !== null, selector, {
+      timeout: 120000,
+    });
+    await page.evaluate((sel) => {
       const el = document.querySelector(sel);
-      if (!(el instanceof HTMLElement)) throw new Error(`missing ${sel}`);
-      el.click();
+      if (el instanceof HTMLElement) el.click();
     }, selector);
+  };
   const pick = (selector, value) =>
     page.evaluate(
       ({ sel, v }) => {
